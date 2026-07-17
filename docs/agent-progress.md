@@ -2,6 +2,137 @@
 
 ## Status
 
+**done（Admin 表单配置通俗化）** — 预览优先：完整定制/路线私人手机框 + 自动 fieldKey（snake）+ 草稿合并「未保存」角标 + 列表整表预览 + CJK 门闩。已验证 build/lint。
+
+### Progress note（Admin 表单配置通俗化，2026-07-18）
+
+- 目标：执行 `.cursor/plans/admin表单配置通俗化_16d97113.plan.md`。
+- 已读：计划、`CustomTripFormPanel`、`CustomTripPreferenceFields`、分类/路线预览壳、API `fieldKey` 校验（`^[a-z][a-z0-9_]{1,63}$`）。
+- 已改：`formFieldDraft.ts`、`FormConfigMobilePreview.tsx`、`Admin.tsx` CustomTripFormPanel、gotchas/task-board。
+- 已验证：`npm run build` / `npm run lint` 全绿。
+- 未验证：浏览器改 label→预览即时变；勾选路线私人→短表单 Tab；列表整表预览；CJK 拦截（需 Postgres）。
+- 下一步：起库后在 Admin「定制行程表单」验收。
+
+**done（Admin 工作台通俗化）** — 四卡紧急序（取消→询盘→草稿路线→待审素材）+ `dashboardOpsCopy` 文案 + 有数醒目/零淡化；未改 dashboard API。已验证 build/lint。
+
+### Progress note（Admin 工作台通俗化，2026-07-18）
+
+- 目标：执行 `.cursor/plans/admin工作台通俗化_0aa74511.plan.md`。
+- 已改：`dashboardOpsCopy.ts`（新建）；`Admin.tsx` DashboardPanel（重排、文案、有数/零样式）；`agent-gotchas`。
+- 已验证：`npm run build` / `npm run lint` 全绿。
+- 未验证：浏览器有取消/询盘数据时前两卡醒目与跳转筛选；全 0 四卡可点（需 Postgres）。
+- 下一步：起库后在 Admin「工作台」验收。
+
+**done（Admin 路线详情预览对齐）** — `MobileRouteDetailFacade` 扩至 Overview 全文、全部逐日、moments、included；无 Booking CTA；无天数截断。已验证 build/lint。
+
+### Progress note（Admin 路线详情预览对齐，2026-07-18）
+
+- 目标：路线预览与目的地同一口径——内容块全预览，交易 CTA 不预览。
+- 已改：`MobileRouteDetailFacade.tsx`；`routeDraft.draftToRouteTour`（无逐日时仍透出 experience/moments/included 供预览）；gotchas。
+- 已验证：`npm run build` / `npm run lint` 全绿。
+- 未验证：浏览器路线编辑「详情门面」Tab。
+- 下一步：无。
+
+**done（Admin 分类通俗化）** — 运营只填英文显示名/排序/启用；key 自动生成并隐藏；CJK 保存拦截；两套筛选与停用说明。已验证 build/lint。
+
+### Progress note（Admin 分类通俗化，2026-07-18）
+
+- 目标：执行 `.cursor/plans/admin分类通俗化_92aba6f1.plan.md`。
+- 已改：`Admin.tsx` CategoriesPanel（新建自动 key + 末尾排序、编辑高级只读 key、页顶 Places/Routes 说明、列表 key 弱化、CJK 门闩、停用文案）；`agent-gotchas`。
+- 已验证：`npm run build` / `npm run lint` 全绿。
+- 未验证：浏览器新建→自动 key→路线/目的地勾选可见；中文拦截；停用后筛选栏隐藏（需 Postgres）。
+- 下一步：起库后在 Admin「分类」验收。
+
+**done（Admin 素材通俗化）** — 选图器搜索/说明/关联筛；库页新建默认 review + 名称多选关联 + 通过/驳回；工作台待审文案对齐。已验证 build/lint。
+
+### Progress note（Admin 素材通俗化，2026-07-18）
+
+- 目标：执行 `.cursor/plans/admin素材通俗化_9a62b58b.plan.md`；选图上传仍 published；库新建 review。
+- 已读：计划、`ImageFieldPicker`、`MediaPanel`/`emptyMediaDraft`、Dashboard `reviewMedia`、`mediaClient`/`parseMediaInput`。
+- 已改：`ImageFieldPicker.tsx`；`Admin.tsx` MediaPanel + Dashboard 卡；`RouteEditor`/`DestinationEditor` 传 context slug；`agent-gotchas`。
+- 已验证：`npm run build` / `npm run lint` 全绿。
+- 未验证：浏览器选图上传→封面变、库新建待审→通过/驳回、关联勾选往返（需 Postgres）。
+- 下一步：起库后在 Admin「素材」与路线/目的地选图验收。
+
+**done（Admin 目的地真移动预览）** — 390 壳三 Tab + 详情照实反查已发布关联路线（最多 4 条）；空态提示去路线勾选。已验证 build/lint。
+
+### Progress note（Admin 目的地真移动预览，2026-07-18）
+
+- 目标：对齐 `RouteMobilePreview`；详情含「Routes from」只读反查。
+- 已改：`MobileDestinationDetailFacade`（相关路线 + 空态）、`DestinationMobilePreview`（`fetchAdminRoutes` 筛 `destinationSlugs` + published）、`DestinationEditor` 传 token；桌面 `.iosapp-page` 空白已修。
+- 已验证：`npm run build` / `npm run lint`。
+- 未验证：浏览器详情 Tab 有/无关联路线两种空态。
+- 下一步：无（本任务收口）。
+
+**done（Admin 目的地通俗化）** — 快速壳 + 自动 slug + 存草稿/上架 + 首页推荐折叠；新建默认 draft；CJK 上架拦截。预览已升级为真移动组件（见上条）。
+
+### Progress note（Admin 目的地通俗化，2026-07-18）
+
+- 目标：对齐路线快速壳；理清 displayOrder vs featuredPriority；不新开字段。
+- 已读：计划、`DestinationsPanel`、`RouteEditor`/`routeDraft`/`slugify`、`destinationsClient`。
+- 已改：`destinationDraft.ts`、`DestinationEditor.tsx`、`slugify.ts`（`prefix`）、`Admin.tsx` DestinationsPanel、gotchas/task-board。
+- 已验证：`npm run build` / `npm run lint` 全绿（通俗化阶段）。
+- 未验证：浏览器新建→自动 slug→存草稿/上架（需 Postgres）。
+
+**done（Admin 班期通俗化）** — 快速开班 + 任务化状态 + 列表短标签/可买/路线与可售筛/重新上架；不改后端状态枚举。已验证 build/lint。
+
+### Progress note（Admin 班期通俗化，2026-07-18）
+
+- 目标：旅客能否购买一眼可见；锁/关/取消人话确认；目的地显示名称；快速开班 + 更多设置。
+- 已读：计划、`DeparturesPanel`、`orderOpsCopy`/`inquiryOpsCopy`、`destinationsClient`、`admin/departures.ts`。
+- 已改：`departureOpsCopy.ts`、`departureDraft.ts`、`DepartureEditor.tsx`、`Admin.tsx` DeparturesPanel、gotchas/task-board。
+- 已验证：`npm run build` / `npm run lint` 全绿。
+- 未验证：浏览器开班→上架→锁团→重新上架→关闭/取消（需 Postgres）。
+- 下一步：起库后在 Admin「班期」验收。
+
+**done（Admin 订单通俗化）** — 详情改为跟进工单三块（下一步/客人行程金额/支付技术折叠）；双状态人话；取消申请强警示；打开详情 GET 回显备注；列表补支付列与可读时间；工作台取消卡文案对齐。已验证 build/lint。
+
+### Progress note（Admin 订单通俗化，2026-07-18）
+
+- 目标：订单详情从字段 dump → 下一步指引；修点列表 `setNotes('')`；列表支付列；不新增取消批准/退款。
+- 已读：计划、`OrdersPanel`、`InquiryDetail`/`inquiryOpsCopy`、`admin/orders.ts`。
+- 已改：`orderOpsCopy.ts`、`OrderDetail.tsx`、`Admin.tsx` OrdersPanel + Dashboard 取消卡、`admin/orders.ts` `sanitizeOrderForDetail`、gotchas/task-board。
+- 已验证：`npm run build` / `npm run lint` 全绿。
+- 未验证：浏览器 `confirmed+paid` / `cancellation_requested` / `pending_payment` 手测（需 Postgres）。
+- 下一步：起库后在 Admin「订单」验收；班期通俗化另开任务。
+
+**done（本地 Admin 免登录）** — 已建 `app/.env.local`（bypass + allowlist = `dev-admin@syncingtravel.test`）；`/#/admin` 可直接进。Postgres `:5432` 未起 → 工作台 `Admin request failed`（与登录无关）。
+
+### Progress note（本地 Admin 免登录，2026-07-18）
+
+- 已改：`app/.env.local`；`app/.env.local.example` 补 `ADMIN_EMAIL_ALLOWLIST`。
+- 已验证：浏览器 Signed in as `dev-admin@syncingtravel.test`。
+- 下一步：用户起本地 Postgres 后刷新；换邮箱则改 `.env.local` 三处并重启 `npm run dev`。
+
+**done（Admin 询盘通俗化）** — 详情改为跟进工单三块（下一步/意向/技术折叠）；一键改状态；偏好用人话 label；列表时间 `M月D日 HH:mm`。已验证 build/lint。
+
+### Progress note（Admin 询盘通俗化，2026-07-18）
+
+- 目标：详情从字段 dump → 下一步/客人意向/技术折叠；列表时间可读；不改状态枚举、不发信。
+- 已读：计划、`InquiriesPanel`、`inquiriesAdminClient`、`customTripFormClient`。
+- 已改：`inquiryOpsCopy.ts`、`inquiryPreferencesDisplay.ts`、`InquiryDetail.tsx`、`Admin.tsx` InquiriesPanel、gotchas/task-board。
+- 已验证：`npm run build` / `npm run lint` 全绿。
+- 未验证：浏览器三态/三类型手测（需 Postgres）；表单偏好 label 往返。
+- 下一步：起库后在 Admin「询盘」验收；班期通俗化另开任务。
+
+**done（Admin 路线通俗化）** — 快速模式 + 完整编辑 + 内嵌移动真组件预览已落地；新建默认 draft；存草稿/上架；CJK 上架拦截。已验证 build/lint（2026-07-18 再验）。
+
+### Progress note（Admin 路线通俗化，2026-07-18 再验）
+
+- 用户要求执行 `.cursor/plans/admin路线通俗化_ebdfaa4e.plan.md`：对照代码后五项 todo 均已落地，无需重写。
+- 再验：`npm run build` / `npm run lint` 全绿。
+- 浏览器：已配 bypass，Admin UI 可进；数据 API 仍等 Postgres。
+- 下一步：起库后在 Admin「路线」走新建→预览→存草稿/上架；班期/询盘通俗化另开任务。
+
+### Progress note（Admin 路线通俗化，2026-07-18）
+
+- 目标：运营友好的路线编辑（默认快速模式、存草稿/上架、390px 列表卡|详情门面预览）。
+- 已读：计划、`Admin.tsx` RoutesPanel、`ChinaTripsMobile` 列表行/详情英雄、`routesClient`/`destinationsClient`、backfill slugify。
+- 已改：`MobileRouteListCard`/`MobileRouteDetailFacade`；`slugify.ts`/`routeDraft.ts`；`RouteEditor`/`RouteMobilePreview`；`Admin.tsx` RoutesPanel 挂载；`ChinaTripsMobile` 列表行改用抽取件；gotchas/task-board。
+- 已验证：`npm run build` / `npm run lint` 全绿。
+- 未验证：浏览器 Admin 新建→预览→存草稿/上架；中文标题上架拦截；375px China Trips 列表卡视觉。
+- 下一步：用户在 Admin「路线」走一遍验收；班期/询盘通俗化另开任务。
+
 **done（Mini-App 去站点顶栏）** — ≤900px `/china-trips` 不再渲染站点 Navbar/Footer；375 无 logo/汉堡，可见 AppHeader「Syncing Travel」+ 底栏 Tab。已验证 build/lint + 浏览器。
 
 ### Progress note（Mini-App 去站点顶栏，2026-07-18）

@@ -47,6 +47,17 @@ import {
   type SafeOrderSummary,
 } from '@/lib/orderClient';
 import { CustomTripPreferenceSections } from '@/components/CustomTripPreferenceFields';
+import { MobileDestinationCard } from '@/components/mobile/MobileDestinationCard';
+import { MobileDestinationListRow } from '@/components/mobile/MobileDestinationListRow';
+import { MobileRouteListCard } from '@/components/mobile/MobileRouteListCard';
+import {
+  getPlaceBestFor,
+  getPlacePace,
+  getPlacePlanningNote,
+  getPlaceSeason,
+  getPlaceTiming,
+  getPlaceWhy,
+} from '@/lib/placeDetailCopy';
 import { asStringList, formatCancellationPolicy } from '@/lib/departurePolicy';
 import {
   fetchCustomTripFormConfig,
@@ -700,20 +711,14 @@ function DestinationGrid({
           const routeCount = routeTours.filter((tour) => tour.destinationSlugs.includes(destination.slug)).length;
 
           return (
-            <motion.button
-              key={destination.slug}
-              type="button"
-              className="iosapp-destination-card"
-              onClick={() => onOpenPlace(destination.slug)}
-              variants={listRowVariants}
-              whileTap={tapScaleSoft}
-            >
-              <img src={destination.image} alt={destination.name} />
-              <span>
-                <strong>{destination.name}</strong>
-                <small>{routeCount} routes</small>
-              </span>
-            </motion.button>
+            <motion.div key={destination.slug} variants={listRowVariants} whileTap={tapScaleSoft}>
+              <MobileDestinationCard
+                image={destination.image}
+                name={destination.name}
+                routeCount={routeCount}
+                onClick={() => onOpenPlace(destination.slug)}
+              />
+            </motion.div>
           );
         })}
       </motion.div>
@@ -1001,19 +1006,13 @@ function SearchResultsView({
                 <h2 id="search-destinations-title">Destinations</h2>
                 <div className="iosapp-card-list">
                   {destinations.map((destination) => (
-                    <button
+                    <MobileDestinationListRow
                       key={destination.slug}
-                      type="button"
-                      className="iosapp-route-row"
+                      image={destination.image}
+                      name={destination.name}
+                      description={destination.description}
                       onClick={() => onOpenPlace(destination.slug)}
-                    >
-                      <img src={destination.image} alt="" />
-                      <span>
-                        <strong>{destination.name}</strong>
-                        <small>{destination.description}</small>
-                      </span>
-                      <ChevronRight size={18} />
-                    </button>
+                    />
                   ))}
                 </div>
               </section>
@@ -1024,21 +1023,13 @@ function SearchResultsView({
                 <h2 id="search-routes-title">Routes</h2>
                 <div className="iosapp-card-list">
                   {routes.map((tour) => (
-                    <button
+                    <MobileRouteListCard
                       key={tour.slug}
-                      type="button"
-                      className="iosapp-route-row"
+                      image={tour.image}
+                      title={tour.title}
+                      meta={`${tour.duration} · ${tour.category}`}
                       onClick={() => onOpenRoute(tour.slug)}
-                    >
-                      <img src={tour.image} alt="" />
-                      <span>
-                        <strong>{tour.title}</strong>
-                        <small>
-                          {tour.duration} · {tour.category}
-                        </small>
-                      </span>
-                      <ChevronRight size={18} />
-                    </button>
+                    />
                   ))}
                 </div>
               </section>
@@ -1153,21 +1144,14 @@ function DestinationsTab({ onOpenPlace }: { onOpenPlace: (slug: string) => void 
         animate="animate"
       >
         {destinations.map((destination) => (
-          <motion.button
-            key={destination.slug}
-            type="button"
-            className="iosapp-route-row"
-            onClick={() => onOpenPlace(destination.slug)}
-            variants={listRowVariants}
-            whileTap={tapScale}
-          >
-            <img src={destination.image} alt={destination.name} />
-            <span>
-              <strong>{destination.name}</strong>
-              <small>{destination.description}</small>
-            </span>
-            <ChevronRight size={18} />
-          </motion.button>
+          <motion.div key={destination.slug} variants={listRowVariants} whileTap={tapScale}>
+            <MobileDestinationListRow
+              image={destination.image}
+              name={destination.name}
+              description={destination.description}
+              onClick={() => onOpenPlace(destination.slug)}
+            />
+          </motion.div>
         ))}
       </motion.div>
     </motion.div>
@@ -1225,23 +1209,14 @@ function RoutesTab({ onOpenRoute }: { onOpenRoute: (slug: string) => void }) {
         animate="animate"
       >
         {filteredRoutes.map((tour) => (
-          <motion.button
-            key={tour.slug}
-            type="button"
-            className="iosapp-route-row"
-            onClick={() => onOpenRoute(tour.slug)}
-            variants={listRowVariants}
-            whileTap={tapScale}
-          >
-            <img src={tour.image} alt={tour.title} />
-            <span>
-              <strong>{tour.title}</strong>
-              <small>
-                {tour.category} · {tour.duration} · {tour.groupSize}
-              </small>
-            </span>
-            <ChevronRight size={18} />
-          </motion.button>
+          <motion.div key={tour.slug} variants={listRowVariants} whileTap={tapScale}>
+            <MobileRouteListCard
+              image={tour.image}
+              title={tour.title}
+              meta={`${tour.category} · ${tour.duration} · ${tour.groupSize}`}
+              onClick={() => onOpenRoute(tour.slug)}
+            />
+          </motion.div>
         ))}
       </motion.div>
     </motion.div>
@@ -1317,16 +1292,13 @@ function PlaceDetailView({
           </div>
           <div className="iosapp-card-list">
             {tours.slice(0, 4).map((tour) => (
-              <button key={tour.slug} type="button" className="iosapp-route-row" onClick={() => onOpenRoute(tour.slug)}>
-                <img src={tour.image} alt={tour.title} />
-                <span>
-                  <strong>{tour.title}</strong>
-                  <small>
-                    {tour.category} · {tour.duration} · {tour.groupSize}
-                  </small>
-                </span>
-                <ChevronRight size={18} />
-              </button>
+              <MobileRouteListCard
+                key={tour.slug}
+                image={tour.image}
+                title={tour.title}
+                meta={`${tour.category} · ${tour.duration} · ${tour.groupSize}`}
+                onClick={() => onOpenRoute(tour.slug)}
+              />
             ))}
           </div>
         </section>
@@ -1861,48 +1833,6 @@ function cleanRouteDetailText(text: string) {
     .replace(/The extracted PDF itinerary includes/gi, 'The itinerary includes')
     .replace(/extracted from the PDF,\s*/gi, '')
     .replace(/\bPDF\b/gi, 'itinerary');
-}
-
-function getPlaceBestFor(slug: string) {
-  if (['beijing', 'shanghai', 'xian'].includes(slug)) return 'First-time China';
-  if (['western-sichuan', 'qinghai', 'xinjiang', 'tibet', 'guangxi'].includes(slug)) return 'Scenery lovers';
-  if (['chengdu', 'chongqing'].includes(slug)) return 'Food & local life';
-  if (slug === 'gansu') return 'Silk Road culture';
-  return 'Private route planning';
-}
-
-function getPlacePace(slug: string) {
-  if (['western-sichuan', 'qinghai', 'xinjiang', 'tibet', 'gansu'].includes(slug)) return 'Slower';
-  if (['shanghai', 'beijing', 'xian'].includes(slug)) return 'Easy';
-  return 'Flexible';
-}
-
-function getPlaceSeason(slug: string) {
-  if (['xinjiang', 'qinghai', 'western-sichuan', 'tibet'].includes(slug)) return 'May-Oct';
-  if (['beijing', 'xian', 'gansu'].includes(slug)) return 'Spring/Fall';
-  if (slug === 'yunnan') return 'Year-round';
-  return 'Flexible';
-}
-
-function getPlaceWhy(slug: string) {
-  if (slug === 'beijing') return 'The clearest introduction to imperial China, the Great Wall, ritual spaces, hutongs, and classic first-trip pacing.';
-  if (slug === 'shanghai') return 'A polished city break with skyline views, riverfront walks, food, water towns, and easy arrival or departure logistics.';
-  if (slug === 'chengdu') return 'A softer-paced base for pandas, Sichuan food, teahouses, and onward routes into Jiuzhaigou or western Sichuan.';
-  if (slug === 'western-sichuan') return 'Highland scenery, Tibetan villages, snow mountains, Jiuzhaigou, Huanglong, and strong photography value.';
-  if (slug === 'gansu') return 'A Silk Road route area with Mogao Caves, desert scenery, Danxia landforms, and historic trade-route atmosphere.';
-  return 'A strong China route area when the trip is matched to season, transport time, scenery, and traveler pace.';
-}
-
-function getPlaceTiming(slug: string) {
-  if (['western-sichuan', 'qinghai', 'xinjiang', 'tibet'].includes(slug)) return 'Season and road conditions matter.';
-  if (['beijing', 'shanghai', 'xian'].includes(slug)) return 'Works well as an arrival or core city stop.';
-  return 'Flexible with private planning.';
-}
-
-function getPlacePlanningNote(slug: string) {
-  if (['western-sichuan', 'qinghai', 'xinjiang', 'tibet'].includes(slug)) return 'Leave buffer for long drives, altitude, and weather.';
-  if (['beijing', 'shanghai', 'xian'].includes(slug)) return 'Group nearby sights together to avoid rushed days.';
-  return 'Match hotel location and daily pace to your route.';
 }
 
 function FieldHint({ id, message }: { id: string; message?: string }) {

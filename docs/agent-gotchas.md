@@ -38,6 +38,18 @@
 | Shell 若已在 `app/`，`git add app/src/...` 会 pathspec 失败 | `git` 路径相对**仓库根**；在 `app/` 内应 `git add src/...`，或设 `working_directory` 为仓库根再用 `app/src/...` |
 | PowerShell 不能用 bash `$(cat <<'EOF')` 写 commit message | 用 `git commit -m "…"` 或 PowerShell here-string `@'…'@` |
 | `npm run build`/`lint` 报 `tsc`/`eslint` 不是内部命令 | 多半缺 `app/node_modules`；在 `app/` 下 `npm install` 后再 `npm run build`，不要裸 `npx tsc`（会装错包） |
+| Admin 路线编辑又堆回巨型表单 / 英文 CSV | 用 `RouteEditor`（默认快速模式）+ `routeDraft`/`slugify`；目的地勾选名称，勿恢复逗号分隔 slug CSV 为主路径；上架拦中文客文案，存草稿可软警告 |
+| Admin 移动预览与线上列表卡不一致 | 预览必须用 `MobileRouteListCard` / `MobileRouteDetailFacade`（与 China Trips 同源），勿另写一套假卡片 HTML |
+| Admin 路线详情预览缺内容块 | `MobileRouteDetailFacade` 须含 Overview / 全部逐日 / moments / included；不要 Booking CTA；勿只截前 4 天 |
+| Admin 班期又堆回六态裸下拉为主路径 | 用 `DepartureEditor`：快速开班 +「更多设置」；状态靠任务按钮（存草稿/上架/锁关取消确认/重新上架）；结论条看旅客能否买；目的地显示名称；「保证发团」在售卖区，勿与状态混淆 |
+| Admin 目的地又堆回状态裸下拉 / 混排推荐与列表序 | 用 `DestinationEditor`：快速填写 + 存草稿/上架；slug 名称自动；`displayOrder` 在快速区、`featuredPriority` 在「首页推荐」折叠；CJK 上架拦截 |
+| Admin 目的地预览又变成示意卡 | 预览必须用 `DestinationMobilePreview`（390 壳）+ `MobileDestinationCard` / `MobileDestinationListRow` / `MobileDestinationDetailFacade`（与 China Trips 同源），勿另写假卡片 HTML |
+| Admin 详情预览空白（桌面） | `.iosapp-page` 公网默认 `display:none`（≤900 才显示）；预览外包 `admin-mobile-preview-shell` 强制 `display:block` |
+| Admin 订单详情又变字段 dump / 点列表清空备注 | 用 `OrderDetail` 三块（下一步/客人行程金额/支付技术折叠）；打开详情走 `GET ?orderNumber=` 回显 `internal_notes`；勿 `setNotes('')`；取消申请只警示不假装可批准 |
+| Admin 素材待审与选图上传混淆 / 关联又变 slug 逗号串 | 选图器上传 → `published`（立刻封面）；素材页新建 → 默认 `review`，列表「通过/驳回」；关联用目的地/路线名称勾选，≠ 自动换封面；工作台「待审」只计库内入库 |
+| Admin 分类又露出手填 key / 中文显示名 | 运营只填英文显示名+排序+启用；新建 key 由 `slugify`/`slugifyOrFallback` 自动生成并隐藏；编辑 key 仅「高级」只读；CJK 保存/启用拦截；停用不删已勾选内容上的 key |
+| Admin 表单配置又手填 fieldKey / 无旅客预览 | 用 `FormConfigMobilePreview`（完整定制｜路线私人）+ `formFieldDraft`；新建 fieldKey 由 label 转 **snake_case**（非 hyphen slug）自动生成并藏进高级；编辑草稿合并预览带「未保存」角标；列表「整表预览」仅已启用已保存；CJK 拦 label/description；勿做拖拽构建器 |
+| Admin 工作台四卡顺序/文案散落 | 紧急序固定：取消申请 → 待跟进询盘 → 未上架路线 → 待确认素材；文案在 `dashboardOpsCopy`（取消说明复用 `orderOpsCopy`）；有数醒目、零淡化；勿改 `dashboard.ts` 计数或增删卡 |
 
 ## 添加标准
 

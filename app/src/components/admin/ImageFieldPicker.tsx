@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -21,9 +21,20 @@ type ImageFieldPickerProps = {
   onChange: (url: string) => void;
   token: string;
   disabled?: boolean;
+  /** When set, library dialog can filter to media linked to this route. */
+  contextRouteSlug?: string;
+  /** When set, library dialog can filter to media linked to this destination. */
+  contextDestinationSlug?: string;
 };
 
-export function ImageFieldPicker({ value, onChange, token, disabled }: ImageFieldPickerProps) {
+export function ImageFieldPicker({
+  value,
+  onChange,
+  token,
+  disabled,
+  contextRouteSlug,
+  contextDestinationSlug,
+}: ImageFieldPickerProps) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [libraryOpen, setLibraryOpen] = useState(false);
@@ -44,8 +55,8 @@ export function ImageFieldPicker({ value, onChange, token, disabled }: ImageFiel
         publicUrl: presigned.publicUrl,
         title: file.name.replace(/\.[^.]+$/, ''),
         altText: '',
-        destinationSlugs: [],
-        routeSlugs: [],
+        destinationSlugs: contextDestinationSlug ? [contextDestinationSlug] : [],
+        routeSlugs: contextRouteSlug ? [contextRouteSlug] : [],
         tags: [],
         status: 'published',
       });
@@ -70,6 +81,10 @@ export function ImageFieldPicker({ value, onChange, token, disabled }: ImageFiel
           暂无图片
         </div>
       )}
+
+      <p className="text-xs text-muted-foreground">
+        上传后立刻用作封面，同时进入素材库（可用）。在路线/目的地里上传不会增加「待审素材」。
+      </p>
 
       <div className="flex flex-wrap items-center gap-2">
         <label
@@ -123,6 +138,8 @@ export function ImageFieldPicker({ value, onChange, token, disabled }: ImageFiel
         open={libraryOpen}
         onOpenChange={setLibraryOpen}
         token={token}
+        contextRouteSlug={contextRouteSlug}
+        contextDestinationSlug={contextDestinationSlug}
         onSelect={(url) => {
           onChange(url);
           setLibraryOpen(false);
@@ -137,20 +154,33 @@ type MediaLibraryDialogProps = {
   onOpenChange: (open: boolean) => void;
   token: string;
   onSelect: (url: string) => void;
+  contextRouteSlug?: string;
+  contextDestinationSlug?: string;
 };
 
-function MediaLibraryDialog({ open, onOpenChange, token, onSelect }: MediaLibraryDialogProps) {
+function MediaLibraryDialog({
+  open,
+  onOpenChange,
+  token,
+  onSelect,
+  contextRouteSlug,
+  contextDestinationSlug,
+}: MediaLibraryDialogProps) {
   const [media, setMedia] = useState<MediaAsset[]>([]);
   const [error, setError] = useState('');
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [linkedOnly, setLinkedOnly] = useState(false);
+
+  const hasContext = Boolean(contextRouteSlug || contextDestinationSlug);
 
   useEffect(() => {
     if (!open) return;
     let active = true;
-    void fetchAdminMedia(token)
+    void fetchAdminMedia(token, { status: 'published' })
       .then((items) => {
         if (!active) return;
-        setMedia(items.filter((item) => item.type === 'image' && item.status === 'published'));
+        setMedia(items.filter((item) => item.type === 'image'));
         setLoadedFor(token);
       })
       .catch((err) => {
@@ -165,29 +195,70 @@ function MediaLibraryDialog({ open, onOpenChange, token, onSelect }: MediaLibrar
 
   const loading = open && loadedFor !== token && !error;
 
+  const visibleMedia = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return media.filter((item) => {
+      if (query && !item.title.toLowerCase().includes(query)) return false;
+      if (!linkedOnly) return true;
+      if (contextRouteSlug && item.routeSlugs.includes(contextRouteSlug)) return true;
+      if (contextDestinationSlug && item.destinationSlugs.includes(contextDestinationSlug)) {
+        return true;
+      }
+      return false;
+    });
+  }, [media, search, linkedOnly, contextRouteSlug, contextDestinationSlug]);
+
   function handleOpenChange(next: boolean) {
     onOpenChange(next);
     if (!next) {
       setMedia([]);
       setError('');
       setLoadedFor(null);
+      setSearch('');
+      setLinkedOnly(false);
     }
   }
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>从素材库选择</DialogTitle>
-          <DialogDescription>仅显示已发布的图片素材，按最新排序。</DialogDescription>
+          <DialogDescription>
+            仅显示已发布的图片。点选后立刻用作当前封面（不会自动改其它产品图）。
+          </DialogDescription>
         </DialogHeader>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <Input
+            placeholder="按标题搜索"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            className="sm:max-w-xs"
+          />
+          {hasContext ? (
+            <label className="flex items-center gap-2 text-sm text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={linkedOnly}
+                onChange={(event) => setLinkedOnly(event.target.checked)}
+              />
+              只看已关联
+              {contextRouteSlug ? '当前路线' : ''}
+              {contextDestinationSlug ? '当前目的地' : ''}
+            </label>
+          ) : null}
+        </div>
+
         {loading && <p className="text-sm text-muted-foreground">加载中…</p>}
         {error && <p className="text-sm text-destructive">{error}</p>}
-        {!loading && !error && media.length === 0 && (
-          <p className="text-sm text-muted-foreground">素材库暂无已发布的图片。</p>
+        {!loading && !error && visibleMedia.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            {search.trim() || linkedOnly ? '无匹配图片。' : '素材库暂无已发布的图片。'}
+          </p>
         )}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {media.map((item) => (
+          {visibleMedia.map((item) => (
             <button
               key={item.id}
               type="button"
@@ -197,9 +268,9 @@ function MediaLibraryDialog({ open, onOpenChange, token, onSelect }: MediaLibrar
               <img
                 src={item.publicUrl}
                 alt={item.altText || item.title}
-                className="h-28 w-full object-cover"
+                className="aspect-[4/3] h-auto w-full object-cover"
               />
-              <span className="block truncate px-2 py-1 text-xs text-muted-foreground">
+              <span className="block truncate px-2 py-1.5 text-xs text-muted-foreground">
                 {item.title || item.publicUrl}
               </span>
             </button>

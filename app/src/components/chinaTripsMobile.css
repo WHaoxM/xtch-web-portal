@@ -1422,6 +1422,12 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Admin 390px 预览：桌面也要显示详情门面（公网 .iosapp-page 默认 display:none） */
+.admin-mobile-preview-shell .iosapp-page {
+  display: block;
+  min-height: 0;
+}
+
 .iosapp-screen {
   width: min(100%, 430px);
   margin: 0 auto;

@@ -111,7 +111,7 @@ async function handleGetOrderDetail(
     userAgent: getHeaderValue(req.headers['user-agent']),
   });
 
-  res.status(200).json({ ok: true, order });
+  res.status(200).json({ ok: true, order: sanitizeOrderForDetail(order) });
 }
 
 async function handleResendConfirmation(
@@ -209,9 +209,9 @@ function readRouteSnapshot(value: unknown): RouteSnapshotFields {
   };
 }
 
-function sanitizeOrderForList(order: ReturnType<typeof getOrderDetailForAdmin> extends Promise<infer T> ? T : never) {
-  if (!order) return null;
+type AdminOrderRow = NonNullable<Awaited<ReturnType<typeof getOrderDetailForAdmin>>>;
 
+function sanitizeOrderForList(order: AdminOrderRow) {
   const route = readRouteSnapshot(order.route_snapshot);
 
   return {
@@ -233,6 +233,24 @@ function sanitizeOrderForList(order: ReturnType<typeof getOrderDetailForAdmin> e
     route_slug: route.route_slug || '',
     created_at: order.created_at,
     updated_at: order.updated_at,
+  };
+}
+
+/** Detail payload: list fields + notes and Stripe/tech timestamps (no secrets). */
+function sanitizeOrderForDetail(order: AdminOrderRow) {
+  return {
+    ...sanitizeOrderForList(order),
+    internal_notes: order.internal_notes ?? '',
+    stripe_checkout_session_id: order.stripe_checkout_session_id,
+    stripe_payment_intent_id: order.stripe_payment_intent_id,
+    stripe_charge_id: order.stripe_charge_id,
+    stripe_refund_id: order.stripe_refund_id,
+    paid_at: order.paid_at,
+    confirmed_at: order.confirmed_at,
+    cancelled_at: order.cancelled_at,
+    refunded_at: order.refunded_at,
+    cancellation_requested_at: order.cancellation_requested_at,
+    expired_at: order.expired_at,
   };
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import {
@@ -11,8 +11,19 @@ import {
 } from '../lib/authClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ImageFieldPicker } from '@/components/admin/ImageFieldPicker';
+import { InquiryDetail } from '@/components/admin/InquiryDetail';
+import { OrderDetail, type AdminOrderDetail } from '@/components/admin/OrderDetail';
+import { DestinationEditor } from '@/components/admin/DestinationEditor';
+import { FormConfigMobilePreview } from '@/components/admin/FormConfigMobilePreview';
+import { RouteEditor } from '@/components/admin/RouteEditor';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -28,11 +39,56 @@ import {
   fetchAdminCustomTripForm,
   postAdminCustomTripForm,
   type CustomTripFormField,
-  type CustomTripFormOption,
   type FormControlType,
   type FormGroup,
 } from '@/lib/customTripFormClient';
-import { endDateFromDuration, inclusiveDayCount } from '@/lib/dateOnly';
+import {
+  emptyFieldDraft,
+  fieldKeyFromLabel,
+  fieldToDraft,
+  hasFieldCopyCjk,
+  isFieldDraftDirty,
+  mergeDraftIntoFields,
+  parseDefaultValueInput,
+  parseOptionsTextarea,
+  resolveFieldKey,
+  type FieldEditDraft,
+} from '@/lib/formFieldDraft';
+import {
+  DepartureEditor,
+} from '@/components/admin/DepartureEditor';
+import {
+  departureToDraft,
+  emptyDepartureDraft,
+  type AdminDepartureRecord,
+  type DepartureEditDraft,
+} from '@/lib/departureDraft';
+import {
+  canResellDeparture,
+  canRunDangerAction,
+  departureActionConfirm,
+  departureActionLabel,
+  departureStatusLabel,
+  departureStatusShortTag,
+  travelerBuyConclusion,
+  travelerCanBuy,
+  type DepartureDangerAction,
+} from '@/lib/departureOpsCopy';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  destinationToDraft,
+  emptyDestinationDraft,
+  type DestinationEditDraft,
+} from '@/lib/destinationDraft';
 import {
   fetchAdminDestinations,
   postAdminDestination,
@@ -49,10 +105,10 @@ import {
   fetchAdminRoutes,
   postAdminRoute,
   type ContentStatus,
-  type RoutePriceMode,
-  type RoutePrimaryType,
   type RouteRecord,
 } from '@/lib/routesClient';
+import { containsCjk, emptyRouteDraft, routeToDraft, type RouteEditDraft } from '@/lib/routeDraft';
+import { slugify, slugifyOrFallback } from '@/lib/slugify';
 import {
   fetchAdminMedia,
   postAdminMedia,
@@ -65,12 +121,25 @@ import {
 import {
   fetchAdminInquiries,
   fetchAdminInquiry,
-  updateAdminInquiryNotes,
-  updateAdminInquiryStatus,
   type AdminInquiry,
   type AdminInquiryListItem,
-  type InquiryStatus,
 } from '@/lib/inquiriesAdminClient';
+import {
+  formatInquiryDateTime,
+  inquiryStatusLabel,
+  inquiryTypeLabel,
+} from '@/lib/inquiryOpsCopy';
+import {
+  formatOrderDateTime,
+  ORDER_STATUS_LABELS,
+  orderStatusLabel,
+  paymentStatusLabel,
+} from '@/lib/orderOpsCopy';
+import {
+  DASHBOARD_CARD_COPY,
+  DASHBOARD_PAGE_TIP,
+  type DashboardCardKey,
+} from '@/lib/dashboardOpsCopy';
 import { cn } from '@/lib/utils';
 
 const ADMIN_NAV_GROUPS = [
@@ -129,6 +198,8 @@ type AdminOrder = {
   order_number: string;
   status: string;
   payment_status: string;
+  refund_status?: string;
+  confirmation_email_status?: string;
   lead_traveler_name: string;
   lead_email: string;
   adult_quantity: number;
@@ -139,27 +210,7 @@ type AdminOrder = {
   end_date?: string;
   route_slug?: string;
   created_at: string;
-};
-
-type AdminDeparture = {
-  public_id: string;
-  status: string;
-  route_slug: string;
-  route_title: string;
-  destination_slug?: string | null;
-  departure_city: string;
-  start_date: string;
-  end_date: string;
-  available_seats: number;
-  capacity: number;
-  adult_unit_price_cents: number;
-  guaranteed?: boolean;
-  featured_on_home?: boolean;
-  featured_priority?: number;
-  confirmation_rule?: string;
-  included_core_items?: unknown[];
-  excluded_core_items?: unknown[];
-  important_notes?: unknown[];
+  updated_at?: string;
 };
 
 function formatCents(cents: number): string {
@@ -179,49 +230,15 @@ function StatusBadge({ status, label }: { status: string; label?: string }) {
         ? 'secondary'
         : status === 'expired' ||
             status === 'cancelled' ||
+            status === 'cancellation_requested' ||
             status === 'closed' ||
             status === 'sold_out' ||
-            status === 'failed'
+            status === 'failed' ||
+            status === 'refunded'
           ? 'destructive'
           : 'outline';
   return <Badge variant={variant as never}>{label ?? status}</Badge>;
 }
-
-const ORDER_STATUS_LABELS: Record<string, string> = {
-  pending_payment: '待支付',
-  confirmed: '已确认',
-  cancellation_requested: '取消申请中',
-  cancelled: '已取消',
-  refunded: '已退款',
-  failed: '失败',
-  expired: '已过期',
-};
-
-const PAYMENT_STATUS_LABELS: Record<string, string> = {
-  unpaid: '未支付',
-  paid: '已支付',
-  partially_refunded: '部分退款',
-  refunded: '已退款',
-  failed: '支付失败',
-};
-
-const DEPARTURE_STATUS_LABELS: Record<string, string> = {
-  draft: '草稿',
-  sellable: '可售',
-  locked: '已锁团',
-  closed: '已关闭',
-  sold_out: '售罄',
-  cancelled: '已取消',
-};
-
-const DEPARTURE_STATUS_VALUES = [
-  'draft',
-  'sellable',
-  'locked',
-  'closed',
-  'sold_out',
-  'cancelled',
-] as const;
 
 const ORDER_STATUS_FILTER_VALUES = [
   'pending_payment',
@@ -232,44 +249,6 @@ const ORDER_STATUS_FILTER_VALUES = [
   'failed',
   'expired',
 ] as const;
-
-const DEPARTURE_ACTION_LABELS: Record<'lock' | 'close' | 'cancel', string> = {
-  lock: '锁团',
-  close: '关闭',
-  cancel: '取消',
-};
-
-function orderStatusLabel(status: string): string {
-  return ORDER_STATUS_LABELS[status] ?? status;
-}
-
-function paymentStatusLabel(status: string): string {
-  return PAYMENT_STATUS_LABELS[status] ?? status;
-}
-
-function departureStatusLabel(status: string): string {
-  return DEPARTURE_STATUS_LABELS[status] ?? status;
-}
-
-const INQUIRY_STATUS_LABELS: Record<InquiryStatus, string> = {
-  new: '新询盘',
-  in_progress: '跟进中',
-  closed: '已关闭',
-};
-
-const INQUIRY_TYPE_LABELS: Record<string, string> = {
-  quick_contact: '快捷联系',
-  custom_trip: '定制行程',
-  route_private: '路线私人定制',
-};
-
-function inquiryStatusLabel(status: string): string {
-  return INQUIRY_STATUS_LABELS[status as InquiryStatus] ?? status;
-}
-
-function inquiryTypeLabel(type: string): string {
-  return INQUIRY_TYPE_LABELS[type] ?? type;
-}
 
 function inquirySourceSummary(inquiry: {
   requested_tour?: string | null;
@@ -282,20 +261,6 @@ function inquirySourceSummary(inquiry: {
     inquiry.source_path?.trim() ||
     '-'
   );
-}
-
-function formatInquiryValue(value: unknown): string {
-  if (value == null || value === '') return '-';
-  if (Array.isArray(value)) {
-    if (value.length === 0) return '-';
-    return value.map((item) => String(item)).join(', ');
-  }
-  if (typeof value === 'object') {
-    const keys = Object.keys(value as Record<string, unknown>);
-    if (keys.length === 0) return '-';
-    return JSON.stringify(value, null, 2);
-  }
-  return String(value);
 }
 
 function SignInView({ onSignedIn }: { onSignedIn: (session: AuthSession) => void }) {
@@ -466,37 +431,27 @@ function DashboardPanel({
   }, [token]);
 
   const cards: Array<{
-    key: string;
-    title: string;
-    description: string;
+    key: DashboardCardKey;
     count: number | null;
     filter: PendingListFilter;
   }> = [
     {
-      key: 'openInquiries',
-      title: '未关闭询盘',
-      description: '新询盘与跟进中，需及时回复。',
-      count: counts?.openInquiries ?? null,
-      filter: { tab: 'inquiries', status: 'open' },
-    },
-    {
       key: 'cancellationRequestedOrders',
-      title: '取消请求订单',
-      description: '旅客已申请取消，待处理。',
       count: counts?.cancellationRequestedOrders ?? null,
       filter: { tab: 'orders', status: 'cancellation_requested' },
     },
     {
+      key: 'openInquiries',
+      count: counts?.openInquiries ?? null,
+      filter: { tab: 'inquiries', status: 'open' },
+    },
+    {
       key: 'draftRoutes',
-      title: '草稿路线',
-      description: '尚未发布的路线草稿。',
       count: counts?.draftRoutes ?? null,
       filter: { tab: 'routes', status: 'draft' },
     },
     {
       key: 'reviewMedia',
-      title: '待审素材',
-      description: '等待审核的图片或视频。',
       count: counts?.reviewMedia ?? null,
       filter: { tab: 'media', status: 'review' },
     },
@@ -505,7 +460,7 @@ function DashboardPanel({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">今日待办总览。点击卡片进入对应列表并带上默认筛选。</p>
+        <p className="text-sm text-muted-foreground">{DASHBOARD_PAGE_TIP}</p>
         <Button type="button" variant="outline" onClick={() => void loadCounts()} disabled={loading}>
           {loading ? '加载中...' : '刷新'}
         </Button>
@@ -514,20 +469,51 @@ function DashboardPanel({
       {error && <p className="text-destructive">{error}</p>}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {cards.map((card) => (
-          <button
-            key={card.key}
-            type="button"
-            onClick={() => onNavigate(card.filter)}
-            className="rounded-lg border border-border bg-card p-5 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <p className="text-sm font-medium text-foreground">{card.title}</p>
-            <p className="mt-3 text-3xl font-semibold tracking-tight tabular-nums">
-              {loading && counts == null ? '—' : (card.count ?? '—')}
-            </p>
-            <p className="mt-2 text-xs text-muted-foreground">{card.description}</p>
-          </button>
-        ))}
+        {cards.map((card) => {
+          const copy = DASHBOARD_CARD_COPY[card.key];
+          const hasWork = card.count != null && card.count > 0;
+          const isZero = card.count === 0;
+          return (
+            <button
+              key={card.key}
+              type="button"
+              onClick={() => onNavigate(card.filter)}
+              className={cn(
+                'rounded-lg border p-5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                hasWork &&
+                  'border-foreground/30 bg-card shadow-sm ring-1 ring-foreground/10 hover:bg-muted/40',
+                isZero && 'border-border/50 bg-muted/20 text-muted-foreground hover:bg-muted/40',
+                !hasWork && !isZero && 'border-border bg-card hover:bg-muted/50',
+              )}
+            >
+              <p
+                className={cn(
+                  'text-sm font-medium',
+                  hasWork ? 'text-foreground' : 'text-muted-foreground',
+                )}
+              >
+                {copy.title}
+              </p>
+              <p
+                className={cn(
+                  'mt-3 text-3xl font-semibold tracking-tight tabular-nums',
+                  hasWork && 'text-foreground',
+                  isZero && 'text-muted-foreground/70 font-medium',
+                )}
+              >
+                {loading && counts == null ? '—' : (card.count ?? '—')}
+              </p>
+              <p
+                className={cn(
+                  'mt-2 text-xs',
+                  hasWork ? 'text-muted-foreground' : 'text-muted-foreground/80',
+                )}
+              >
+                {copy.description}
+              </p>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -545,10 +531,8 @@ function OrdersPanel({
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
-  const [selectedOrder, setSelectedOrder] = useState<AdminOrder | null>(null);
-  const [notes, setNotes] = useState('');
-  const [actionStatus, setActionStatus] = useState<'idle' | 'loading' | 'done'>('idle');
-  const [actionMessage, setActionMessage] = useState('');
+  const [selectedOrder, setSelectedOrder] = useState<AdminOrderDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   async function fetchOrders() {
     setLoading(true);
@@ -578,57 +562,29 @@ function OrdersPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  async function resendConfirmation(orderNumber: string) {
-    setActionStatus('loading');
-    setActionMessage('');
+  async function openDetail(orderNumber: string) {
+    setDetailLoading(true);
     setError('');
     try {
       const response = await fetch(
-        `/api/admin/orders?orderNumber=${encodeURIComponent(orderNumber)}&action=resend-confirmation`,
+        `/api/admin/orders?orderNumber=${encodeURIComponent(orderNumber)}`,
         {
-          method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
         },
       );
-      if (!response.ok) throw new Error('重发确认邮件失败。');
-      setActionStatus('done');
-      setActionMessage('确认邮件已重发');
-      setTimeout(() => {
-        setActionStatus('idle');
-        setActionMessage('');
-      }, 1500);
+      const result = (await response.json()) as {
+        ok: boolean;
+        order?: AdminOrderDetail;
+        error?: string;
+      };
+      if (!response.ok || !result.ok || !result.order) {
+        throw new Error(result.error || `HTTP ${response.status}`);
+      }
+      setSelectedOrder(result.order);
     } catch (err) {
-      setActionStatus('idle');
-      setError(err instanceof Error ? err.message : '重发确认邮件失败。');
-    }
-  }
-
-  async function updateNotes(orderNumber: string) {
-    setActionStatus('loading');
-    setActionMessage('');
-    setError('');
-    try {
-      const response = await fetch(
-        `/api/admin/orders?orderNumber=${encodeURIComponent(orderNumber)}&action=internal-notes`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'content-type': 'application/json',
-          },
-          body: JSON.stringify({ notes }),
-        },
-      );
-      if (!response.ok) throw new Error('保存备注失败。');
-      setActionStatus('done');
-      setActionMessage('备注已保存');
-      setTimeout(() => {
-        setActionStatus('idle');
-        setActionMessage('');
-      }, 1500);
-    } catch (err) {
-      setActionStatus('idle');
-      setError(err instanceof Error ? err.message : '保存备注失败。');
+      setError(err instanceof Error ? err.message : '无法加载订单详情。');
+    } finally {
+      setDetailLoading(false);
     }
   }
 
@@ -639,93 +595,15 @@ function OrdersPanel({
         backLabel="← 返回列表"
         onBack={() => {
           setSelectedOrder(null);
-          setActionMessage('');
+          void fetchOrders();
         }}
       >
-        {error && <p className="text-destructive">{error}</p>}
-        {actionMessage && <p className="text-sm text-green-600">{actionMessage}</p>}
-
-        <Card>
-          <CardHeader>
-            <CardTitle>订单信息</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-3 text-sm sm:grid-cols-2">
-            <div>
-              <span className="text-muted-foreground">客户：</span>
-              {selectedOrder.lead_traveler_name}
-            </div>
-            <div>
-              <span className="text-muted-foreground">邮箱：</span>
-              {selectedOrder.lead_email}
-            </div>
-            <div>
-              <span className="text-muted-foreground">订单状态：</span>
-              <StatusBadge
-                status={selectedOrder.status}
-                label={orderStatusLabel(selectedOrder.status)}
-              />
-            </div>
-            <div>
-              <span className="text-muted-foreground">支付状态：</span>
-              {paymentStatusLabel(selectedOrder.payment_status)}
-            </div>
-            <div>
-              <span className="text-muted-foreground">金额：</span>
-              {formatCents(selectedOrder.total_price_cents)}
-            </div>
-            <div>
-              <span className="text-muted-foreground">创建时间：</span>
-              {formatDate(selectedOrder.created_at)}
-            </div>
-            <div>
-              <span className="text-muted-foreground">路线：</span>
-              {selectedOrder.route_title || '-'}
-            </div>
-            <div>
-              <span className="text-muted-foreground">出发地：</span>
-              {selectedOrder.departure_city || '-'}
-            </div>
-            <div>
-              <span className="text-muted-foreground">行程日期：</span>
-              {selectedOrder.start_date
-                ? `${formatDate(selectedOrder.start_date)}${selectedOrder.end_date ? ` – ${formatDate(selectedOrder.end_date)}` : ''}`
-                : '-'}
-            </div>
-            <div>
-              <span className="text-muted-foreground">成人数：</span>
-              {selectedOrder.adult_quantity}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>跟进</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Button
-              onClick={() => void resendConfirmation(selectedOrder.order_number)}
-              disabled={actionStatus === 'loading'}
-            >
-              重发确认邮件
-            </Button>
-            <label className="block space-y-2 text-sm">
-              <span className="font-medium">内部备注</span>
-              <Textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={4}
-                placeholder="仅内部可见"
-              />
-            </label>
-            <Button
-              onClick={() => void updateNotes(selectedOrder.order_number)}
-              disabled={actionStatus === 'loading'}
-            >
-              保存备注
-            </Button>
-          </CardContent>
-        </Card>
+        <OrderDetail
+          token={token}
+          order={selectedOrder}
+          onOrderChange={setSelectedOrder}
+          onListRefresh={fetchOrders}
+        />
       </AdminEditShell>
     );
   }
@@ -754,12 +632,13 @@ function OrdersPanel({
             </option>
           ))}
         </select>
-        <Button onClick={() => void fetchOrders()} disabled={loading}>
+        <Button onClick={() => void fetchOrders()} disabled={loading || detailLoading}>
           {loading ? '加载中...' : '搜索'}
         </Button>
       </div>
 
       {error && <p className="text-destructive">{error}</p>}
+      {detailLoading && <p className="text-sm text-muted-foreground">正在打开订单详情…</p>}
 
       <Card>
         <CardContent className="p-0">
@@ -769,35 +648,47 @@ function OrdersPanel({
                 <TableHead>订单号</TableHead>
                 <TableHead>路线</TableHead>
                 <TableHead>状态</TableHead>
+                <TableHead>支付</TableHead>
                 <TableHead>客户</TableHead>
                 <TableHead>金额</TableHead>
                 <TableHead>创建时间</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {orders.map((order) => (
-                <TableRow
-                  key={order.order_number}
-                  className="cursor-pointer"
-                  onClick={() => {
-                    setSelectedOrder(order);
-                    setNotes('');
-                    setActionMessage('');
-                  }}
-                >
-                  <TableCell className="font-medium">{order.order_number}</TableCell>
-                  <TableCell>{order.route_title || '-'}</TableCell>
-                  <TableCell>
-                    <StatusBadge status={order.status} label={orderStatusLabel(order.status)} />
-                  </TableCell>
-                  <TableCell>{order.lead_traveler_name}</TableCell>
-                  <TableCell>{formatCents(order.total_price_cents)}</TableCell>
-                  <TableCell>{formatDate(order.created_at)}</TableCell>
-                </TableRow>
-              ))}
+              {orders.map((order) => {
+                const isCancelRequest = order.status === 'cancellation_requested';
+                return (
+                  <TableRow
+                    key={order.order_number}
+                    className={cn(
+                      'cursor-pointer',
+                      isCancelRequest && 'bg-destructive/5 hover:bg-destructive/10',
+                    )}
+                    onClick={() => void openDetail(order.order_number)}
+                  >
+                    <TableCell className="font-medium">{order.order_number}</TableCell>
+                    <TableCell>{order.route_title || '-'}</TableCell>
+                    <TableCell>
+                      <StatusBadge
+                        status={order.status}
+                        label={orderStatusLabel(order.status)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge
+                        status={order.payment_status}
+                        label={paymentStatusLabel(order.payment_status)}
+                      />
+                    </TableCell>
+                    <TableCell>{order.lead_traveler_name}</TableCell>
+                    <TableCell>{formatCents(order.total_price_cents)}</TableCell>
+                    <TableCell>{formatOrderDateTime(order.created_at)}</TableCell>
+                  </TableRow>
+                );
+              })}
               {orders.length === 0 && !loading && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">
                     {search.trim() || statusFilter ? '无匹配结果' : '暂无订单'}
                   </TableCell>
                 </TableRow>
@@ -825,10 +716,6 @@ function InquiriesPanel({
   const [typeFilter, setTypeFilter] = useState('');
   const [selected, setSelected] = useState<AdminInquiry | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [statusDraft, setStatusDraft] = useState<InquiryStatus>('new');
-  const [notes, setNotes] = useState('');
-  const [actionStatus, setActionStatus] = useState<'idle' | 'loading' | 'done'>('idle');
-  const [actionMessage, setActionMessage] = useState('');
 
   async function fetchInquiries() {
     setLoading(true);
@@ -855,62 +742,13 @@ function InquiriesPanel({
   async function openDetail(id: string) {
     setDetailLoading(true);
     setError('');
-    setActionMessage('');
     try {
       const inquiry = await fetchAdminInquiry(token, id);
       setSelected(inquiry);
-      setStatusDraft(
-        (['new', 'in_progress', 'closed'] as const).includes(inquiry.status as InquiryStatus)
-          ? (inquiry.status as InquiryStatus)
-          : 'new',
-      );
-      setNotes(inquiry.internal_notes ?? '');
     } catch (err) {
       setError(err instanceof Error ? err.message : '无法加载询盘详情。');
     } finally {
       setDetailLoading(false);
-    }
-  }
-
-  async function saveStatus() {
-    if (!selected) return;
-    setActionStatus('loading');
-    setActionMessage('');
-    setError('');
-    try {
-      const inquiry = await updateAdminInquiryStatus(token, selected.id, statusDraft);
-      setSelected(inquiry);
-      setActionStatus('done');
-      setActionMessage('状态已保存');
-      setTimeout(() => {
-        setActionStatus('idle');
-        setActionMessage('');
-      }, 1500);
-      await fetchInquiries();
-    } catch (err) {
-      setActionStatus('idle');
-      setError(err instanceof Error ? err.message : '无法更新询盘状态。');
-    }
-  }
-
-  async function saveNotes() {
-    if (!selected) return;
-    setActionStatus('loading');
-    setActionMessage('');
-    setError('');
-    try {
-      const inquiry = await updateAdminInquiryNotes(token, selected.id, notes);
-      setSelected(inquiry);
-      setNotes(inquiry.internal_notes ?? '');
-      setActionStatus('done');
-      setActionMessage('备注已保存');
-      setTimeout(() => {
-        setActionStatus('idle');
-        setActionMessage('');
-      }, 1500);
-    } catch (err) {
-      setActionStatus('idle');
-      setError(err instanceof Error ? err.message : '无法保存内部备注。');
     }
   }
 
@@ -921,147 +759,15 @@ function InquiriesPanel({
         backLabel="← 返回列表"
         onBack={() => {
           setSelected(null);
-          setActionMessage('');
           void fetchInquiries();
         }}
       >
-        {error && <p className="text-destructive">{error}</p>}
-        {actionMessage && <p className="text-sm text-green-600">{actionMessage}</p>}
-
-        <Card>
-          <CardHeader>
-            <CardTitle>提交信息</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-3 text-sm sm:grid-cols-2">
-            <div>
-              <span className="text-muted-foreground">类型：</span>
-              {inquiryTypeLabel(selected.type)}
-            </div>
-            <div>
-              <span className="text-muted-foreground">状态：</span>
-              {inquiryStatusLabel(selected.status)}
-            </div>
-            <div>
-              <span className="text-muted-foreground">姓名：</span>
-              {selected.name}
-            </div>
-            <div>
-              <span className="text-muted-foreground">邮箱：</span>
-              {selected.email}
-            </div>
-            <div>
-              <span className="text-muted-foreground">电话：</span>
-              {formatInquiryValue(selected.phone)}
-            </div>
-            <div>
-              <span className="text-muted-foreground">出行月份：</span>
-              {formatInquiryValue(selected.travel_month)}
-            </div>
-            <div>
-              <span className="text-muted-foreground">人数：</span>
-              {formatInquiryValue(selected.travelers)}
-            </div>
-            <div>
-              <span className="text-muted-foreground">行程天数：</span>
-              {formatInquiryValue(selected.trip_length)}
-            </div>
-            <div>
-              <span className="text-muted-foreground">预算：</span>
-              {formatInquiryValue(selected.budget)}
-            </div>
-            <div>
-              <span className="text-muted-foreground">酒店等级：</span>
-              {formatInquiryValue(selected.hotel_level)}
-            </div>
-            <div>
-              <span className="text-muted-foreground">旅行风格：</span>
-              {formatInquiryValue(selected.travel_style)}
-            </div>
-            <div>
-              <span className="text-muted-foreground">支持偏好：</span>
-              {formatInquiryValue(selected.support_preference)}
-            </div>
-            <div>
-              <span className="text-muted-foreground">意向路线：</span>
-              {selected.type === 'route_private' && selected.requested_tour?.trim()
-                ? selected.requested_tour.trim()
-                : formatInquiryValue(selected.requested_tour)}
-            </div>
-            <div>
-              <span className="text-muted-foreground">意向目的地：</span>
-              {formatInquiryValue(selected.requested_destination)}
-            </div>
-            <div className="sm:col-span-2">
-              <span className="text-muted-foreground">目的地：</span>
-              {formatInquiryValue(selected.destinations)}
-            </div>
-            <div className="sm:col-span-2">
-              <span className="text-muted-foreground">兴趣：</span>
-              {formatInquiryValue(selected.interests)}
-            </div>
-            <div className="sm:col-span-2">
-              <span className="text-muted-foreground">留言：</span>
-              <p className="mt-1 whitespace-pre-wrap">{formatInquiryValue(selected.message)}</p>
-            </div>
-            <div className="sm:col-span-2">
-              <span className="text-muted-foreground">定制偏好：</span>
-              <pre className="mt-1 overflow-x-auto whitespace-pre-wrap rounded-md bg-muted/40 p-2 text-xs">
-                {formatInquiryValue(selected.custom_preferences)}
-              </pre>
-            </div>
-            <div>
-              <span className="text-muted-foreground">来源路径：</span>
-              {formatInquiryValue(selected.source_path)}
-            </div>
-            <div>
-              <span className="text-muted-foreground">邮件状态：</span>
-              {formatInquiryValue(selected.email_status)}
-            </div>
-            <div>
-              <span className="text-muted-foreground">提交时间：</span>
-              {formatDate(selected.created_at)}
-            </div>
-            <div>
-              <span className="text-muted-foreground">更新时间：</span>
-              {formatDate(selected.updated_at)}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>跟进</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <label className="block space-y-2 text-sm">
-              <span className="font-medium">状态</span>
-              <select
-                className="flex h-10 w-full max-w-xs rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={statusDraft}
-                onChange={(event) => setStatusDraft(event.target.value as InquiryStatus)}
-              >
-                <option value="new">新询盘</option>
-                <option value="in_progress">跟进中</option>
-                <option value="closed">已关闭</option>
-              </select>
-            </label>
-            <Button onClick={() => void saveStatus()} disabled={actionStatus === 'loading'}>
-              保存状态
-            </Button>
-            <label className="block space-y-2 text-sm">
-              <span className="font-medium">内部备注</span>
-              <Textarea
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
-                rows={5}
-                placeholder="仅内部可见，保存后覆盖"
-              />
-            </label>
-            <Button onClick={() => void saveNotes()} disabled={actionStatus === 'loading'}>
-              保存备注
-            </Button>
-          </CardContent>
-        </Card>
+        <InquiryDetail
+          token={token}
+          inquiry={selected}
+          onInquiryChange={setSelected}
+          onListRefresh={fetchInquiries}
+        />
       </AdminEditShell>
     );
   }
@@ -1124,8 +830,12 @@ function InquiriesPanel({
                   className="cursor-pointer"
                   onClick={() => void openDetail(inquiry.id)}
                 >
-                  <TableCell>{formatDate(inquiry.created_at)}</TableCell>
-                  <TableCell>{inquiryTypeLabel(inquiry.type)}</TableCell>
+                  <TableCell className="whitespace-nowrap text-sm">
+                    {formatInquiryDateTime(inquiry.created_at)}
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm font-medium">{inquiryTypeLabel(inquiry.type)}</span>
+                  </TableCell>
                   <TableCell className="font-medium">{inquiry.name}</TableCell>
                   <TableCell>{inquiry.email}</TableCell>
                   <TableCell>
@@ -1161,75 +871,12 @@ function InquiriesPanel({
   );
 }
 
-type DepartureEditDraft = {
-  publicId: string;
-  routeSlug: string;
-  routeTitle: string;
-  destinationSlug: string;
-  departureCity: string;
-  startDate: string;
-  endDate: string;
-  status: string;
-  guaranteed: boolean;
-  adultUnitPriceUsd: string;
-  capacity: string;
-  featuredOnHome: boolean;
-  featuredPriority: string;
-  confirmationRule: string;
-  includedText: string;
-  excludedText: string;
-  notesText: string;
-};
-
-function emptyDepartureDraft(routes: RouteRecord[]): DepartureEditDraft {
-  const firstRoute = routes[0];
-  return {
-    publicId: '',
-    routeSlug: firstRoute?.slug ?? '',
-    routeTitle: firstRoute?.title ?? '',
-    destinationSlug: firstRoute?.destinationSlugs[0] ?? '',
-    departureCity: '',
-    startDate: '',
-    endDate: '',
-    status: 'sellable',
-    guaranteed: true,
-    adultUnitPriceUsd: '',
-    capacity: '8',
-    featuredOnHome: false,
-    featuredPriority: '0',
-    confirmationRule:
-      'Minimum travelers may apply. If the minimum is not met, you will be offered a full refund or a date change.',
-    includedText: 'Hotel accommodation\nDaily breakfast\nLocal guide\nEntrance fees',
-    excludedText: 'International flights\nTravel insurance\nPersonal expenses',
-    notesText: '',
-  };
-}
-
-function departureToDraft(departure: AdminDeparture): DepartureEditDraft {
-  return {
-    publicId: departure.public_id,
-    routeSlug: departure.route_slug,
-    routeTitle: departure.route_title,
-    destinationSlug: departure.destination_slug || '',
-    departureCity: departure.departure_city,
-    startDate: departure.start_date.slice(0, 10),
-    endDate: departure.end_date.slice(0, 10),
-    status: departure.status || 'sellable',
-    guaranteed: Boolean(departure.guaranteed),
-    adultUnitPriceUsd: (departure.adult_unit_price_cents / 100).toFixed(2),
-    capacity: String(departure.capacity),
-    featuredOnHome: Boolean(departure.featured_on_home),
-    featuredPriority: String(departure.featured_priority ?? 0),
-    confirmationRule: departure.confirmation_rule || '',
-    includedText: (departure.included_core_items ?? []).map(String).join('\n'),
-    excludedText: (departure.excluded_core_items ?? []).map(String).join('\n'),
-    notesText: (departure.important_notes ?? []).map(String).join('\n'),
-  };
-}
+type AdminDeparture = AdminDepartureRecord;
 
 function DeparturesPanel({ token }: { token: string }) {
   const [departures, setDepartures] = useState<AdminDeparture[]>([]);
   const [routes, setRoutes] = useState<RouteRecord[]>([]);
+  const [destinations, setDestinations] = useState<Destination[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
@@ -1237,13 +884,21 @@ function DeparturesPanel({ token }: { token: string }) {
   const [actionStatus, setActionStatus] = useState<Record<string, 'idle' | 'loading'>>({});
   const [editing, setEditing] = useState<DepartureEditDraft | null>(null);
   const [isCreate, setIsCreate] = useState(false);
-  /** Last end date we auto-filled; only overwrite end when empty or still equal to this. */
-  const lastAutoEndDateRef = useRef('');
+  const [editingSeats, setEditingSeats] = useState<number | undefined>(undefined);
+  const [routeFilter, setRouteFilter] = useState('');
+  const [saleFilter, setSaleFilter] = useState<'all' | 'sellable' | 'stopped'>('all');
+  const [pendingAction, setPendingAction] = useState<{
+    publicId: string;
+    action: DepartureDangerAction;
+  } | null>(null);
 
   useEffect(() => {
-    fetchAdminRoutes(token)
-      .then(setRoutes)
-      .catch((err) => setError(err instanceof Error ? err.message : '无法加载路线列表。'));
+    Promise.all([fetchAdminRoutes(token), fetchAdminDestinations(token)])
+      .then(([nextRoutes, nextDestinations]) => {
+        setRoutes(nextRoutes);
+        setDestinations(nextDestinations);
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : '无法加载路线或目的地。'));
   }, [token]);
 
   async function fetchDepartures() {
@@ -1275,9 +930,10 @@ function DeparturesPanel({ token }: { token: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  async function runAction(publicId: string, action: 'lock' | 'close' | 'cancel') {
+  async function runAction(publicId: string, action: DepartureDangerAction) {
     setActionStatus((current) => ({ ...current, [`${publicId}:${action}`]: 'loading' }));
     setError('');
+    setPendingAction(null);
     try {
       const response = await fetch(
         `/api/admin/departures?publicId=${encodeURIComponent(publicId)}&action=${action}`,
@@ -1300,7 +956,7 @@ function DeparturesPanel({ token }: { token: string }) {
       } else {
         await fetchDepartures();
       }
-      setStatus(`班期 ${publicId} 已${DEPARTURE_ACTION_LABELS[action]}。`);
+      setStatus(`班期已${departureActionLabel(action)}。`);
     } catch (err) {
       setError(err instanceof Error ? err.message : '操作失败。');
     } finally {
@@ -1308,48 +964,40 @@ function DeparturesPanel({ token }: { token: string }) {
     }
   }
 
-  async function saveDeparture() {
-    if (!editing) return;
+  async function resellDeparture(departure: AdminDeparture) {
     setBusy(true);
     setError('');
     setStatus('');
-    const priceUsd = Number(editing.adultUnitPriceUsd);
-    if (!Number.isFinite(priceUsd) || priceUsd <= 0) {
-      setError('成人单价须为正数（美元）。');
-      setBusy(false);
-      return;
-    }
-
+    const draft = departureToDraft(departure);
     const payload = {
-      action: isCreate ? 'create' : 'update',
-      publicId: editing.publicId || undefined,
-      routeSlug: editing.routeSlug,
-      routeTitle: editing.routeTitle,
-      destinationSlug: editing.destinationSlug || undefined,
-      departureCity: editing.departureCity,
-      startDate: editing.startDate,
-      endDate: editing.endDate,
-      status: editing.status,
-      guaranteed: editing.guaranteed,
-      adultUnitPriceCents: Math.round(priceUsd * 100),
-      capacity: Number(editing.capacity),
-      featuredOnHome: editing.featuredOnHome,
-      featuredPriority: Number(editing.featuredPriority) || 0,
-      confirmationRule: editing.confirmationRule,
-      includedCoreItems: editing.includedText
+      action: 'update',
+      publicId: draft.publicId,
+      routeSlug: draft.routeSlug,
+      routeTitle: draft.routeTitle,
+      destinationSlug: draft.destinationSlug || undefined,
+      departureCity: draft.departureCity,
+      startDate: draft.startDate,
+      endDate: draft.endDate,
+      status: 'sellable',
+      guaranteed: draft.guaranteed,
+      adultUnitPriceCents: Math.round(Number(draft.adultUnitPriceUsd) * 100),
+      capacity: Number(draft.capacity),
+      featuredOnHome: draft.featuredOnHome,
+      featuredPriority: Number(draft.featuredPriority) || 0,
+      confirmationRule: draft.confirmationRule,
+      includedCoreItems: draft.includedText
         .split('\n')
         .map((line) => line.trim())
         .filter(Boolean),
-      excludedCoreItems: editing.excludedText
+      excludedCoreItems: draft.excludedText
         .split('\n')
         .map((line) => line.trim())
         .filter(Boolean),
-      importantNotes: editing.notesText
+      importantNotes: draft.notesText
         .split('\n')
         .map((line) => line.trim())
         .filter(Boolean),
     };
-
     try {
       const response = await fetch('/api/admin/departures', {
         method: 'POST',
@@ -1373,384 +1021,54 @@ function DeparturesPanel({ token }: { token: string }) {
       } else {
         await fetchDepartures();
       }
-      setStatus(isCreate ? '班期已创建。' : '班期已更新。');
-      setEditing(null);
-      setIsCreate(false);
+      setStatus('已重新上架可售。');
     } catch (err) {
-      setError(err instanceof Error ? err.message : '保存班期失败。');
+      setError(err instanceof Error ? err.message : '重新上架失败。');
     } finally {
       setBusy(false);
     }
   }
 
-  function applyRouteSelection(slug: string) {
-    const route = routes.find((item) => item.slug === slug);
-    setEditing((current) => {
-      if (!current) return current;
-      const next = {
-        ...current,
-        routeSlug: slug,
-        routeTitle: route?.title ?? current.routeTitle,
-        destinationSlug: route?.destinationSlugs[0] ?? '',
-        departureCity: current.departureCity || route?.destinationSlugs[0] || '',
-      };
-      const suggested =
-        next.startDate && route?.durationDays
-          ? endDateFromDuration(next.startDate, route.durationDays)
-          : '';
-      const shouldAutoEnd =
-        Boolean(suggested) &&
-        (!next.endDate || next.endDate === lastAutoEndDateRef.current);
-      if (shouldAutoEnd && suggested) {
-        lastAutoEndDateRef.current = suggested;
-        return { ...next, endDate: suggested };
-      }
-      return next;
-    });
-  }
+  const filteredDepartures = departures.filter((departure) => {
+    if (routeFilter && departure.route_slug !== routeFilter) return false;
+    if (saleFilter === 'sellable' && departure.status !== 'sellable') return false;
+    if (saleFilter === 'stopped' && departure.status === 'sellable') return false;
+    return true;
+  });
 
-  function applyStartDate(startDate: string) {
-    setEditing((current) => {
-      if (!current) return current;
-      const route = routes.find((item) => item.slug === current.routeSlug);
-      const suggested =
-        startDate && route?.durationDays
-          ? endDateFromDuration(startDate, route.durationDays)
-          : '';
-      const shouldAutoEnd =
-        Boolean(suggested) &&
-        (!current.endDate || current.endDate === lastAutoEndDateRef.current);
-      if (shouldAutoEnd && suggested) {
-        lastAutoEndDateRef.current = suggested;
-        return { ...current, startDate, endDate: suggested };
-      }
-      return { ...current, startDate };
-    });
-  }
-
-  const selectedRoute = editing
-    ? routes.find((route) => route.slug === editing.routeSlug)
-    : undefined;
-  const destinationOptions = selectedRoute?.destinationSlugs ?? [];
-  const tripDayCount =
-    editing?.startDate && editing?.endDate
-      ? inclusiveDayCount(editing.startDate, editing.endDate)
-      : null;
-  const durationMismatch =
-    Boolean(selectedRoute?.durationDays) &&
-    tripDayCount != null &&
-    tripDayCount !== selectedRoute!.durationDays;
+  const confirmCopy = pendingAction ? departureActionConfirm(pendingAction.action) : null;
 
   if (editing) {
     return (
       <AdminEditShell
-        title={isCreate ? '新建班期' : `编辑：${editing.publicId}`}
+        title={isCreate ? '新建班期' : `编辑：${editing.publicId || '班期'}`}
         backLabel="← 返回列表"
         onBack={() => {
           setEditing(null);
           setIsCreate(false);
+          setEditingSeats(undefined);
         }}
       >
-        {error && <p className="text-destructive">{error}</p>}
-        <Card>
-          <CardHeader>
-            <CardTitle>{isCreate ? '新建班期' : `编辑：${editing.publicId}`}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <FormSection title="关联与行程" description="绑定路线、目的地与出行日期。">
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="space-y-2 text-sm md:col-span-2">
-                  <span>路线</span>
-                  <select
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={editing.routeSlug}
-                    onChange={(event) => applyRouteSelection(event.target.value)}
-                  >
-                    {routes.map((route) => (
-                      <option key={route.slug} value={route.slug}>
-                        {route.title}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {!isCreate && (
-                  <label className="space-y-2 text-sm">
-                    <span>班期 ID</span>
-                    <Input value={editing.publicId} disabled />
-                  </label>
-                )}
-                {isCreate && (
-                  <label className="space-y-2 text-sm">
-                    <span>班期 ID（可选）</span>
-                    <Input
-                      value={editing.publicId}
-                      placeholder="留空则自动生成"
-                      onChange={(event) =>
-                        setEditing((current) =>
-                          current ? { ...current, publicId: event.target.value } : current,
-                        )
-                      }
-                    />
-                  </label>
-                )}
-                <label className="space-y-2 text-sm">
-                  <span>目的地</span>
-                  {destinationOptions.length > 0 ? (
-                    <select
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      value={editing.destinationSlug}
-                      onChange={(event) =>
-                        setEditing((current) =>
-                          current
-                            ? { ...current, destinationSlug: event.target.value }
-                            : current,
-                        )
-                      }
-                    >
-                      {destinationOptions.map((slug) => (
-                        <option key={slug} value={slug}>
-                          {slug}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <Input
-                      value={editing.destinationSlug}
-                      onChange={(event) =>
-                        setEditing((current) =>
-                          current
-                            ? { ...current, destinationSlug: event.target.value }
-                            : current,
-                        )
-                      }
-                      placeholder="目的地 slug"
-                    />
-                  )}
-                  <FieldHint>关联目的地；通常随路线自动带出。</FieldHint>
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span>出发城市</span>
-                  <Input
-                    value={editing.departureCity}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, departureCity: event.target.value } : current,
-                      )
-                    }
-                  />
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span>开始日期</span>
-                  <Input
-                    type="date"
-                    value={editing.startDate}
-                    onChange={(event) => applyStartDate(event.target.value)}
-                  />
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span>结束日期</span>
-                  <Input
-                    type="date"
-                    value={editing.endDate}
-                    onChange={(event) => {
-                      lastAutoEndDateRef.current = '';
-                      setEditing((current) =>
-                        current ? { ...current, endDate: event.target.value } : current,
-                      );
-                    }}
-                  />
-                  <FieldHint>
-                    结束日默认按路线天数推算（开始日 + {selectedRoute?.durationDays ?? 'N'} − 1）。可改。
-                  </FieldHint>
-                </label>
-                {durationMismatch && (
-                  <p className="text-sm text-amber-700 md:col-span-2" role="status">
-                    与路线 {selectedRoute?.durationDays} 天不一致（当前 {tripDayCount}{' '}
-                    天），确认后仍可保存。
-                  </p>
-                )}
-              </div>
-            </FormSection>
-
-            <FormSection title="售卖与库存" description="控制是否可售、价格与名额。">
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="space-y-2 text-sm">
-                  <span>班期状态</span>
-                  <select
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={editing.status}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, status: event.target.value } : current,
-                      )
-                    }
-                  >
-                    {DEPARTURE_STATUS_VALUES.map((value) => (
-                      <option key={value} value={value}>
-                        {DEPARTURE_STATUS_LABELS[value]}
-                      </option>
-                    ))}
-                  </select>
-                  <FieldHint>
-                    仅「可售」可被旅客下单；锁团/关闭/售罄/取消后不可新订。
-                  </FieldHint>
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span>成人单价（美元）</span>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={editing.adultUnitPriceUsd}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, adultUnitPriceUsd: event.target.value } : current,
-                      )
-                    }
-                  />
-                  <FieldHint>界面按美元填写；入库为美分（自动 ×100）。</FieldHint>
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span>容量（总名额）</span>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={editing.capacity}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, capacity: event.target.value } : current,
-                      )
-                    }
-                  />
-                  <FieldHint>本团总座位数；剩余名额 = 容量 − 已订。</FieldHint>
-                </label>
-                <label className="flex items-start gap-2 text-sm md:col-span-2">
-                  <input
-                    type="checkbox"
-                    className="mt-1"
-                    checked={editing.guaranteed}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, guaranteed: event.target.checked } : current,
-                      )
-                    }
-                  />
-                  <span>
-                    保证成团
-                    <FieldHint>
-                      勾选表示该班期保证发团；与「班期状态」无关，勿与可售混淆。
-                    </FieldHint>
-                  </span>
-                </label>
-              </div>
-            </FormSection>
-
-            <FormSection title="首页推荐" description="控制是否进入移动端首页热门拼团。">
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="flex items-start gap-2 text-sm md:col-span-2">
-                  <input
-                    type="checkbox"
-                    className="mt-1"
-                    checked={editing.featuredOnHome}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, featuredOnHome: event.target.checked } : current,
-                      )
-                    }
-                  />
-                  <span>
-                    首页推荐
-                    <FieldHint>
-                      勾选后可出现在移动端首页；还需状态为「可售」且有剩余名额。
-                    </FieldHint>
-                  </span>
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span>推荐优先级</span>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={editing.featuredPriority}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, featuredPriority: event.target.value } : current,
-                      )
-                    }
-                  />
-                  <FieldHint>仅作用于首页推荐列表；数字越小越靠前。</FieldHint>
-                </label>
-              </div>
-            </FormSection>
-
-            <FormSection title="旅客可见说明" description="展示在班期/下单相关页的英文文案（内容值仍英文）。">
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="space-y-2 text-sm md:col-span-2">
-                  <span>确认规则</span>
-                  <Textarea
-                    value={editing.confirmationRule}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, confirmationRule: event.target.value } : current,
-                      )
-                    }
-                  />
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span>费用包含（每行一条）</span>
-                  <Textarea
-                    rows={5}
-                    value={editing.includedText}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, includedText: event.target.value } : current,
-                      )
-                    }
-                  />
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span>费用不含（每行一条）</span>
-                  <Textarea
-                    rows={5}
-                    value={editing.excludedText}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, excludedText: event.target.value } : current,
-                      )
-                    }
-                  />
-                </label>
-                <label className="space-y-2 text-sm md:col-span-2">
-                  <span>重要提示（每行一条）</span>
-                  <Textarea
-                    rows={3}
-                    value={editing.notesText}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, notesText: event.target.value } : current,
-                      )
-                    }
-                  />
-                </label>
-              </div>
-            </FormSection>
-
-            <div className="flex gap-2">
-              <Button onClick={() => void saveDeparture()} disabled={busy}>
-                {busy ? '保存中…' : isCreate ? '创建班期' : '保存修改'}
-              </Button>
-              <Button
-                variant="outline"
-                disabled={busy}
-                onClick={() => {
-                  setEditing(null);
-                  setIsCreate(false);
-                }}
-              >
-                取消
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <DepartureEditor
+          token={token}
+          initialDraft={editing}
+          isCreate={isCreate}
+          routes={routes}
+          destinations={destinations}
+          availableSeats={editingSeats}
+          onCancel={() => {
+            setEditing(null);
+            setIsCreate(false);
+            setEditingSeats(undefined);
+          }}
+          onSaved={(message) => {
+            setStatus(message);
+            setEditing(null);
+            setIsCreate(false);
+            setEditingSeats(undefined);
+            void fetchDepartures();
+          }}
+        />
       </AdminEditShell>
     );
   }
@@ -1759,16 +1077,16 @@ function DeparturesPanel({ token }: { token: string }) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          管理可售班期与首页热门拼团。首页推荐需状态为「可售」且有剩余名额才会展示。
+          快速开班后上架可售；锁团可恢复，关闭/取消不提供一键开卖。
         </p>
         <div className="flex gap-2">
           <Button
             variant="outline"
             disabled={busy || loading}
             onClick={() => {
-              lastAutoEndDateRef.current = '';
               setIsCreate(true);
-              setEditing(emptyDepartureDraft(routes));
+              setEditingSeats(undefined);
+              setEditing(emptyDepartureDraft(routes, destinations));
             }}
           >
             新建班期
@@ -1777,6 +1095,38 @@ function DeparturesPanel({ token }: { token: string }) {
             {loading ? '加载中...' : '刷新'}
           </Button>
         </div>
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        <label className="space-y-1 text-sm">
+          <span className="text-muted-foreground">路线</span>
+          <select
+            className="flex h-10 min-w-[12rem] rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={routeFilter}
+            onChange={(event) => setRouteFilter(event.target.value)}
+          >
+            <option value="">全部路线</option>
+            {routes.map((route) => (
+              <option key={route.slug} value={route.slug}>
+                {route.title}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="space-y-1 text-sm">
+          <span className="text-muted-foreground">售卖</span>
+          <select
+            className="flex h-10 min-w-[8rem] rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={saleFilter}
+            onChange={(event) =>
+              setSaleFilter(event.target.value as 'all' | 'sellable' | 'stopped')
+            }
+          >
+            <option value="all">全部</option>
+            <option value="sellable">可售</option>
+            <option value="stopped">停售</option>
+          </select>
+        </label>
       </div>
 
       {error && <p className="text-destructive">{error}</p>}
@@ -1791,6 +1141,7 @@ function DeparturesPanel({ token }: { token: string }) {
                 <TableHead>出发城市</TableHead>
                 <TableHead>日期</TableHead>
                 <TableHead>状态</TableHead>
+                <TableHead>旅客能否买</TableHead>
                 <TableHead>名额</TableHead>
                 <TableHead>单价</TableHead>
                 <TableHead>首页</TableHead>
@@ -1798,82 +1149,100 @@ function DeparturesPanel({ token }: { token: string }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {departures.map((departure) => (
-                <TableRow key={departure.public_id}>
-                  <TableCell className="font-medium">
-                    <div>{departure.route_title}</div>
-                    <div className="font-mono text-xs text-muted-foreground">{departure.public_id}</div>
-                  </TableCell>
-                  <TableCell>{departure.departure_city}</TableCell>
-                  <TableCell>
-                    {formatDate(departure.start_date)} - {formatDate(departure.end_date)}
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge
-                      status={departure.status}
-                      label={departureStatusLabel(departure.status)}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    {departure.available_seats} / {departure.capacity}
-                  </TableCell>
-                  <TableCell>{formatCents(departure.adult_unit_price_cents)}</TableCell>
-                  <TableCell>
-                    {departure.featured_on_home ? (
-                      <Badge>P{departure.featured_priority ?? 0}</Badge>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={busy}
-                        onClick={() => {
-                          setIsCreate(false);
-                          const draft = departureToDraft(departure);
-                          const route = routes.find((item) => item.slug === draft.routeSlug);
-                          const suggested =
-                            draft.startDate && route?.durationDays
-                              ? endDateFromDuration(draft.startDate, route.durationDays)
-                              : '';
-                          lastAutoEndDateRef.current =
-                            suggested && draft.endDate === suggested ? suggested : '';
-                          setEditing(draft);
-                        }}
-                      >
-                        编辑
-                      </Button>
-                      {(['lock', 'close', 'cancel'] as const).map((action) => (
+              {filteredDepartures.map((departure) => {
+                const shortTag = departureStatusShortTag(departure.status);
+                const canBuy = travelerCanBuy(departure.status, departure.available_seats);
+                const buy = travelerBuyConclusion(departure.status, departure.available_seats);
+                return (
+                  <TableRow key={departure.public_id}>
+                    <TableCell className="font-medium">
+                      <div>{departure.route_title}</div>
+                      <div className="font-mono text-xs text-muted-foreground">
+                        {departure.public_id}
+                      </div>
+                    </TableCell>
+                    <TableCell>{departure.departure_city}</TableCell>
+                    <TableCell>
+                      {formatDate(departure.start_date)} - {formatDate(departure.end_date)}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap items-center gap-1">
+                        <StatusBadge
+                          status={departure.status}
+                          label={departureStatusLabel(departure.status)}
+                        />
+                        {shortTag ? (
+                          <span className="text-xs text-muted-foreground">{shortTag}</span>
+                        ) : null}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className={canBuy ? 'text-green-700' : 'text-muted-foreground'}>
+                        {canBuy ? '是' : '否'}
+                      </span>
+                      {!canBuy && buy.detail.includes('售罄') ? (
+                        <div className="text-xs text-muted-foreground">售罄</div>
+                      ) : null}
+                    </TableCell>
+                    <TableCell>
+                      {departure.available_seats} / {departure.capacity}
+                    </TableCell>
+                    <TableCell>{formatCents(departure.adult_unit_price_cents)}</TableCell>
+                    <TableCell>
+                      {departure.featured_on_home ? (
+                        <Badge>P{departure.featured_priority ?? 0}</Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-2">
                         <Button
-                          key={action}
                           size="sm"
                           variant="outline"
-                          title={
-                            action === 'lock'
-                              ? '锁团：停止新订，已有订单保留'
-                              : action === 'close'
-                                ? '关闭：班期结束售卖'
-                                : '取消：整团取消'
-                          }
-                          disabled={
-                            departure.status !== 'sellable' ||
-                            actionStatus[`${departure.public_id}:${action}`] === 'loading'
-                          }
-                          onClick={() => void runAction(departure.public_id, action)}
+                          disabled={busy}
+                          onClick={() => {
+                            setIsCreate(false);
+                            setEditingSeats(departure.available_seats);
+                            setEditing(departureToDraft(departure));
+                          }}
                         >
-                          {DEPARTURE_ACTION_LABELS[action]}
+                          编辑
                         </Button>
-                      ))}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {departures.length === 0 && !loading && (
+                        {canResellDeparture(departure.status) && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={busy}
+                            onClick={() => void resellDeparture(departure)}
+                          >
+                            重新上架
+                          </Button>
+                        )}
+                        {canRunDangerAction(departure.status) &&
+                          (['lock', 'close', 'cancel'] as const).map((action) => (
+                            <Button
+                              key={action}
+                              size="sm"
+                              variant="outline"
+                              disabled={
+                                actionStatus[`${departure.public_id}:${action}`] === 'loading'
+                              }
+                              onClick={() =>
+                                setPendingAction({ publicId: departure.public_id, action })
+                              }
+                            >
+                              {departureActionLabel(action)}
+                            </Button>
+                          ))}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+              {filteredDepartures.length === 0 && !loading && (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center text-muted-foreground">
                     暂无班期
                   </TableCell>
                 </TableRow>
@@ -1882,58 +1251,46 @@ function DeparturesPanel({ token }: { token: string }) {
           </Table>
         </CardContent>
       </Card>
+
+      <AlertDialog
+        open={pendingAction != null}
+        onOpenChange={(open) => {
+          if (!open) setPendingAction(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmCopy?.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmCopy?.body}
+              {confirmCopy?.shortTag ? `（${confirmCopy.shortTag}）` : ''}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>再想想</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                if (pendingAction) {
+                  void runAction(pendingAction.publicId, pendingAction.action);
+                }
+              }}
+            >
+              确认{pendingAction ? departureActionLabel(pendingAction.action) : ''}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
+
 
 function formatDefaultSummary(field: CustomTripFormField): string {
   const value = field.defaultValue;
   if (Array.isArray(value)) return value.length ? value.join(', ') : '(empty)';
   if (value == null || value === '') return '(empty)';
   return String(value);
-}
-
-function optionsToTextarea(options: CustomTripFormOption[]): string {
-  return options
-    .slice()
-    .sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label))
-    .map((option) => `${option.optionKey}|${option.label}|${option.enabled ? 'enabled' : 'disabled'}`)
-    .join('\n');
-}
-
-function parseOptionsTextarea(text: string): CustomTripFormOption[] {
-  return text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line, index) => {
-      const [optionKey = '', label = '', enabledRaw = 'enabled'] = line.split('|').map((part) => part.trim());
-      const enabled = enabledRaw.toLowerCase() !== 'disabled' && enabledRaw !== '0' && enabledRaw !== 'false';
-      return {
-        id: '',
-        optionKey,
-        label: label || optionKey,
-        sortOrder: index,
-        enabled,
-      };
-    });
-}
-
-function defaultValueToEditString(field: CustomTripFormField): string {
-  if (field.controlType === 'multi_select') {
-    return Array.isArray(field.defaultValue) ? field.defaultValue.map(String).join(', ') : '';
-  }
-  return field.defaultValue == null ? '' : String(field.defaultValue);
-}
-
-function parseDefaultValueInput(controlType: FormControlType, raw: string): unknown {
-  if (controlType === 'multi_select') {
-    return raw
-      .split(',')
-      .map((item) => item.trim())
-      .filter(Boolean);
-  }
-  return raw;
 }
 
 const CUSTOM_TRIP_CONTROL_LABELS: Record<FormControlType, string> = {
@@ -1949,65 +1306,27 @@ const CUSTOM_TRIP_GROUP_LABELS: Record<FormGroup, string> = {
   more: '更多偏好',
 };
 
-type FieldEditDraft = {
-  id: string;
-  fieldKey: string;
-  label: string;
-  description: string;
-  controlType: FormControlType;
-  formGroup: FormGroup;
-  required: boolean;
-  sortOrder: number;
-  enabled: boolean;
-  keyLocked: boolean;
-  useOnRoutePrivate: boolean;
-  defaultValueText: string;
-  optionsText: string;
-};
-
-function emptyFieldDraft(): FieldEditDraft {
-  return {
-    id: '',
-    fieldKey: '',
-    label: '',
-    description: '',
-    controlType: 'single_select',
-    formGroup: 'more',
-    required: false,
-    sortOrder: 100,
-    enabled: true,
-    keyLocked: false,
-    useOnRoutePrivate: false,
-    defaultValueText: '',
-    optionsText: '',
-  };
-}
-
-function fieldToDraft(field: CustomTripFormField): FieldEditDraft {
-  return {
-    id: field.id,
-    fieldKey: field.fieldKey,
-    label: field.label,
-    description: field.description,
-    controlType: field.controlType,
-    formGroup: field.formGroup,
-    required: field.required,
-    sortOrder: field.sortOrder,
-    enabled: field.enabled,
-    keyLocked: field.keyLocked,
-    useOnRoutePrivate: Boolean(field.useOnRoutePrivate),
-    defaultValueText: defaultValueToEditString(field),
-    optionsText: optionsToTextarea(field.options),
-  };
-}
-
 function CustomTripFormPanel({ token }: { token: string }) {
   const [fields, setFields] = useState<CustomTripFormField[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
+  const [warning, setWarning] = useState('');
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<FieldEditDraft | null>(null);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [listPreviewOpen, setListPreviewOpen] = useState(false);
+  const [widePreview, setWidePreview] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 1100px)').matches : true,
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1100px)');
+    const onChange = () => setWidePreview(mq.matches);
+    onChange();
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
 
   async function loadFields() {
     setLoading(true);
@@ -2027,6 +1346,42 @@ function CustomTripFormPanel({ token }: { token: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
+  const previewFields = useMemo(() => mergeDraftIntoFields(fields, editing), [fields, editing]);
+  const savedField = editing?.id ? fields.find((field) => field.id === editing.id) : undefined;
+  const unsavedPreview = Boolean(editing && isFieldDraftDirty(editing, savedField));
+  const previewDefaultMode = editing?.useOnRoutePrivate ? 'routePrivate' : 'full';
+  const listPreviewFields = useMemo(() => fields.filter((field) => field.enabled), [fields]);
+  const previewKey =
+    editing &&
+    (editing.fieldKey.trim() ||
+      (editing.label.trim() ? fieldKeyFromLabel(editing.label) || 'field_…' : '（自动生成）'));
+
+  function onLabelChange(label: string) {
+    setEditing((current) => {
+      if (!current) return current;
+      if (current.id || current.keyLocked) {
+        return { ...current, label };
+      }
+      return { ...current, label, fieldKey: fieldKeyFromLabel(label) };
+    });
+  }
+
+  function startCreate() {
+    setError('');
+    setStatus('');
+    setWarning('');
+    setAdvancedOpen(false);
+    setEditing(emptyFieldDraft((fields[fields.length - 1]?.sortOrder ?? 0) + 10));
+  }
+
+  function startEdit(field: CustomTripFormField) {
+    setError('');
+    setStatus('');
+    setWarning('');
+    setAdvancedOpen(false);
+    setEditing(fieldToDraft(field));
+  }
+
   async function setEnabled(field: CustomTripFormField, enabled: boolean) {
     setBusy(true);
     setError('');
@@ -2037,7 +1392,7 @@ function CustomTripFormPanel({ token }: { token: string }) {
         id: field.id,
         enabled,
       });
-      setStatus(`${field.fieldKey} 已${enabled ? '启用' : '停用'}。`);
+      setStatus(`「${field.label || field.fieldKey}」已${enabled ? '启用' : '停用'}。`);
       await loadFields();
     } catch (err) {
       setError(err instanceof Error ? err.message : '更新字段失败。');
@@ -2075,9 +1430,24 @@ function CustomTripFormPanel({ token }: { token: string }) {
 
   async function saveField() {
     if (!editing) return;
-    setBusy(true);
     setError('');
     setStatus('');
+    setWarning('');
+
+    if (!editing.label.trim()) {
+      setError('请填写旅客可见标题（英文）。');
+      return;
+    }
+
+    if (hasFieldCopyCjk(editing)) {
+      setWarning('标题或说明疑似含中文。旅客表单会直接显示这段文案，请改为英文。');
+      setError('已拦截：标题或说明含中文。请改为英文后再保存。');
+      return;
+    }
+
+    const fieldKey = resolveFieldKey(editing);
+
+    setBusy(true);
     try {
       const existing = fields.find((field) => field.id === editing.id);
       const idByKey = new Map(
@@ -2090,8 +1460,8 @@ function CustomTripFormPanel({ token }: { token: string }) {
       await postAdminCustomTripForm(token, {
         action: 'save-field',
         ...(editing.id ? { id: editing.id } : {}),
-        fieldKey: editing.fieldKey,
-        label: editing.label,
+        fieldKey,
+        label: editing.label.trim(),
         description: editing.description,
         controlType: editing.controlType,
         required: editing.required,
@@ -2102,7 +1472,7 @@ function CustomTripFormPanel({ token }: { token: string }) {
         useOnRoutePrivate: editing.useOnRoutePrivate,
         options,
       });
-      setStatus(`${editing.fieldKey} 已保存。`);
+      setStatus(`「${editing.label.trim()}」已保存。`);
       setEditing(null);
       await loadFields();
     } catch (err) {
@@ -2114,241 +1484,277 @@ function CustomTripFormPanel({ token }: { token: string }) {
 
   if (editing) {
     const isCreate = !editing.id;
+    const cjkWarning = hasFieldCopyCjk(editing)
+      ? '标题或说明疑似含中文。旅客表单会直接显示这段文案，请改为英文。'
+      : '';
+
+    const editorCard = (
+      <Card>
+        <CardHeader>
+          <CardTitle>{isCreate ? '新建偏好字段' : `编辑：${editing.label || editing.fieldKey}`}</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            运营填写旅客可见英文文案；系统字段键自动生成。右侧可即时预览旅客侧控件。
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {error && <p className="text-destructive">{error}</p>}
+          {warning && <p className="rounded-md bg-amber-100 p-2 text-sm text-amber-900">{warning}</p>}
+          {cjkWarning && !warning && (
+            <p className="rounded-md bg-amber-100 p-2 text-sm text-amber-900">{cjkWarning}</p>
+          )}
+
+          <FormSection title="旅客可见" description="显示在询盘偏好区；请用英文。">
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="space-y-2 text-sm md:col-span-2">
+                <span>标题（英文）</span>
+                <Input
+                  value={editing.label}
+                  placeholder="例如 Hotel level"
+                  onChange={(event) => onLabelChange(event.target.value)}
+                />
+                <FieldHint>
+                  旅客看到的问题标题。新建时系统会据此自动生成内部字段键
+                  {previewKey ? `（${previewKey}）` : ''}。
+                </FieldHint>
+              </label>
+              <label className="space-y-2 text-sm md:col-span-2">
+                <span>说明（英文，可选）</span>
+                <Textarea
+                  value={editing.description}
+                  onChange={(event) =>
+                    setEditing((current) =>
+                      current ? { ...current, description: event.target.value } : current,
+                    )
+                  }
+                />
+              </label>
+              <label className="space-y-2 text-sm">
+                <span>定制表单分组</span>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={editing.formGroup}
+                  onChange={(event) =>
+                    setEditing((current) =>
+                      current
+                        ? { ...current, formGroup: event.target.value as FormGroup }
+                        : current,
+                    )
+                  }
+                >
+                  {(['basic', 'more'] as FormGroup[]).map((value) => (
+                    <option key={value} value={value}>
+                      {CUSTOM_TRIP_GROUP_LABELS[value]}
+                    </option>
+                  ))}
+                </select>
+                <FieldHint>完整定制里出现在「基础信息」还是「更多偏好」。</FieldHint>
+              </label>
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={editing.useOnRoutePrivate}
+                  onChange={(event) =>
+                    setEditing((current) =>
+                      current ? { ...current, useOnRoutePrivate: event.target.checked } : current,
+                    )
+                  }
+                />
+                <span>
+                  用于路线私人短表单
+                  <FieldHint>勾选后出现在「基于此路线」的私人短询盘偏好区。</FieldHint>
+                </span>
+              </label>
+            </div>
+          </FormSection>
+
+          <FormSection title="控件" description="控制输入方式、必填规则、默认值和选项。">
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="space-y-2 text-sm">
+                <span>控件类型</span>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={editing.controlType}
+                  onChange={(event) =>
+                    setEditing((current) =>
+                      current
+                        ? { ...current, controlType: event.target.value as FormControlType }
+                        : current,
+                    )
+                  }
+                >
+                  {(['single_select', 'multi_select', 'select', 'text', 'textarea'] as FormControlType[]).map(
+                    (value) => (
+                      <option key={value} value={value}>
+                        {CUSTOM_TRIP_CONTROL_LABELS[value]}
+                      </option>
+                    ),
+                  )}
+                </select>
+                <FieldHint>多选默认值用英文 optionKey 逗号分隔。</FieldHint>
+              </label>
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={editing.required}
+                  onChange={(event) =>
+                    setEditing((current) =>
+                      current ? { ...current, required: event.target.checked } : current,
+                    )
+                  }
+                />
+                <span>
+                  必填
+                  <FieldHint>开启后旅客提交时必须填写。</FieldHint>
+                </span>
+              </label>
+              <label className="space-y-2 text-sm md:col-span-2">
+                <span>
+                  默认值
+                  {editing.controlType === 'multi_select' ? '（多选用 optionKey 逗号分隔）' : ''}
+                </span>
+                <Input
+                  value={editing.defaultValueText}
+                  onChange={(event) =>
+                    setEditing((current) =>
+                      current ? { ...current, defaultValueText: event.target.value } : current,
+                    )
+                  }
+                />
+              </label>
+              <label className="space-y-2 text-sm md:col-span-2">
+                <span>选项（每行：optionKey|label|enabled）</span>
+                <Textarea
+                  rows={8}
+                  value={editing.optionsText}
+                  onChange={(event) =>
+                    setEditing((current) =>
+                      current ? { ...current, optionsText: event.target.value } : current,
+                    )
+                  }
+                />
+                <FieldHint>
+                  optionKey 是入库值；label 是旅客可见英文文案；enabled 可写 disabled 隐藏单个选项。
+                </FieldHint>
+              </label>
+            </div>
+          </FormSection>
+
+          <FormSection title="展示与发布" description="控制顺序和是否在新询盘表单中露出。">
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="space-y-2 text-sm">
+                <span>排序值</span>
+                <Input
+                  type="number"
+                  value={editing.sortOrder}
+                  onChange={(event) =>
+                    setEditing((current) =>
+                      current
+                        ? { ...current, sortOrder: Number(event.target.value) || 0 }
+                        : current,
+                    )
+                  }
+                />
+                <FieldHint>数字越小越靠前；列表里的上移/下移也会更新顺序。</FieldHint>
+              </label>
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={editing.enabled}
+                  onChange={(event) =>
+                    setEditing((current) =>
+                      current ? { ...current, enabled: event.target.checked } : current,
+                    )
+                  }
+                />
+                <span>
+                  启用字段
+                  <FieldHint>停用只隐藏新表单字段，历史询盘答案会保留。</FieldHint>
+                </span>
+              </label>
+            </div>
+          </FormSection>
+
+          <details
+            className="rounded-md border border-border/70 bg-muted/20 p-3"
+            open={advancedOpen}
+            onToggle={(event) => setAdvancedOpen((event.target as HTMLDetailsElement).open)}
+          >
+            <summary className="cursor-pointer text-sm font-medium">高级：系统字段键</summary>
+            <div className="mt-3 space-y-2">
+              <Input value={String(previewKey || '')} disabled readOnly className="font-mono text-xs" />
+              <FieldHint>
+                {editing.keyLocked
+                  ? '已锁定，不可改名（历史询盘答案按此键存储）。'
+                  : isCreate
+                    ? '由标题自动生成；保存后若被锁定将不可改。'
+                    : '已有字段键请勿随意改动；已锁定字段不可改。'}
+              </FieldHint>
+            </div>
+          </details>
+
+          <div className="flex gap-2">
+            <Button onClick={saveField} disabled={busy}>
+              {busy ? '保存中...' : '保存字段'}
+            </Button>
+            <Button variant="outline" disabled={busy} onClick={() => setEditing(null)}>
+              取消
+            </Button>
+          </div>
+
+          {!widePreview ? (
+            <FormConfigMobilePreview
+              fields={previewFields}
+              unsaved={unsavedPreview}
+              defaultMode={previewDefaultMode}
+              embedded={false}
+            />
+          ) : null}
+        </CardContent>
+      </Card>
+    );
+
     return (
       <AdminEditShell
-        title={isCreate ? '新建字段' : `编辑字段：${editing.fieldKey}`}
+        title={isCreate ? '新建偏好字段' : `编辑字段：${editing.label || editing.fieldKey}`}
         backLabel="← 返回列表"
         onBack={() => setEditing(null)}
       >
-        {error && <p className="text-destructive">{error}</p>}
-        <Card>
-          <CardHeader>
-            <CardTitle>{isCreate ? '新建字段' : `编辑字段：${editing.fieldKey}`}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <FormSection
-              title="标识"
-              description="系统键与旅客可见文案分开维护；label/description 值仍建议写英文。"
-            >
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="space-y-2 text-sm">
-                  <span>系统字段键（fieldKey）</span>
-                  <Input
-                    value={editing.fieldKey}
-                    disabled={editing.keyLocked}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, fieldKey: event.target.value } : current,
-                      )
-                    }
-                  />
-                  <FieldHint>
-                    用于存储答案和后端识别；{editing.keyLocked ? '当前字段已锁定，不可重命名。' : '创建后请谨慎修改。'}
-                  </FieldHint>
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span>旅客可见标题（label）</span>
-                  <Input
-                    value={editing.label}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, label: event.target.value } : current,
-                      )
-                    }
-                  />
-                  <FieldHint>显示在询盘偏好区，面向旅客。</FieldHint>
-                </label>
-                <label className="space-y-2 text-sm md:col-span-2">
-                  <span>旅客可见说明（description）</span>
-                  <Textarea
-                    value={editing.description}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, description: event.target.value } : current,
-                      )
-                    }
-                  />
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span>定制表单分组</span>
-                  <select
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={editing.formGroup}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current
-                          ? { ...current, formGroup: event.target.value as FormGroup }
-                          : current,
-                      )
-                    }
-                  >
-                    {(['basic', 'more'] as FormGroup[]).map((value) => (
-                      <option key={value} value={value}>
-                        {CUSTOM_TRIP_GROUP_LABELS[value]}
-                      </option>
-                    ))}
-                  </select>
-                  <FieldHint>控制字段在「从零定制」完整表单里出现在基础信息还是更多偏好；保存值仍是英文枚举。</FieldHint>
-                </label>
-                <label className="flex items-start gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    className="mt-1"
-                    checked={editing.useOnRoutePrivate}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, useOnRoutePrivate: event.target.checked } : current,
-                      )
-                    }
-                  />
-                  <span>
-                    用于路线私人短表单
-                    <FieldHint>勾选后，该字段会出现在「基于此路线」的私人短询盘偏好区（与分组无关）。</FieldHint>
-                  </span>
-                </label>
-              </div>
-            </FormSection>
-
-            <FormSection title="控件" description="控制输入方式、必填规则、默认值和选项。">
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="space-y-2 text-sm">
-                  <span>控件类型</span>
-                  <select
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={editing.controlType}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current
-                          ? { ...current, controlType: event.target.value as FormControlType }
-                          : current,
-                      )
-                    }
-                  >
-                    {(['single_select', 'multi_select', 'select', 'text', 'textarea'] as FormControlType[]).map(
-                      (value) => (
-                        <option key={value} value={value}>
-                          {CUSTOM_TRIP_CONTROL_LABELS[value]}
-                        </option>
-                      ),
-                    )}
-                  </select>
-                  <FieldHint>入库仍为英文枚举；多选默认值用英文 optionKey 逗号分隔。</FieldHint>
-                </label>
-                <label className="flex items-start gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    className="mt-1"
-                    checked={editing.required}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, required: event.target.checked } : current,
-                      )
-                    }
-                  />
-                  <span>
-                    必填
-                    <FieldHint>开启后旅客提交表单时必须填写该字段。</FieldHint>
-                  </span>
-                </label>
-                <label className="space-y-2 text-sm md:col-span-2">
-                  <span>
-                    默认值
-                    {editing.controlType === 'multi_select' ? '（多选用 optionKey 逗号分隔）' : ''}
-                  </span>
-                  <Input
-                    value={editing.defaultValueText}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, defaultValueText: event.target.value } : current,
-                      )
-                    }
-                  />
-                </label>
-                <label className="space-y-2 text-sm md:col-span-2">
-                  <span>选项（每行：optionKey|label|enabled）</span>
-                  <Textarea
-                    rows={8}
-                    value={editing.optionsText}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, optionsText: event.target.value } : current,
-                      )
-                    }
-                  />
-                  <FieldHint>optionKey 是入库值；label 是旅客可见英文文案；enabled 可写 disabled 隐藏单个选项。</FieldHint>
-                </label>
-              </div>
-            </FormSection>
-
-            <FormSection title="展示与发布" description="控制顺序和是否在新询盘表单中露出。">
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="space-y-2 text-sm">
-                  <span>排序值</span>
-                  <Input
-                    type="number"
-                    value={editing.sortOrder}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current
-                          ? { ...current, sortOrder: Number(event.target.value) || 0 }
-                          : current,
-                      )
-                    }
-                  />
-                  <FieldHint>数字越小越靠前；列表里的上移/下移也会更新顺序。</FieldHint>
-                </label>
-                <label className="flex items-start gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    className="mt-1"
-                    checked={editing.enabled}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, enabled: event.target.checked } : current,
-                      )
-                    }
-                  />
-                  <span>
-                    启用字段
-                    <FieldHint>停用只会隐藏新表单字段，历史询盘已保存答案会保留。</FieldHint>
-                  </span>
-                </label>
-              </div>
-            </FormSection>
-            <div className="flex gap-2">
-              <Button onClick={saveField} disabled={busy}>
-                {busy ? '保存中...' : '保存字段'}
-              </Button>
-              <Button variant="outline" disabled={busy} onClick={() => setEditing(null)}>
-                取消
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <div className={widePreview ? 'grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]' : 'space-y-4'}>
+          {editorCard}
+          {widePreview ? (
+            <FormConfigMobilePreview
+              fields={previewFields}
+              unsaved={unsavedPreview}
+              defaultMode={previewDefaultMode}
+              embedded
+            />
+          ) : null}
+        </div>
       </AdminEditShell>
     );
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
-          统一配置询盘偏好字段：从零定制表单按「基础信息 / 更多偏好」分组；勾选「路线私人」的字段会出现在基于路线的短表单。停用只影响新表单；fieldKey
-          已锁定后不能改名。
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <p className="max-w-3xl text-sm text-muted-foreground">
+          配置询盘偏好字段。完整定制按「基础信息 / 更多偏好」分组；勾选「路线私人」会出现在基于路线的短表单。停用只影响新表单。可用「整表预览」查看旅客侧已启用字段。
         </p>
-        <div className="flex shrink-0 gap-2">
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setListPreviewOpen(true)}
+            disabled={loading || busy || listPreviewFields.length === 0}
+          >
+            整表预览
+          </Button>
           <Button variant="outline" onClick={loadFields} disabled={loading || busy}>
             {loading ? '加载中...' : '刷新'}
           </Button>
-          <Button
-            onClick={() =>
-              setEditing({
-                ...emptyFieldDraft(),
-                sortOrder: (fields[fields.length - 1]?.sortOrder ?? 0) + 10,
-              })
-            }
-            disabled={loading || busy}
-          >
+          <Button onClick={startCreate} disabled={loading || busy}>
             新建
           </Button>
         </div>
@@ -2362,7 +1768,6 @@ function CustomTripFormPanel({ token }: { token: string }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>字段键</TableHead>
                 <TableHead>标题</TableHead>
                 <TableHead>分组</TableHead>
                 <TableHead>路线私人</TableHead>
@@ -2370,13 +1775,13 @@ function CustomTripFormPanel({ token }: { token: string }) {
                 <TableHead>必填</TableHead>
                 <TableHead>启用</TableHead>
                 <TableHead>默认值</TableHead>
+                <TableHead className="text-muted-foreground">字段键</TableHead>
                 <TableHead>操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {fields.map((field, index) => (
                 <TableRow key={field.id}>
-                  <TableCell className="font-mono text-xs">{field.fieldKey}</TableCell>
                   <TableCell className="font-medium">{field.label}</TableCell>
                   <TableCell>{CUSTOM_TRIP_GROUP_LABELS[field.formGroup]}</TableCell>
                   <TableCell>{field.useOnRoutePrivate ? '是' : '否'}</TableCell>
@@ -2389,6 +1794,9 @@ function CustomTripFormPanel({ token }: { token: string }) {
                   </TableCell>
                   <TableCell className="max-w-[180px] truncate text-xs">
                     {formatDefaultSummary(field)}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">
+                    {field.fieldKey}
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-2">
@@ -2420,7 +1828,7 @@ function CustomTripFormPanel({ token }: { token: string }) {
                         size="sm"
                         variant="outline"
                         disabled={busy}
-                        onClick={() => setEditing(fieldToDraft(field))}
+                        onClick={() => startEdit(field)}
                       >
                         编辑
                       </Button>
@@ -2440,6 +1848,17 @@ function CustomTripFormPanel({ token }: { token: string }) {
         </CardContent>
       </Card>
 
+      <Dialog open={listPreviewOpen} onOpenChange={setListPreviewOpen}>
+        <DialogContent className="max-h-[90vh] max-w-[440px] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>整表预览（已保存）</DialogTitle>
+            <DialogDescription>
+              仅显示已启用字段；不含未保存草稿。姓名/邮箱等联系区不在此预览。
+            </DialogDescription>
+          </DialogHeader>
+          <FormConfigMobilePreview fields={listPreviewFields} unsaved={false} defaultMode="full" embedded />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -2451,61 +1870,6 @@ const CONTENT_STATUS_LABELS: Record<ContentStatus, string> = {
   draft: '草稿',
   archived: '已归档',
 };
-
-const ROUTE_PRICE_MODE_LABELS: Record<RoutePriceMode, string> = {
-  'on-request': '询价',
-  'fixed-from': '固定起价',
-  'seasonal-table': '季节价表',
-  'per-person-range': '人均区间',
-  unavailable: '暂不可订',
-};
-
-const ROUTE_PRIMARY_TYPE_LABELS: Record<RoutePrimaryType, string> = {
-  private: '私人定制',
-  'group-tour': '拼团',
-  customizable: '可定制',
-  'fixed-departure': '固定班期',
-};
-
-type DestinationEditDraft = {
-  slug: string;
-  name: string;
-  description: string;
-  image: string;
-  displayOrder: string;
-  status: ContentStatus;
-  travelStyles: string[];
-  featuredOnHome: boolean;
-  featuredPriority: string;
-};
-
-function emptyDestinationDraft(): DestinationEditDraft {
-  return {
-    slug: '',
-    name: '',
-    description: '',
-    image: '',
-    displayOrder: '0',
-    status: 'published',
-    travelStyles: [],
-    featuredOnHome: false,
-    featuredPriority: '0',
-  };
-}
-
-function destinationToDraft(destination: Destination): DestinationEditDraft {
-  return {
-    slug: destination.slug,
-    name: destination.name,
-    description: destination.description,
-    image: destination.image,
-    displayOrder: String(destination.displayOrder),
-    status: destination.status,
-    travelStyles: destination.travelStyles,
-    featuredOnHome: destination.featuredOnHome,
-    featuredPriority: String(destination.featuredPriority ?? 0),
-  };
-}
 
 function DestinationsPanel({ token }: { token: string }) {
   const [destinations, setDestinations] = useState<Destination[]>([]);
@@ -2537,35 +1901,6 @@ function DestinationsPanel({ token }: { token: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  async function saveDestination() {
-    if (!editing) return;
-    setBusy(true);
-    setError('');
-    setStatus('');
-    try {
-      const result = await postAdminDestination(token, {
-        action: isCreate ? 'create' : 'update',
-        slug: editing.slug,
-        name: editing.name,
-        description: editing.description,
-        image: editing.image,
-        displayOrder: Number(editing.displayOrder) || 0,
-        status: editing.status,
-        travelStyles: editing.travelStyles,
-        featuredOnHome: editing.featuredOnHome,
-        featuredPriority: Number(editing.featuredPriority) || 0,
-      });
-      setDestinations(result.destinations);
-      setStatus(isCreate ? '目的地已创建。' : '目的地已更新。');
-      setEditing(null);
-      setIsCreate(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '保存目的地失败。');
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function archiveDestinationRow(slug: string) {
     setBusy(true);
     setError('');
@@ -2584,186 +1919,29 @@ function DestinationsPanel({ token }: { token: string }) {
   if (editing) {
     return (
       <AdminEditShell
-        title={isCreate ? '新建目的地' : `编辑：${editing.slug}`}
+        title={isCreate ? '新建目的地' : `编辑：${editing.slug || editing.name}`}
         backLabel="← 返回列表"
         onBack={() => {
           setEditing(null);
           setIsCreate(false);
         }}
       >
-        {error && <p className="text-destructive">{error}</p>}
-        <Card>
-          <CardHeader>
-            <CardTitle>{isCreate ? '新建目的地' : `编辑：${editing.slug}`}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <FormSection title="基本信息" description="详情页门面：名称、简介与主图。">
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="space-y-2 text-sm">
-                  <span>标识（slug）</span>
-                  <Input
-                    value={editing.slug}
-                    disabled={!isCreate}
-                    placeholder="例如 beijing"
-                    onChange={(event) =>
-                      setEditing((current) => (current ? { ...current, slug: event.target.value } : current))
-                    }
-                  />
-                  <FieldHint>公网 URL 与关联用的唯一标识；创建后不可改。</FieldHint>
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span>名称</span>
-                  <Input
-                    value={editing.name}
-                    onChange={(event) =>
-                      setEditing((current) => (current ? { ...current, name: event.target.value } : current))
-                    }
-                  />
-                </label>
-                <label className="space-y-2 text-sm md:col-span-2">
-                  <span>简介</span>
-                  <Textarea
-                    value={editing.description}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, description: event.target.value } : current,
-                      )
-                    }
-                  />
-                </label>
-                <div className="space-y-2 text-sm md:col-span-2">
-                  <span>图片</span>
-                  <ImageFieldPicker
-                    value={editing.image}
-                    token={token}
-                    disabled={busy}
-                    onChange={(url) =>
-                      setEditing((current) => (current ? { ...current, image: url } : current))
-                    }
-                  />
-                </div>
-              </div>
-            </FormSection>
-
-            <FormSection title="首页与排序" description="控制是否进入首页推荐，以及列表中的先后顺序。">
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="flex items-start gap-2 text-sm md:col-span-2">
-                  <input
-                    type="checkbox"
-                    className="mt-1"
-                    checked={editing.featuredOnHome}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, featuredOnHome: event.target.checked } : current,
-                      )
-                    }
-                  />
-                  <span>
-                    首页推荐
-                    <FieldHint>勾选后出现在移动端/首页「热门目的地」区域。</FieldHint>
-                  </span>
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span>推荐优先级</span>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={editing.featuredPriority}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, featuredPriority: event.target.value } : current,
-                      )
-                    }
-                  />
-                  <FieldHint>仅作用于首页推荐列表；数字越小越靠前。</FieldHint>
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span>展示排序</span>
-                  <Input
-                    type="number"
-                    value={editing.displayOrder}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, displayOrder: event.target.value } : current,
-                      )
-                    }
-                  />
-                  <FieldHint>目的地列表等处的默认排序权重。</FieldHint>
-                </label>
-              </div>
-            </FormSection>
-
-            <FormSection title="分类" description="用于公网目的地筛选（分类在「分类」模块维护）。">
-              <div className="space-y-2 text-sm">
-                <span>旅行风格</span>
-                <div className="flex flex-wrap gap-3 rounded-md border border-input p-3">
-                  {categories.length === 0 && (
-                    <span className="text-muted-foreground">
-                      暂无目的地分类。请先到「分类」模块创建。
-                    </span>
-                  )}
-                  {categories.map((category) => (
-                    <label key={category.id} className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={editing.travelStyles.includes(category.key)}
-                        onChange={(event) =>
-                          setEditing((current) => {
-                            if (!current) return current;
-                            const travelStyles = event.target.checked
-                              ? [...current.travelStyles, category.key]
-                              : current.travelStyles.filter((key) => key !== category.key);
-                            return { ...current, travelStyles };
-                          })
-                        }
-                      />
-                      {category.label}
-                    </label>
-                  ))}
-                </div>
-                <FieldHint>决定旅客按风格筛选时能否找到此目的地。</FieldHint>
-              </div>
-            </FormSection>
-
-            <FormSection title="状态">
-              <label className="space-y-2 text-sm max-w-xs">
-                <span>发布状态</span>
-                <select
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  value={editing.status}
-                  onChange={(event) =>
-                    setEditing((current) =>
-                      current ? { ...current, status: event.target.value as ContentStatus } : current,
-                    )
-                  }
-                >
-                  {CONTENT_STATUSES.map((value) => (
-                    <option key={value} value={value}>
-                      {CONTENT_STATUS_LABELS[value]}
-                    </option>
-                  ))}
-                </select>
-                <FieldHint>仅「已发布」对旅客可见；草稿/归档不出现在公网列表。</FieldHint>
-              </label>
-            </FormSection>
-
-            <div className="flex gap-2">
-              <Button onClick={saveDestination} disabled={busy}>
-                {busy ? '保存中…' : isCreate ? '创建目的地' : '保存修改'}
-              </Button>
-              <Button
-                variant="outline"
-                disabled={busy}
-                onClick={() => {
-                  setEditing(null);
-                  setIsCreate(false);
-                }}
-              >
-                取消
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <DestinationEditor
+          token={token}
+          initialDraft={editing}
+          isCreate={isCreate}
+          categories={categories}
+          onCancel={() => {
+            setEditing(null);
+            setIsCreate(false);
+          }}
+          onSaved={async (message) => {
+            setStatus(message);
+            setEditing(null);
+            setIsCreate(false);
+            await loadDestinations();
+          }}
+        />
       </AdminEditShell>
     );
   }
@@ -2772,7 +1950,7 @@ function DestinationsPanel({ token }: { token: string }) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          管理公网展示的目的地（目的地页、页脚、导航等）。填写内容仍用英文（面向旅客）。
+          管理公网展示的目的地。默认快速填写门面；旅客可见文案请用英文。新建默认存为草稿。
         </p>
         <div className="flex gap-2">
           <Button
@@ -2858,137 +2036,9 @@ function DestinationsPanel({ token }: { token: string }) {
   );
 }
 
-const ROUTE_PRICE_MODES: RoutePriceMode[] = [
-  'on-request',
-  'fixed-from',
-  'seasonal-table',
-  'per-person-range',
-  'unavailable',
-];
-const ROUTE_PRIMARY_TYPES: RoutePrimaryType[] = ['private', 'group-tour', 'customizable', 'fixed-departure'];
-
-type ItineraryDayDraft = {
-  title: string;
-  city: string;
-  summary: string;
-  attractionsText: string;
-  meals: string;
-  accommodation: string;
-  transport: string;
-  notesText: string;
-};
-
-function emptyItineraryDayDraft(): ItineraryDayDraft {
-  return {
-    title: '',
-    city: '',
-    summary: '',
-    attractionsText: '',
-    meals: '',
-    accommodation: '',
-    transport: '',
-    notesText: '',
-  };
-}
-
-type RouteEditDraft = {
-  slug: string;
-  legacyNumericId: string;
-  title: string;
-  subtitle: string;
-  summary: string;
-  durationDays: string;
-  groupSizeDisplay: string;
-  category: string;
-  themes: string[];
-  status: ContentStatus;
-  featured: boolean;
-  heroImage: string;
-  pdfUrl: string;
-  priceMode: RoutePriceMode;
-  priceDisplay: string;
-  primaryType: RoutePrimaryType;
-  availableTypesText: string;
-  destinationSlugsText: string;
-  experienceText: string;
-  momentsText: string;
-  includedSupportText: string;
-  itineraryDays: ItineraryDayDraft[];
-};
-
-function emptyRouteDraft(): RouteEditDraft {
-  return {
-    slug: '',
-    legacyNumericId: '',
-    title: '',
-    subtitle: '',
-    summary: '',
-    durationDays: '1',
-    groupSizeDisplay: 'Private / Group tour',
-    category: '',
-    themes: [],
-    status: 'published',
-    featured: false,
-    heroImage: '',
-    pdfUrl: '',
-    priceMode: 'on-request',
-    priceDisplay: 'On request',
-    primaryType: 'customizable',
-    availableTypesText: 'customizable',
-    destinationSlugsText: '',
-    experienceText: '',
-    momentsText: '',
-    includedSupportText: '',
-    itineraryDays: [],
-  };
-}
-
-function routeToDraft(route: RouteRecord): RouteEditDraft {
-  return {
-    slug: route.slug,
-    legacyNumericId: route.legacyNumericId == null ? '' : String(route.legacyNumericId),
-    title: route.title,
-    subtitle: route.subtitle,
-    summary: route.summary,
-    durationDays: String(route.durationDays),
-    groupSizeDisplay: route.groupSizeDisplay,
-    category: route.category,
-    themes: route.themes,
-    status: route.status,
-    featured: route.featured,
-    heroImage: route.heroImage,
-    pdfUrl: route.pdfUrl,
-    priceMode: route.priceMode,
-    priceDisplay: route.priceDisplay,
-    primaryType: route.primaryType,
-    availableTypesText: route.availableTypes.join(', '),
-    destinationSlugsText: route.destinationSlugs.join(', '),
-    experienceText: route.experience.join('\n'),
-    momentsText: route.moments.join('\n'),
-    includedSupportText: route.includedSupport.join('\n'),
-    itineraryDays: route.itineraryDays.map((day) => ({
-      title: day.title,
-      city: day.city,
-      summary: day.summary,
-      attractionsText: day.attractions.join('\n'),
-      meals: day.meals,
-      accommodation: day.accommodation,
-      transport: day.transport,
-      notesText: day.notes.join('\n'),
-    })),
-  };
-}
-
 function csvToList(value: string): string[] {
   return value
     .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function linesToList(value: string): string[] {
-  return value
-    .split('\n')
     .map((item) => item.trim())
     .filter(Boolean);
 }
@@ -3002,6 +2052,7 @@ function RoutesPanel({
 }) {
   const [routes, setRoutes] = useState<RouteRecord[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [destinations, setDestinations] = useState<Destination[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
@@ -3033,65 +2084,11 @@ function RoutesPanel({
     fetchCategories('route')
       .then(setCategories)
       .catch(() => setCategories([]));
+    fetchAdminDestinations(token)
+      .then(setDestinations)
+      .catch(() => setDestinations([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
-
-  async function saveRoute() {
-    if (!editing) return;
-    const durationDays = Number(editing.durationDays);
-    if (!Number.isFinite(durationDays) || durationDays <= 0) {
-      setError('行程天数须为正数。');
-      return;
-    }
-    setBusy(true);
-    setError('');
-    setStatus('');
-    try {
-      await postAdminRoute(token, {
-        action: isCreate ? 'create' : 'update',
-        slug: editing.slug,
-        legacyNumericId: editing.legacyNumericId ? Number(editing.legacyNumericId) : null,
-        title: editing.title,
-        subtitle: editing.subtitle,
-        summary: editing.summary,
-        durationDays,
-        groupSizeDisplay: editing.groupSizeDisplay,
-        category: editing.category,
-        themes: editing.themes,
-        status: editing.status,
-        featured: editing.featured,
-        heroImage: editing.heroImage,
-        pdfUrl: editing.pdfUrl,
-        priceMode: editing.priceMode,
-        priceDisplay: editing.priceDisplay,
-        primaryType: editing.primaryType,
-        availableTypes: csvToList(editing.availableTypesText),
-        destinationSlugs: csvToList(editing.destinationSlugsText),
-        experience: linesToList(editing.experienceText),
-        moments: linesToList(editing.momentsText),
-        includedSupport: linesToList(editing.includedSupportText),
-        itineraryDays: editing.itineraryDays.map((day, index) => ({
-          dayNumber: index + 1,
-          title: day.title.trim(),
-          city: day.city.trim(),
-          summary: day.summary.trim(),
-          attractions: linesToList(day.attractionsText),
-          meals: day.meals.trim(),
-          accommodation: day.accommodation.trim(),
-          transport: day.transport.trim(),
-          notes: linesToList(day.notesText),
-        })),
-      });
-      setStatus(isCreate ? '路线已创建。' : '路线已更新。');
-      setEditing(null);
-      setIsCreate(false);
-      await loadRoutes();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '保存路线失败。');
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function archiveRouteRow(slug: string) {
     setBusy(true);
@@ -3108,488 +2105,33 @@ function RoutesPanel({
     }
   }
 
-  function updateItineraryDay(index: number, patch: Partial<ItineraryDayDraft>) {
-    setEditing((current) => {
-      if (!current) return current;
-      const itineraryDays = current.itineraryDays.map((day, i) => (i === index ? { ...day, ...patch } : day));
-      return { ...current, itineraryDays };
-    });
-  }
-
-  function addItineraryDay() {
-    setEditing((current) =>
-      current ? { ...current, itineraryDays: [...current.itineraryDays, emptyItineraryDayDraft()] } : current,
-    );
-  }
-
-  function removeItineraryDay(index: number) {
-    setEditing((current) => {
-      if (!current) return current;
-      return { ...current, itineraryDays: current.itineraryDays.filter((_, i) => i !== index) };
-    });
-  }
-
-  function moveItineraryDay(index: number, direction: -1 | 1) {
-    setEditing((current) => {
-      if (!current) return current;
-      const target = index + direction;
-      if (target < 0 || target >= current.itineraryDays.length) return current;
-      const itineraryDays = [...current.itineraryDays];
-      [itineraryDays[index], itineraryDays[target]] = [itineraryDays[target], itineraryDays[index]];
-      return { ...current, itineraryDays };
-    });
-  }
-
   if (editing) {
     return (
       <AdminEditShell
-        title={isCreate ? '新建路线' : `编辑：${editing.slug}`}
+        title={isCreate ? '新建路线' : `编辑：${editing.slug || editing.title}`}
         backLabel="← 返回列表"
         onBack={() => {
           setEditing(null);
           setIsCreate(false);
         }}
       >
-        {error && <p className="text-destructive">{error}</p>}
-        <Card>
-          <CardHeader>
-            <CardTitle>{isCreate ? '新建路线' : `编辑：${editing.slug}`}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <FormSection title="基本信息" description="详情页门面与关联目的地。">
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="space-y-2 text-sm">
-                  <span>标识（slug）</span>
-                  <Input
-                    value={editing.slug}
-                    disabled={!isCreate}
-                    placeholder="例如 beijing-shanghai-classic"
-                    onChange={(event) =>
-                      setEditing((current) => (current ? { ...current, slug: event.target.value } : current))
-                    }
-                  />
-                  <FieldHint>公网路线页 URL 与关联用的唯一标识；创建后不可改。</FieldHint>
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span>旧版数字 ID（可选）</span>
-                  <Input
-                    type="number"
-                    value={editing.legacyNumericId}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, legacyNumericId: event.target.value } : current,
-                      )
-                    }
-                  />
-                  <FieldHint>用于回退到旧 PDF/通用行程文案；无结构化逐日行程时才有用。</FieldHint>
-                </label>
-                <label className="space-y-2 text-sm md:col-span-2">
-                  <span>标题</span>
-                  <Input
-                    value={editing.title}
-                    onChange={(event) =>
-                      setEditing((current) => (current ? { ...current, title: event.target.value } : current))
-                    }
-                  />
-                </label>
-                <label className="space-y-2 text-sm md:col-span-2">
-                  <span>副标题</span>
-                  <Input
-                    value={editing.subtitle}
-                    onChange={(event) =>
-                      setEditing((current) => (current ? { ...current, subtitle: event.target.value } : current))
-                    }
-                  />
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span>行程天数</span>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={editing.durationDays}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, durationDays: event.target.value } : current,
-                      )
-                    }
-                  />
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span>团型展示文案</span>
-                  <Input
-                    value={editing.groupSizeDisplay}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, groupSizeDisplay: event.target.value } : current,
-                      )
-                    }
-                  />
-                </label>
-                <label className="space-y-2 text-sm md:col-span-2">
-                  <span>关联目的地（slug，逗号分隔）</span>
-                  <Input
-                    value={editing.destinationSlugsText}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, destinationSlugsText: event.target.value } : current,
-                      )
-                    }
-                  />
-                  <FieldHint>决定此路线出现在哪些目的地页；须与已有目的地标识一致。</FieldHint>
-                </label>
-              </div>
-            </FormSection>
-
-            <FormSection title="卡片与筛选" description="列表卡、筛选与推荐位。">
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="space-y-2 text-sm md:col-span-2">
-                  <span>摘要（卡片描述）</span>
-                  <Textarea
-                    value={editing.summary}
-                    onChange={(event) =>
-                      setEditing((current) => (current ? { ...current, summary: event.target.value } : current))
-                    }
-                  />
-                </label>
-                <div className="space-y-2 text-sm md:col-span-2">
-                  <span>主图</span>
-                  <ImageFieldPicker
-                    value={editing.heroImage}
-                    token={token}
-                    disabled={busy}
-                    onChange={(url) =>
-                      setEditing((current) => (current ? { ...current, heroImage: url } : current))
-                    }
-                  />
-                </div>
-                <div className="space-y-2 text-sm md:col-span-2">
-                  <span>主题 / 分类</span>
-                  <div className="flex flex-wrap gap-3 rounded-md border border-input p-3">
-                    {categories.length === 0 && (
-                      <span className="text-muted-foreground">
-                        暂无路线分类。请先到「分类」模块创建。
-                      </span>
-                    )}
-                    {categories.map((category) => (
-                      <label key={category.id} className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={editing.themes.includes(category.key)}
-                          onChange={(event) =>
-                            setEditing((current) => {
-                              if (!current) return current;
-                              const themes = event.target.checked
-                                ? [...current.themes, category.key]
-                                : current.themes.filter((key) => key !== category.key);
-                              return { ...current, themes };
-                            })
-                          }
-                        />
-                        {category.label}
-                      </label>
-                    ))}
-                  </div>
-                  <FieldHint>控制列表筛选与标签展示；选项在「分类」模块维护。</FieldHint>
-                </div>
-                <label className="space-y-2 text-sm">
-                  <span>分类文案</span>
-                  <Input
-                    value={editing.category}
-                    onChange={(event) =>
-                      setEditing((current) => (current ? { ...current, category: event.target.value } : current))
-                    }
-                  />
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span>主产品类型</span>
-                  <select
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={editing.primaryType}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, primaryType: event.target.value as RoutePrimaryType } : current,
-                      )
-                    }
-                  >
-                    {ROUTE_PRIMARY_TYPES.map((value) => (
-                      <option key={value} value={value}>
-                        {ROUTE_PRIMARY_TYPE_LABELS[value]}
-                      </option>
-                    ))}
-                  </select>
-                  <FieldHint>详情页主展示的产品类型；入库仍为英文枚举。</FieldHint>
-                </label>
-                <label className="space-y-2 text-sm md:col-span-2">
-                  <span>可选产品类型（逗号分隔英文值）</span>
-                  <Input
-                    value={editing.availableTypesText}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, availableTypesText: event.target.value } : current,
-                      )
-                    }
-                  />
-                </label>
-                <label className="flex items-start gap-2 text-sm md:col-span-2">
-                  <input
-                    type="checkbox"
-                    className="mt-1"
-                    checked={editing.featured}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, featured: event.target.checked } : current,
-                      )
-                    }
-                  />
-                  <span>
-                    推荐路线
-                    <FieldHint>勾选后进入 China Trips / 移动端推荐位。</FieldHint>
-                  </span>
-                </label>
-              </div>
-            </FormSection>
-
-            <FormSection
-              title="详情页内容"
-              description="详情页正文块（亮点与含括支持）。每行一条。"
-            >
-              <div className="grid gap-4 md:grid-cols-3">
-                <label className="space-y-2 text-sm">
-                  <span>体验亮点</span>
-                  <Textarea
-                    rows={4}
-                    value={editing.experienceText}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, experienceText: event.target.value } : current,
-                      )
-                    }
-                  />
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span>招牌时刻</span>
-                  <Textarea
-                    rows={4}
-                    value={editing.momentsText}
-                    onChange={(event) =>
-                      setEditing((current) => (current ? { ...current, momentsText: event.target.value } : current))
-                    }
-                  />
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span>含括支持</span>
-                  <Textarea
-                    rows={4}
-                    value={editing.includedSupportText}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, includedSupportText: event.target.value } : current,
-                      )
-                    }
-                  />
-                </label>
-              </div>
-            </FormSection>
-
-            <FormSection
-              title="逐日行程"
-              description="详情页按日叙事。留空则回退到旧版 PDF/通用行程（若配置了旧版数字 ID）。"
-            >
-              <div className="flex flex-wrap items-center justify-end gap-3">
-                <Button type="button" variant="outline" size="sm" onClick={addItineraryDay}>
-                  添加一天
-                </Button>
-              </div>
-
-              <div className="space-y-4">
-                {editing.itineraryDays.map((day, index) => (
-                  <div key={index} className="space-y-3 rounded-md border border-input p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-sm font-semibold">第 {index + 1} 天</span>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={index === 0}
-                          onClick={() => moveItineraryDay(index, -1)}
-                        >
-                          上移
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={index === editing.itineraryDays.length - 1}
-                          onClick={() => moveItineraryDay(index, 1)}
-                        >
-                          下移
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => removeItineraryDay(index)}
-                        >
-                          删除
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <label className="space-y-2 text-sm">
-                        <span>标题（可选，如 Arrival in Beijing）</span>
-                        <Input
-                          value={day.title}
-                          onChange={(event) => updateItineraryDay(index, { title: event.target.value })}
-                        />
-                      </label>
-                      <label className="space-y-2 text-sm">
-                        <span>城市</span>
-                        <Input
-                          value={day.city}
-                          onChange={(event) => updateItineraryDay(index, { city: event.target.value })}
-                        />
-                      </label>
-                      <label className="space-y-2 text-sm md:col-span-2">
-                        <span>景点（每行一个，按游览顺序）</span>
-                        <Textarea
-                          rows={3}
-                          value={day.attractionsText}
-                          onChange={(event) =>
-                            updateItineraryDay(index, { attractionsText: event.target.value })
-                          }
-                        />
-                      </label>
-                      <label className="space-y-2 text-sm">
-                        <span>餐饮</span>
-                        <Input
-                          value={day.meals}
-                          onChange={(event) => updateItineraryDay(index, { meals: event.target.value })}
-                        />
-                      </label>
-                      <label className="space-y-2 text-sm">
-                        <span>住宿</span>
-                        <Input
-                          value={day.accommodation}
-                          onChange={(event) => updateItineraryDay(index, { accommodation: event.target.value })}
-                        />
-                      </label>
-                      <label className="space-y-2 text-sm md:col-span-2">
-                        <span>交通</span>
-                        <Input
-                          value={day.transport}
-                          onChange={(event) => updateItineraryDay(index, { transport: event.target.value })}
-                        />
-                      </label>
-                      <label className="space-y-2 text-sm md:col-span-2">
-                        <span>内部摘要（可选）</span>
-                        <Textarea
-                          rows={2}
-                          value={day.summary}
-                          onChange={(event) => updateItineraryDay(index, { summary: event.target.value })}
-                        />
-                        <FieldHint>不展示给旅客，仅供运营备注。</FieldHint>
-                      </label>
-                      <label className="space-y-2 text-sm md:col-span-2">
-                        <span>补充说明（每行一条，可选）</span>
-                        <Textarea
-                          rows={2}
-                          value={day.notesText}
-                          onChange={(event) => updateItineraryDay(index, { notesText: event.target.value })}
-                        />
-                        <FieldHint>会拼入公网逐日叙述，请用英文旅客文案。</FieldHint>
-                      </label>
-                    </div>
-                  </div>
-                ))}
-                {editing.itineraryDays.length === 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    尚无结构化日程。当前会回退到旧版 PDF 行程（若已填旧版数字 ID）或通用模板。
-                  </p>
-                )}
-              </div>
-            </FormSection>
-
-            <FormSection title="价格与状态" description="售卖展示与发布状态。">
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="space-y-2 text-sm">
-                  <span>价格模式</span>
-                  <select
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={editing.priceMode}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, priceMode: event.target.value as RoutePriceMode } : current,
-                      )
-                    }
-                  >
-                    {ROUTE_PRICE_MODES.map((value) => (
-                      <option key={value} value={value}>
-                        {ROUTE_PRICE_MODE_LABELS[value]}
-                      </option>
-                    ))}
-                  </select>
-                  <FieldHint>影响价格如何展示/计算；入库仍为英文枚举。</FieldHint>
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span>价格展示文案</span>
-                  <Input
-                    value={editing.priceDisplay}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, priceDisplay: event.target.value } : current,
-                      )
-                    }
-                  />
-                </label>
-                <label className="space-y-2 text-sm md:col-span-2">
-                  <span>PDF URL（可选）</span>
-                  <Input
-                    value={editing.pdfUrl}
-                    onChange={(event) =>
-                      setEditing((current) => (current ? { ...current, pdfUrl: event.target.value } : current))
-                    }
-                  />
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span>发布状态</span>
-                  <select
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={editing.status}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, status: event.target.value as ContentStatus } : current,
-                      )
-                    }
-                  >
-                    {CONTENT_STATUSES.map((value) => (
-                      <option key={value} value={value}>
-                        {CONTENT_STATUS_LABELS[value]}
-                      </option>
-                    ))}
-                  </select>
-                  <FieldHint>仅「已发布」对旅客可见；草稿/归档不出现在公网列表。</FieldHint>
-                </label>
-              </div>
-            </FormSection>
-
-            <div className="flex gap-2">
-              <Button onClick={saveRoute} disabled={busy}>
-                {busy ? '保存中…' : isCreate ? '创建路线' : '保存修改'}
-              </Button>
-              <Button
-                variant="outline"
-                disabled={busy}
-                onClick={() => {
-                  setEditing(null);
-                  setIsCreate(false);
-                }}
-              >
-                取消
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <RouteEditor
+          token={token}
+          initialDraft={editing}
+          isCreate={isCreate}
+          categories={categories}
+          destinations={destinations}
+          onCancel={() => {
+            setEditing(null);
+            setIsCreate(false);
+          }}
+          onSaved={async (message) => {
+            setStatus(message);
+            setEditing(null);
+            setIsCreate(false);
+            await loadRoutes();
+          }}
+        />
       </AdminEditShell>
     );
   }
@@ -3598,7 +2140,7 @@ function RoutesPanel({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          管理 China Trips、目的地页与路线详情上的路线卡片。填写内容仍用英文（面向旅客）。
+          管理 China Trips、目的地页与路线详情上的路线卡片。默认快速模式填写门面；旅客可见文案请用英文。
         </p>
         <Button
           variant="outline"
@@ -3731,8 +2273,8 @@ type MediaEditDraft = {
   publicUrl: string;
   title: string;
   altText: string;
-  destinationSlugsText: string;
-  routeSlugsText: string;
+  destinationSlugs: string[];
+  routeSlugs: string[];
   tagsText: string;
   status: MediaAssetStatus;
 };
@@ -3744,10 +2286,10 @@ function emptyMediaDraft(): MediaEditDraft {
     publicUrl: '',
     title: '',
     altText: '',
-    destinationSlugsText: '',
-    routeSlugsText: '',
+    destinationSlugs: [],
+    routeSlugs: [],
     tagsText: '',
-    status: 'published',
+    status: 'review',
   };
 }
 
@@ -3758,8 +2300,8 @@ function mediaToDraft(media: MediaAsset): MediaEditDraft {
     publicUrl: media.publicUrl,
     title: media.title,
     altText: media.altText,
-    destinationSlugsText: media.destinationSlugs.join(', '),
-    routeSlugsText: media.routeSlugs.join(', '),
+    destinationSlugs: [...media.destinationSlugs],
+    routeSlugs: [...media.routeSlugs],
     tagsText: media.tags.join(', '),
     status: media.status,
   };
@@ -3828,8 +2370,8 @@ type CategoryEditDraft = {
   enabled: boolean;
 };
 
-function emptyCategoryDraft(scope: CategoryScope): CategoryEditDraft {
-  return { id: null, key: '', label: '', scope, sortOrder: '0', enabled: true };
+function emptyCategoryDraft(scope: CategoryScope, nextSortOrder = 0): CategoryEditDraft {
+  return { id: null, key: '', label: '', scope, sortOrder: String(nextSortOrder), enabled: true };
 }
 
 function categoryToDraft(category: Category): CategoryEditDraft {
@@ -3845,6 +2387,18 @@ function categoryToDraft(category: Category): CategoryEditDraft {
 
 function categoryScopeLabel(scope: CategoryScope): string {
   return scope === 'destination' ? '目的地筛选' : '路线筛选';
+}
+
+function nextCategorySortOrder(categories: Category[], scope: CategoryScope): number {
+  const scoped = categories.filter((item) => item.scope === scope);
+  if (scoped.length === 0) return 0;
+  return Math.max(...scoped.map((item) => item.sortOrder)) + 1;
+}
+
+function resolveCategoryKey(draft: CategoryEditDraft): string {
+  const trimmed = draft.key.trim().toLowerCase();
+  if (trimmed) return trimmed;
+  return slugifyOrFallback(draft.label || 'category', new Date(), 'cat');
 }
 
 function CategoryScopeSection({
@@ -3887,8 +2441,7 @@ function CategoryScopeSection({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>名称</TableHead>
-              <TableHead>标识</TableHead>
+              <TableHead>显示名称</TableHead>
               <TableHead>排序</TableHead>
               <TableHead>启用</TableHead>
               <TableHead>操作</TableHead>
@@ -3897,8 +2450,10 @@ function CategoryScopeSection({
           <TableBody>
             {scoped.map((category, index) => (
               <TableRow key={category.id}>
-                <TableCell className="font-medium">{category.label}</TableCell>
-                <TableCell className="font-mono text-xs">{category.key}</TableCell>
+                <TableCell>
+                  <div className="font-medium">{category.label}</div>
+                  <div className="mt-0.5 font-mono text-xs text-muted-foreground">{category.key}</div>
+                </TableCell>
                 <TableCell>{category.sortOrder}</TableCell>
                 <TableCell>
                   <Badge variant={category.enabled ? 'default' : 'secondary'}>
@@ -3940,7 +2495,7 @@ function CategoryScopeSection({
             ))}
             {scoped.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground">
+                <TableCell colSpan={4} className="text-center text-muted-foreground">
                   暂无分类。
                 </TableCell>
               </TableRow>
@@ -3957,8 +2512,10 @@ function CategoriesPanel({ token }: { token: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
+  const [warning, setWarning] = useState('');
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<CategoryEditDraft | null>(null);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   async function loadCategories() {
     setLoading(true);
@@ -3977,17 +2534,59 @@ function CategoriesPanel({ token }: { token: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  async function saveCategory() {
-    if (!editing) return;
-    setBusy(true);
+  function startCreate(scope: CategoryScope) {
     setError('');
     setStatus('');
+    setWarning('');
+    setAdvancedOpen(false);
+    setEditing(emptyCategoryDraft(scope, nextCategorySortOrder(categories, scope)));
+  }
+
+  function startEdit(category: Category) {
+    setError('');
+    setStatus('');
+    setWarning('');
+    setAdvancedOpen(false);
+    setEditing(categoryToDraft(category));
+  }
+
+  function onLabelChange(label: string) {
+    setEditing((current) => {
+      if (!current) return current;
+      if (current.id) {
+        return { ...current, label };
+      }
+      return { ...current, label, key: slugify(label) };
+    });
+  }
+
+  async function saveCategory() {
+    if (!editing) return;
+    setError('');
+    setStatus('');
+    setWarning('');
+
+    if (!editing.label.trim()) {
+      setError('请填写显示名称（英文，给旅客看）。');
+      return;
+    }
+
+    const labelHasCjk = containsCjk(editing.label);
+    if (labelHasCjk) {
+      setWarning('显示名称疑似含中文。旅客筛选栏会直接显示这段文案，请改为英文。');
+      setError('已拦截：显示名称含中文。请改为英文后再保存或启用。');
+      return;
+    }
+
+    const key = resolveCategoryKey(editing);
+
+    setBusy(true);
     try {
       const result = await postAdminCategory(token, {
         action: editing.id ? 'update' : 'create',
         id: editing.id,
-        key: editing.key,
-        label: editing.label,
+        key,
+        label: editing.label.trim(),
         scope: editing.scope,
         sortOrder: Number(editing.sortOrder) || 0,
         enabled: editing.enabled,
@@ -4009,7 +2608,7 @@ function CategoriesPanel({ token }: { token: string }) {
     try {
       const result = await postAdminCategory(token, { action: 'archive', id: category.id });
       setCategories(result.categories);
-      setStatus(`分类 ${category.label} 已停用。`);
+      setStatus(`「${category.label}」已从筛选栏隐藏；已勾选该分类的内容仍保留 key「${category.key}」。`);
     } catch (err) {
       setError(err instanceof Error ? err.message : '停用分类失败。');
     } finally {
@@ -4046,6 +2645,13 @@ function CategoriesPanel({ token }: { token: string }) {
   }
 
   if (editing) {
+    const isCreate = !editing.id;
+    const previewKey =
+      editing.key.trim() || (editing.label.trim() ? slugify(editing.label) || 'cat-…' : '（自动生成）');
+    const cjkWarning = containsCjk(editing.label)
+      ? '显示名称疑似含中文。旅客筛选栏会直接显示这段文案，请改为英文。'
+      : '';
+
     return (
       <AdminEditShell
         title={editing.id
@@ -4055,48 +2661,35 @@ function CategoriesPanel({ token }: { token: string }) {
         onBack={() => setEditing(null)}
       >
         {error && <p className="text-destructive">{error}</p>}
+        {warning && <p className="rounded-md bg-amber-100 p-2 text-sm text-amber-900">{warning}</p>}
+        {cjkWarning && !warning && (
+          <p className="rounded-md bg-amber-100 p-2 text-sm text-amber-900">{cjkWarning}</p>
+        )}
         <Card>
           <CardHeader>
             <CardTitle>{editing.id ? `编辑：${editing.label || editing.key}` : '新建分类'}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <FormSection title="标识" description="分类分为目的地筛选和路线筛选两个 scope；本次不合并。">
+            <FormSection
+              title="基本信息"
+              description={
+                editing.scope === 'destination'
+                  ? '用于移动端 Places（目的地）筛选栏。'
+                  : '用于移动端 Routes（路线）筛选栏。'
+              }
+            >
               <div className="grid gap-4 md:grid-cols-2">
-                <label className="space-y-2 text-sm">
-                  <span>标识（key）</span>
-                  <Input
-                    value={editing.key}
-                    disabled={Boolean(editing.id)}
-                    placeholder="例如 culture"
-                    onChange={(event) =>
-                      setEditing((current) => (current ? { ...current, key: event.target.value } : current))
-                    }
-                  />
-                  <FieldHint>创建后不要随意修改；路线/目的地用这个英文 key 存储分类关系。</FieldHint>
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span>显示名称（label）</span>
+                <label className="space-y-2 text-sm md:col-span-2">
+                  <span>显示名称（英文）</span>
                   <Input
                     value={editing.label}
                     placeholder="例如 Culture & history"
-                    onChange={(event) =>
-                      setEditing((current) => (current ? { ...current, label: event.target.value } : current))
-                    }
+                    onChange={(event) => onLabelChange(event.target.value)}
                   />
-                  <FieldHint>显示给旅客的筛选文案，建议仍用英文。</FieldHint>
+                  <FieldHint>旅客在筛选栏看到的文案；请用英文。系统会据此自动生成内部标识。</FieldHint>
                 </label>
-                <label className="space-y-2 text-sm md:col-span-2">
-                  <span>分类范围（scope）</span>
-                  <Input value={categoryScopeLabel(editing.scope)} disabled />
-                  <FieldHint>只读；目的地分类用于 Places tab，路线分类用于 Routes tab。</FieldHint>
-                </label>
-              </div>
-            </FormSection>
-
-            <FormSection title="展示" description="控制筛选栏显示和排序。">
-              <div className="grid gap-4 md:grid-cols-2">
                 <label className="space-y-2 text-sm">
-                  <span>排序值</span>
+                  <span>排序</span>
                   <Input
                     type="number"
                     value={editing.sortOrder}
@@ -4106,7 +2699,7 @@ function CategoriesPanel({ token }: { token: string }) {
                       )
                     }
                   />
-                  <FieldHint>数字越小越靠前；列表里的上移/下移也会更新排序。</FieldHint>
+                  <FieldHint>数字越小越靠前；列表里的上移/下移也会更新排序。新建默认排在末尾。</FieldHint>
                 </label>
                 <label className="flex items-start gap-2 text-sm">
                   <input
@@ -4121,11 +2714,55 @@ function CategoriesPanel({ token }: { token: string }) {
                   />
                   <span>
                     启用分类
-                    <FieldHint>启用后出现在移动端筛选栏；停用不会删除已打在内容上的 key。</FieldHint>
+                    <FieldHint>
+                      启用后出现在移动端筛选栏。停用只会从筛选栏隐藏，已勾选该分类的目的地/路线仍保留内部标识。
+                    </FieldHint>
                   </span>
+                </label>
+                <label className="space-y-2 text-sm md:col-span-2">
+                  <span>分类范围</span>
+                  <Input value={categoryScopeLabel(editing.scope)} disabled />
+                  <FieldHint>
+                    只读。目的地分类管 Places；路线分类管 Routes。两套列表互不合并。
+                  </FieldHint>
                 </label>
               </div>
             </FormSection>
+
+            {!isCreate && (
+              <div className="rounded-md border">
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium"
+                  onClick={() => setAdvancedOpen((open) => !open)}
+                >
+                  <span>高级</span>
+                  <span className="text-muted-foreground">{advancedOpen ? '收起' : '展开'}</span>
+                </button>
+                {advancedOpen ? (
+                  <div className="space-y-3 border-t px-4 py-3">
+                    <label className="space-y-2 text-sm">
+                      <span>内部标识（key）</span>
+                      <Input
+                        value={editing.key}
+                        disabled
+                        className="font-mono text-xs"
+                      />
+                      <FieldHint>
+                        创建后不可改。目的地/路线勾选分类时按此 key 存储关系；乱改会导致已勾选内容对不上。
+                      </FieldHint>
+                    </label>
+                  </div>
+                ) : null}
+              </div>
+            )}
+
+            {isCreate && (
+              <p className="text-xs text-muted-foreground">
+                内部标识将自动生成：<span className="font-mono">{previewKey}</span>
+              </p>
+            )}
+
             <div className="flex gap-2">
               <Button onClick={saveCategory} disabled={busy}>
                 {busy ? '保存中...' : editing.id ? '保存修改' : '创建分类'}
@@ -4142,31 +2779,36 @@ function CategoriesPanel({ token }: { token: string }) {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        管理移动端 China Trips 的 Places 和 Routes 筛选分类。停用分类只会从筛选栏隐藏，不会删除已打在目的地或路线上的分类 key。
-      </p>
+      <div className="space-y-1 text-sm text-muted-foreground">
+        <p>
+          两套筛选分开维护：上方管移动端 Places（目的地）筛选；下方管 Routes（路线）筛选。只填英文显示名、排序和是否启用；内部标识由系统生成。
+        </p>
+        <p>
+          停用分类只会从筛选栏隐藏；已勾选该分类的目的地或路线仍保留内部标识，不会丢关系。
+        </p>
+      </div>
 
       {error && <p className="text-destructive">{error}</p>}
       {status && <p className="text-sm text-green-700">{status}</p>}
 
       <CategoryScopeSection
         scope="destination"
-        title="目的地分类（Places tab）"
+        title="目的地分类（Places 筛选）"
         categories={categories}
         busy={busy || loading}
-        onEdit={(category) => setEditing(categoryToDraft(category))}
-        onCreate={() => setEditing(emptyCategoryDraft('destination'))}
+        onEdit={startEdit}
+        onCreate={() => startCreate('destination')}
         onArchive={archiveCategoryRow}
         onMove={moveCategory}
       />
 
       <CategoryScopeSection
         scope="route"
-        title="路线分类（Routes tab）"
+        title="路线分类（Routes 筛选）"
         categories={categories}
         busy={busy || loading}
-        onEdit={(category) => setEditing(categoryToDraft(category))}
-        onCreate={() => setEditing(emptyCategoryDraft('route'))}
+        onEdit={startEdit}
+        onCreate={() => startCreate('route')}
         onArchive={archiveCategoryRow}
         onMove={moveCategory}
       />
@@ -4192,6 +2834,8 @@ function MediaPanel({
   const [uploading, setUploading] = useState(false);
   const [editing, setEditing] = useState<MediaEditDraft | null>(null);
   const [isCreate, setIsCreate] = useState(false);
+  const [destinations, setDestinations] = useState<Destination[]>([]);
+  const [routes, setRoutes] = useState<RouteRecord[]>([]);
 
   async function loadMedia() {
     setLoading(true);
@@ -4215,6 +2859,22 @@ function MediaPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
+  useEffect(() => {
+    let active = true;
+    Promise.all([fetchAdminDestinations(token), fetchAdminRoutes(token)])
+      .then(([destList, routeList]) => {
+        if (!active) return;
+        setDestinations(destList);
+        setRoutes(routeList);
+      })
+      .catch(() => {
+        // Association pickers stay empty; form still usable.
+      });
+    return () => {
+      active = false;
+    };
+  }, [token]);
+
   async function saveMedia() {
     if (!editing) return;
     setBusy(true);
@@ -4228,8 +2888,8 @@ function MediaPanel({
         publicUrl: editing.publicUrl,
         title: editing.title,
         altText: editing.altText,
-        destinationSlugs: csvToList(editing.destinationSlugsText),
-        routeSlugs: csvToList(editing.routeSlugsText),
+        destinationSlugs: editing.destinationSlugs,
+        routeSlugs: editing.routeSlugs,
         tags: csvToList(editing.tagsText),
         status: editing.status,
       });
@@ -4254,6 +2914,77 @@ function MediaPanel({
       await loadMedia();
     } catch (err) {
       setError(err instanceof Error ? err.message : '归档素材失败。');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function setMediaRowStatus(item: MediaAsset, nextStatus: 'published' | 'rejected') {
+    setBusy(true);
+    setError('');
+    setStatus('');
+    try {
+      await postAdminMedia(token, {
+        action: 'update',
+        id: item.id,
+        type: item.type,
+        publicUrl: item.publicUrl,
+        title: item.title,
+        altText: item.altText,
+        destinationSlugs: item.destinationSlugs,
+        routeSlugs: item.routeSlugs,
+        tags: item.tags,
+        status: nextStatus,
+      });
+      setStatus(nextStatus === 'published' ? '已通过，素材可用。' : '已驳回。');
+      await loadMedia();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '更新素材状态失败。');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function toggleDraftSlug(
+    field: 'destinationSlugs' | 'routeSlugs',
+    slug: string,
+    checked: boolean,
+  ) {
+    setEditing((current) => {
+      if (!current) return current;
+      const next = checked
+        ? current[field].includes(slug)
+          ? current[field]
+          : [...current[field], slug]
+        : current[field].filter((value) => value !== slug);
+      return { ...current, [field]: next };
+    });
+  }
+
+  async function saveEditingAsStatus(nextStatus: 'published' | 'rejected') {
+    if (!editing) return;
+    setBusy(true);
+    setError('');
+    setStatus('');
+    try {
+      await postAdminMedia(token, {
+        action: 'update',
+        id: editing.id,
+        type: editing.type,
+        publicUrl: editing.publicUrl,
+        title: editing.title,
+        altText: editing.altText,
+        destinationSlugs: editing.destinationSlugs,
+        routeSlugs: editing.routeSlugs,
+        tags: csvToList(editing.tagsText),
+        status: nextStatus,
+      });
+      setStatus(nextStatus === 'published' ? '已通过，素材可用。' : '已驳回。');
+      setEditing(null);
+      setIsCreate(false);
+      await loadMedia();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '更新素材状态失败。');
     } finally {
       setBusy(false);
     }
@@ -4301,6 +3032,11 @@ function MediaPanel({
       >
         {error && <p className="text-destructive">{error}</p>}
         {status && <p className="text-sm text-green-700">{status}</p>}
+        {isCreate || editing.status === 'review' ? (
+          <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+            待审 = 素材库入库尚未正式可用。通过后，路线/目的地选图器才能选到它。在选图器里直接上传的图是「已发布」，不会走这道确认。
+          </p>
+        ) : null}
         <Card>
           <CardHeader>
             <CardTitle>{isCreate ? '新建素材' : '编辑素材'}</CardTitle>
@@ -4378,7 +3114,7 @@ function MediaPanel({
               </div>
             </FormSection>
 
-            <FormSection title="素材说明" description="给运营识别和图片无障碍说明使用。内容建议仍用英文。">
+            <FormSection title="素材说明" description="标题方便运营查找；替代文本给读屏和裂图用。">
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="space-y-2 text-sm">
                   <span>标题</span>
@@ -4397,49 +3133,71 @@ function MediaPanel({
                       setEditing((current) => (current ? { ...current, tagsText: event.target.value } : current))
                     }
                   />
+                  <FieldHint>可选，用于检索，例如 beijing, great-wall。</FieldHint>
                 </label>
                 <label className="space-y-2 text-sm md:col-span-2">
-                  <span>替代文本（altText）</span>
+                  <span>替代文本（给读屏 / 裂图用的英文描述）</span>
                   <Input
                     value={editing.altText}
                     onChange={(event) =>
                       setEditing((current) => (current ? { ...current, altText: event.target.value } : current))
                     }
                   />
-                  <FieldHint>用于图片无法加载和无障碍阅读；不是运营备注。</FieldHint>
+                  <FieldHint>不是运营备注；图片打不开或读屏软件会读这段英文。</FieldHint>
                 </label>
               </div>
             </FormSection>
 
             <FormSection
               title="关联与发布"
-              description="关联 slug 只是素材元数据，不会自动替换产品封面或详情页图片。"
+              description="勾选关联只是素材元数据，方便以后按路线/目的地筛选；不会自动替换产品封面或详情页图片。"
             >
               <div className="grid gap-4 md:grid-cols-2">
-                <label className="space-y-2 text-sm">
-                  <span>关联目的地（slug，逗号分隔）</span>
-                  <Input
-                    value={editing.destinationSlugsText}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, destinationSlugsText: event.target.value } : current,
-                      )
-                    }
-                  />
-                  <FieldHint>例如 beijing, shanghai；需与已有目的地标识一致。</FieldHint>
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span>关联路线（slug，逗号分隔）</span>
-                  <Input
-                    value={editing.routeSlugsText}
-                    onChange={(event) =>
-                      setEditing((current) =>
-                        current ? { ...current, routeSlugsText: event.target.value } : current,
-                      )
-                    }
-                  />
-                  <FieldHint>仅记录素材和路线的关系，前台引用仍需在对应内容里选择图片 URL。</FieldHint>
-                </label>
+                <div className="space-y-2 text-sm md:col-span-2">
+                  <span>关联目的地</span>
+                  <div className="flex max-h-40 flex-wrap gap-3 overflow-y-auto rounded-md border border-input p-3">
+                    {destinations.length === 0 ? (
+                      <span className="text-muted-foreground">暂无目的地可选。</span>
+                    ) : (
+                      destinations.map((destination) => (
+                        <label key={destination.slug} className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={editing.destinationSlugs.includes(destination.slug)}
+                            onChange={(event) =>
+                              toggleDraftSlug('destinationSlugs', destination.slug, event.target.checked)
+                            }
+                          />
+                          {destination.name}
+                          <span className="font-mono text-xs text-muted-foreground">{destination.slug}</span>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-2 text-sm md:col-span-2">
+                  <span>关联路线</span>
+                  <div className="flex max-h-40 flex-wrap gap-3 overflow-y-auto rounded-md border border-input p-3">
+                    {routes.length === 0 ? (
+                      <span className="text-muted-foreground">暂无线路可选。</span>
+                    ) : (
+                      routes.map((route) => (
+                        <label key={route.slug} className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={editing.routeSlugs.includes(route.slug)}
+                            onChange={(event) =>
+                              toggleDraftSlug('routeSlugs', route.slug, event.target.checked)
+                            }
+                          />
+                          {route.title}
+                          <span className="font-mono text-xs text-muted-foreground">{route.slug}</span>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                  <FieldHint>关联 ≠ 自动换封面。前台仍要在对应内容里选图片 URL。</FieldHint>
+                </div>
                 <label className="space-y-2 text-sm">
                   <span>状态</span>
                   <select
@@ -4457,14 +3215,35 @@ function MediaPanel({
                       </option>
                     ))}
                   </select>
-                  <FieldHint>显示为中文，保存值仍是 review / published / rejected / archived。</FieldHint>
+                  <FieldHint>
+                    新建默认「待审」。通过 → 已发布（选图器可用）；驳回 → 已驳回。
+                  </FieldHint>
                 </label>
               </div>
             </FormSection>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button onClick={saveMedia} disabled={busy || uploading}>
                 {busy ? '保存中...' : isCreate ? '创建素材' : '保存修改'}
               </Button>
+              {!isCreate && editing.status === 'review' ? (
+                <>
+                  <Button
+                    type="button"
+                    disabled={busy || uploading}
+                    onClick={() => void saveEditingAsStatus('published')}
+                  >
+                    通过并保存
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={busy || uploading}
+                    onClick={() => void saveEditingAsStatus('rejected')}
+                  >
+                    驳回并保存
+                  </Button>
+                </>
+              ) : null}
               <Button variant="outline" disabled={busy || uploading} onClick={() => setEditing(null)}>
                 取消
               </Button>
@@ -4479,7 +3258,7 @@ function MediaPanel({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          管理素材元数据，或通过预签名 URL 上传文件到 MinIO。关联 slug 仅用于检索，不会自动替换产品图片。
+          素材库负责入库与待审。待审 = 尚未正式可用；在路线/目的地选图器上传的图会直接可用，不会进待审。关联只方便筛选，不会自动换封面。
         </p>
         <Button
           variant="outline"
@@ -4566,6 +3345,25 @@ function MediaPanel({
                       >
                         编辑
                       </Button>
+                      {item.status === 'review' ? (
+                        <>
+                          <Button
+                            size="sm"
+                            disabled={busy}
+                            onClick={() => void setMediaRowStatus(item, 'published')}
+                          >
+                            通过
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={busy}
+                            onClick={() => void setMediaRowStatus(item, 'rejected')}
+                          >
+                            驳回
+                          </Button>
+                        </>
+                      ) : null}
                       <Button
                         size="sm"
                         variant="outline"
