@@ -96,6 +96,8 @@ Reference URLs:
 ## Me / Orders Rules
 
 - Me → **My Orders** stays inside the Mini-App (`myOrders` view). Do **not** `navigate('/account')` or open the desktop Account page from China Trips.
+- Me and tab headers expose a light exit to the portal homepage: AppHeader brand **Syncing Travel** and Me **Back to website** both link to `/`. Booking flows stay in-app; this is not a primary CTA.
+- Homepage Curated “View Itinerary” on mobile opens `/#/china-trips?route={slug}` which clears the query and opens that route detail. Desktop Curated links go to `/tours/{slug}`.
 - List loads via `fetchMyOrders` (`/api/my-orders` + Bearer token). Empty state CTA **Explore trips** returns to the Home tab.
 - Opening a list row shows order details in-app (`bookingConfirmed` with `mode: 'detail'`); Back returns to `myOrders`, not Home.
 - Desktop `/#/account` remains for non–Mini-App entry points (bookmarks, future desktop nav); do not delete it as part of this rule.

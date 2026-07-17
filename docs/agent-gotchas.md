@@ -15,6 +15,8 @@
 | TOCN 只能作为参考 | 只能参考结构、节奏、交互和信息层级，不能当作 Syncing 事实 |
 | `ChinaTripsMobile` 不是普通长网页 | 先读 `docs/mobile-ios-front-end-context.md`，并检查 320px、375px、390px |
 | Mini-App Me → My Orders 跳到桌面 Account | 必须开站内 `myOrders` 视图；禁止 `navigate('/account')`（与搜索、支付回流同一规则） |
+| 首页 Curated「View Itinerary」仍进 `/china-trips` 总览 | 桌面链 `/tours/:slug`；手机链 `/china-trips?route={slug}`（打开详情后清 query） |
+| Mini-App 无回门户入口 | 顶栏品牌 Syncing Travel + Me「Back to website」链到 `/`；勿把预订主路径改成外跳 |
 | `AGENTS.md` 不是知识库 | 详细内容放入对应 `docs/` 文件 |
 | 本机 `docker` CLI（`docker ps` 等）在这个 shell 环境里可能一直挂起不返回，即使 Docker Desktop 里真的有容器在跑（可能是 shell 会话拿不到桌面会话的 named pipe） | 不要死等 `docker ps`；改用直连 `pg`/`fetch` 测 `POSTGRES_URL` 指向的端口（如 `localhost:5432`）是否能连通，能连通就说明数据库可用，不用管 `docker` CLI 卡不卡 |
 | PowerShell（本项目终端默认）不支持 `&&` 链接命令（会报 `token '&&' is not a valid statement separator`） | 用 `;` 分隔，或用 Shell 工具的 `working_directory` 参数代替 `cd xxx &&` |
@@ -30,6 +32,10 @@
 | 隧道 Host 被 Vite 拦 | `Blocked request... not allowed` → `vite --mode tunnel` 需 `server.allowedHosts: ['.trycloudflare.com']`（仅 tunnel mode） |
 | 隧道下 MinIO 直连 `127.0.0.1:9000` 会签名失败 | Presign Host 须等于浏览器访问的隧道域名。用 Vite `/s3` 反代 + `S3_ENDPOINT=https://<tunnel>/s3`（`testbed:tunnel` 会回写） |
 | 隧道上的 Admin / auth bypass 不是生产 | `DEV_CHECKOUT_BYPASS` + bypass 邮箱在公网裸奔；用完 Ctrl+C 关隧道，勿当正式站 |
+| 直连 GitHub `443` 失败 | 本机 v2rayN/xray 常见 SOCKS `127.0.0.1:10808`；临时用 `git -c http.proxy=socks5://127.0.0.1:10808 -c https.proxy=socks5://127.0.0.1:10808 …`，勿默写进 global config；经代理会明显变慢 |
+| Shell 若已在 `app/`，`git add app/src/...` 会 pathspec 失败 | `git` 路径相对**仓库根**；在 `app/` 内应 `git add src/...`，或设 `working_directory` 为仓库根再用 `app/src/...` |
+| PowerShell 不能用 bash `$(cat <<'EOF')` 写 commit message | 用 `git commit -m "…"` 或 PowerShell here-string `@'…'@` |
+| `npm run build`/`lint` 报 `tsc`/`eslint` 不是内部命令 | 多半缺 `app/node_modules`；在 `app/` 下 `npm install` 后再 `npm run build`，不要裸 `npx tsc`（会装错包） |
 
 ## 添加标准
 

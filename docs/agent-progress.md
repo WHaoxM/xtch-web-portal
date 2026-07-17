@@ -2,6 +2,18 @@
 
 ## Status
 
+**done（首页 Curated 转化 + Mini-App 回门户）** — 三卡深链 + 首选 slug/featured 兜底；Mini-App `?route=`；顶栏品牌 + Me 回 `/`。已验证 `npm run build` / `npm run lint`。
+
+### Progress note（首页 Curated 转化，2026-07-18）
+
+- 目标：Curated Journeys 可转化；Mini-App 可回门户。
+- 已读：grill 决议、`Home.tsx`、`ChinaTripsMobile`、`contentStore`、`useIsMobile`。
+- 已改：`Home.tsx`（首选 slug + featured 补位 + 静态兜底；桌面 `/tours/:slug`、手机 `?route=`）；`ChinaTripsMobile.tsx`（`?route=` 打开详情后清 query；AppHeader 品牌 + Me Back to website）；`chinaTripsMobile.css`；`mobile-ios-front-end-context.md`；`agent-gotchas.md`。
+- 已验证：`npm run build` / `npm run lint` 全绿（本机曾缺 `node_modules`，已 `npm install`）。
+- 未验证：浏览器桌面/手机点 View Itinerary；Mini-App 品牌与 Me 回门户；空库兜底三卡。
+- 踩坑沉淀（已写入 gotchas）：GitHub 经 SOCKS 慢/需 `-c http.proxy`；`git add` 路径相对仓库根（勿在 `app/` cwd 下写 `app/src/...`）；PowerShell 不用 bash heredoc；缺 `node_modules` 先 `npm install`。
+- 下一步：grill 用户清单第 2 项。
+
 **in-progress（隧道测试台联调）** — 本机前置与 `testbed:tunnel` 已拉起；外网四项验收待用户走一遍。
 
 ### Progress note（隧道联调启动，2026-07-17）
