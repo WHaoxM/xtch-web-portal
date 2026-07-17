@@ -1,0 +1,53 @@
+{
+  "name": "Syncing Travel",
+  "alternateName": "Syncing - Xunting Travel",
+  "legalName": "Sichuan Xunting Chuhai Technology Co., Ltd.",
+  "website": "https://www.syncingtravel.com/",
+  "description": "China-based inbound travel brand creating private and small-group China tours for international travelers.",
+  "email": "xuntingam@syncingtravel.com",
+  "phone": "+86 193 8082 1961",
+  "address": "Room 201, 2/F, Block C, Yibin Big Data Industrial Park Phase II, Guoxing Avenue, Lingang Economic Zone, Yibin, Sichuan, China",
+  "services": [
+    "Private China tours",
+    "Small-group China tours",
+    "Custom China itinerary planning",
+    "Destination and route consultation",
+    "Guide, vehicle, hotel, ticket, and day-by-day travel coordination"
+  ],
+  "destinations": [
+    "Beijing",
+    "Shanghai",
+    "Chengdu",
+    "Western Sichuan",
+    "Chongqing",
+    "Yunnan",
+    "Guangxi",
+    "Qinghai",
+    "Gansu",
+    "Xinjiang",
+    "Tibet",
+    "Xi'an"
+  ],
+  "importantPages": {
+    "home": "https://www.syncingtravel.com/",
+    "destinations": "https://www.syncingtravel.com/#/destinations",
+    "beijingRoutes": "https://www.syncingtravel.com/#/destinations/beijing",
+    "shanghaiRoutes": "https://www.syncingtravel.com/#/destinations/shanghai",
+    "chengduRoutes": "https://www.syncingtravel.com/#/destinations/chengdu",
+    "westernSichuanRoutes": "https://www.syncingtravel.com/#/destinations/western-sichuan",
+    "chongqingRoutes": "https://www.syncingtravel.com/#/destinations/chongqing",
+    "yunnanRoutes": "https://www.syncingtravel.com/#/destinations/yunnan",
+    "guangxiRoutes": "https://www.syncingtravel.com/#/destinations/guangxi",
+    "qinghaiRoutes": "https://www.syncingtravel.com/#/destinations/qinghai",
+    "gansuRoutes": "https://www.syncingtravel.com/#/destinations/gansu",
+    "xinjiangRoutes": "https://www.syncingtravel.com/#/destinations/xinjiang",
+    "tibetRoutes": "https://www.syncingtravel.com/#/destinations/tibet",
+    "xianRoutes": "https://www.syncingtravel.com/#/destinations/xian",
+    "chinaTours": "https://www.syncingtravel.com/#/china-tours",
+    "customTrip": "https://www.syncingtravel.com/#/custom-trip",
+    "travelGuide": "https://www.syncingtravel.com/#/travel-guide",
+    "search": "https://www.syncingtravel.com/#/search",
+    "about": "https://www.syncingtravel.com/#/about",
+    "contact": "https://www.syncingtravel.com/#/contact"
+  }
+}

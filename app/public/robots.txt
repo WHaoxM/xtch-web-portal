@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://www.syncingtravel.com/sitemap.xml
+AI-Summary: https://www.syncingtravel.com/ai-summary.json
+LLMS: https://www.syncingtravel.com/llms.txt

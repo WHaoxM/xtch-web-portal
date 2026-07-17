@@ -1,0 +1,13 @@
+{
+  "name": "xtch-web-portal",
+  "private": true,
+  "description": "Repo root proxy — npm scripts run in app/",
+  "scripts": {
+    "dev": "npm run dev --prefix app",
+    "dev:keep": "npm run dev:keep --prefix app",
+    "build": "npm run build --prefix app",
+    "lint": "npm run lint --prefix app",
+    "preview": "npm run preview --prefix app",
+    "typecheck": "npm run typecheck --prefix app"
+  }
+}

@@ -1,0 +1,30 @@
+.playwright-browsers/
+
+# Agent / IDE local directories
+.agents/
+.claude/
+.codex/
+.cursor/
+.playwright-mcp/
+
+# Logs
+*.log
+app/err.txt
+app/out.txt
+
+# Local installer / executables
+Codex Installer.exe
+
+# Transient build/cache
+app/node-jiti/
+
+# Root lockfile (no root package.json)
+/package-lock.json
+
+# Local noise
+build-out.txt
+lint-out.txt
+app/build-exit.txt
+**/__pycache__/
+*.pyc
+
