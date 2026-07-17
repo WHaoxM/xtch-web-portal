@@ -28,3 +28,13 @@ app/build-exit.txt
 **/__pycache__/
 *.pyc
 
+# Local-only reference / intake (not part of origin/dev portal tree)
+/data/
+/本站/
+/目标站/
+/网站素材/
+/路线_新/
+/prototypes/
+/china-trips-smallgroup-flow-390.png
+/skills-lock.json
+
