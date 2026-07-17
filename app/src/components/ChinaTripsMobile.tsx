@@ -1,5 +1,5 @@
 ﻿import { type ComponentType, type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion, MotionConfig } from 'motion/react';
 import {
   BadgeCheck,
@@ -381,7 +381,10 @@ function AppHeader({
   return (
     <header className="iosapp-header">
       <div>
-        {subtitle && <p>{subtitle}</p>}
+        <Link to="/" className="iosapp-header-brand">
+          Syncing Travel
+        </Link>
+        {subtitle && subtitle !== 'Syncing Travel' ? <p>{subtitle}</p> : null}
         <h1>{title}</h1>
       </div>
       {trailing}
@@ -2558,6 +2561,16 @@ function MeTab({
             <p>View reserve requests, deposits, and planner messages from one account.</p>
           </div>
           <SignInOptions onSignIn={onSignIn} />
+          <Link to="/" className="iosapp-settings-row iosapp-settings-row-link">
+            <span className="iosapp-settings-icon">
+              <Home size={19} />
+            </span>
+            <span>
+              <strong>Back to website</strong>
+              <small>Return to Syncing Travel homepage</small>
+            </span>
+            <ChevronRight size={18} />
+          </Link>
         </motion.section>
       ) : (
         <motion.div className="iosapp-settings-list" variants={staggerListVariants}>
@@ -2587,6 +2600,16 @@ function MeTab({
             </span>
             <ChevronRight size={18} />
           </motion.button>
+          <Link to="/" className="iosapp-settings-row iosapp-settings-row-link">
+            <span className="iosapp-settings-icon">
+              <Home size={19} />
+            </span>
+            <span>
+              <strong>Back to website</strong>
+              <small>Return to Syncing Travel homepage</small>
+            </span>
+            <ChevronRight size={18} />
+          </Link>
           <motion.button
             type="button"
             className="iosapp-settings-row"
@@ -3596,6 +3619,7 @@ export default function ChinaTripsMobile() {
   const [postSignInCheckoutDraft, setPostSignInCheckoutDraft] = useState<GroupRequestDraft | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const bookingHandledRef = useRef(false);
+  const routeDeepLinkHandledRef = useRef(false);
   const bookingIdentifiersRef = useRef<{ orderNumber: string; sessionId?: string } | null>(null);
   const bookingOrderRef = useRef<SafeOrderSummary | null>(null);
   const isSignedIn = Boolean(authUser);
@@ -3982,6 +4006,21 @@ export default function ChinaTripsMobile() {
     setRouteDetailReturnView(returnView);
     setActiveView('routeDetail');
   };
+
+  useEffect(() => {
+    if (routeDeepLinkHandledRef.current) return;
+    const routeSlug = searchParams.get('route');
+    if (!routeSlug) return;
+
+    routeDeepLinkHandledRef.current = true;
+    const next = new URLSearchParams(searchParams);
+    next.delete('route');
+    setSearchParams(next, { replace: true });
+
+    if (routeTours.some((tour) => tour.slug === routeSlug)) {
+      openRouteDetail(routeSlug, 'tabs');
+    }
+  }, [searchParams, setSearchParams]);
 
   const openGroupFromPlace = (destination: (typeof destinationMeta)[number]) => {
     setDraft((current) => ({

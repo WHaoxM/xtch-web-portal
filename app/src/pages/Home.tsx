@@ -16,9 +16,30 @@ import {
   Star,
   UsersRound,
 } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { destinationMeta, routeTours, type RouteTour } from '@/lib/contentStore';
 
-const curatedJourneys = [
+/** Preferred homepage Curated cards; fill gaps with other `featured` routes. */
+const CURATED_PREFERRED_SLUGS = [
+  '3-5-days-and-4-nights-in-beijing',
+  '5-chengdu-jiuzhaigou-and-huanglong',
+  '13-encounter-qinghai-and-gansu-grand-circuit',
+] as const;
+
+type CuratedJourneyCard = {
+  slug: string;
+  title: string;
+  subtitle: string;
+  image: string;
+  days: string;
+  places: string[];
+  featured: boolean;
+  wide: boolean;
+};
+
+const curatedJourneyFallback: CuratedJourneyCard[] = [
   {
+    slug: '3-5-days-and-4-nights-in-beijing',
     title: '5-Day Beijing Classic Trip',
     subtitle: 'Imperial history, Great Wall & first China moments',
     image: '/images/route-beijing-greatwall-01.png',
@@ -28,20 +49,84 @@ const curatedJourneys = [
     wide: true,
   },
   {
+    slug: '5-chengdu-jiuzhaigou-and-huanglong',
     title: '5-Day Chengdu & Jiuzhaigou',
     subtitle: 'Pandas, soft city life & colorful mountain lakes',
     image: '/images/route-jiuzhaigou-lake-01.png',
     days: '5 Days',
     places: ['Chengdu', 'Jiuzhaigou', 'Huanglong'],
+    featured: false,
+    wide: false,
   },
   {
+    slug: '13-encounter-qinghai-and-gansu-grand-circuit',
     title: '8-Day Qinghai & Gansu Loop',
     subtitle: 'Salt lakes, Silk Road color & northwest horizons',
     image: '/images/route-qinghai-mingsha-01.jpg',
     days: '8 Days',
     places: ['Qinghai', 'Dunhuang', 'Danxia'],
+    featured: false,
+    wide: false,
   },
 ];
+
+function placeLabelsForTour(tour: RouteTour): string[] {
+  const fromDestinations = tour.destinationSlugs
+    .map((slug) => destinationMeta.find((destination) => destination.slug === slug)?.name)
+    .filter((name): name is string => Boolean(name));
+  if (fromDestinations.length > 0) return fromDestinations.slice(0, 3);
+  return tour.destinationSlugs.slice(0, 3).map((slug) =>
+    slug
+      .split('-')
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' '),
+  );
+}
+
+function tourToCuratedCard(tour: RouteTour, index: number): CuratedJourneyCard {
+  return {
+    slug: tour.slug,
+    title: tour.title,
+    subtitle: tour.desc,
+    image: tour.image,
+    days: tour.duration,
+    places: placeLabelsForTour(tour),
+    featured: index === 0,
+    wide: index === 0,
+  };
+}
+
+function selectCuratedJourneys(): CuratedJourneyCard[] {
+  if (routeTours.length === 0) return curatedJourneyFallback;
+
+  const bySlug = new Map(routeTours.map((tour) => [tour.slug, tour]));
+  const selected: RouteTour[] = [];
+  const used = new Set<string>();
+
+  for (const slug of CURATED_PREFERRED_SLUGS) {
+    const tour = bySlug.get(slug);
+    if (!tour || used.has(tour.slug)) continue;
+    selected.push(tour);
+    used.add(tour.slug);
+    if (selected.length >= 3) break;
+  }
+
+  if (selected.length < 3) {
+    for (const tour of routeTours) {
+      if (!tour.featured || used.has(tour.slug)) continue;
+      selected.push(tour);
+      used.add(tour.slug);
+      if (selected.length >= 3) break;
+    }
+  }
+
+  if (selected.length === 0) return curatedJourneyFallback;
+  return selected.map((tour, index) => tourToCuratedCard(tour, index));
+}
+
+function curatedJourneyHref(slug: string, isMobile: boolean) {
+  return isMobile ? `/china-trips?route=${encodeURIComponent(slug)}` : `/tours/${slug}`;
+}
 
 const curatedTrustItems = [
   {
@@ -188,6 +273,9 @@ const travelerStories = [
 ];
 
 export default function Home() {
+  const isMobile = useIsMobile();
+  const curatedJourneys = selectCuratedJourneys();
+
   return (
     <div className="bg-white text-[#002A3A]">
       <section className="home-reference-hero">
@@ -320,7 +408,10 @@ export default function Home() {
                         From <strong>On request</strong>
                       </p>
                     )}
-                    <Link to="/china-trips" className="curated-button">
+                    <Link
+                      to={curatedJourneyHref(journey.slug, isMobile)}
+                      className="curated-button"
+                    >
                       View Itinerary
                       <ArrowRight size={18} />
                     </Link>
