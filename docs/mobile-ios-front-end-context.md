@@ -6,6 +6,7 @@ This file is the working design contract for `app/src/components/ChinaTripsMobil
 
 - Audience: foreign travelers planning China trips in English.
 - Platform feel: iOS app / mini app, not a responsive marketing webpage.
+- On ≤900px `/china-trips`, do **not** show the marketing site Navbar (logo + hamburger) or Footer. Chrome is omitted in `App.tsx` and reinforced with CSS (`china-trips-miniapp-nav` / `body:has(.china-trips-mobile-page)`). In-app navigation is the bottom tab bar plus screen headers (AppHeader / back), not the website nav.
 - Top-level tabs: Home, Places, Routes, Custom, Me.
 - Custom private trip planning is the primary Home-screen business goal.
 - Group tour reserve is a supporting path, not the primary Home-screen story and not a top-level tab. It appears on Home and can be reviewed from Me.

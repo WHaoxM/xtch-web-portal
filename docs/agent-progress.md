@@ -2,6 +2,59 @@
 
 ## Status
 
+**done（Mini-App 去站点顶栏）** — ≤900px `/china-trips` 不再渲染站点 Navbar/Footer；375 无 logo/汉堡，可见 AppHeader「Syncing Travel」+ 底栏 Tab。已验证 build/lint + 浏览器。
+
+### Progress note（Mini-App 去站点顶栏，2026-07-18）
+
+- 目标：去掉网站式顶栏（logo + 汉堡）；Mini-App 用底栏 + AppHeader。
+- 已改：`App.tsx`（`useSyncExternalStore` ≤900px 不渲染 Navbar/Footer）；`index.css` / `chinaTripsMobile.css`（`:has` / `!important` 加固）；设计文档与 gotchas。
+- 已验证：`npm run build` / `npm run lint`；375 `navCount=0`、`Open menu` 不存在；截图无站点顶栏。
+- 未验证：隧道真机需硬刷新或重启 `testbed:tunnel`。
+- 下一步：无（本任务收口）。
+
+**done（traveler story 轮播 UX）** — 已按 grill 规格落地：Embla 可控轮播、交互暂停 + 8s 恢复、圆点可点+滑动、移动端满宽无 peek、reduced-motion 关自动、循环；图片 marquee 未动。已验证 `npm run build` / `npm run lint`。
+
+**done（Real Moments「亭」顶裁切）** — 窄屏负 margin 大于上内边距，父级 `overflow:hidden` 裁掉「亭」顶部；已加大 padding 并改为只裁水平。已验证 build/lint + 375。
+
+### Progress note（traveler story 轮播，2026-07-18）
+
+- 目标：去掉 CSS 强制自动切带来的移动端难受；按 grill 规格落地可控轮播。
+- 已读：grill 决议、`Home.tsx` Real Moments story、`index.css` `real-story-*`、`ui/carousel.tsx`（复用已有 Embla，未加新依赖）。
+- 已改：`app/src/pages/Home.tsx`（`TravelerStoryCarousel`）；`app/src/index.css`（去掉 `real-story-slide` 动画、viewport/满宽/圆点 button）；任务板/进度/gotchas。
+- 已验证：`npm run build` / `npm run lint` 全绿。
+- 未验证：浏览器桌面 hover/圆点、移动端滑与 8s 恢复、`prefers-reduced-motion`。
+- 下一步：无（本任务收口）；用户刷新首页 Real Moments 故事区验收。
+
+### Progress note（Real Moments「亭」顶裁切，2026-07-18）
+
+- 目标：修用户第二张截图「亭」顶部被裁。
+- 根因：移动端 `margin:-72px` + `padding-top:64px` → 内容起点在父级裁切线上方约 8px。
+- 已改：`index.css`（`overflow-x:hidden`、padding-top 88px、emblem `line-height:1.2`）；`Home.tsx`（外包 `overflow-x-hidden`）。
+- 已验证：`npm run build` / `npm run lint`；375 `clippedByParent=false`；截图「亭」完整。
+- 下一步：无；用户硬刷新后再看。
+
+**done（Real Moments 标题溢出）** — 窄屏 Iconic Places 标题与山形图标重叠已修；`.real-moment-row-title` 改为固定图标列 grid。已验证 `npm run build` / `npm run lint` + 浏览器 320/375。
+
+### Progress note（Real Moments 标题溢出，2026-07-18）
+
+- 目标：修用户截图中 Iconic Places 标题文字压到山形图标上。
+- 已读：截图、`Home.tsx` Real Moments、`index.css` `.real-moment-row-title` / `.curated-trust-item`。
+- 已改：`app/src/index.css`（标题区改 grid `44px/36px + minmax(0,1fr)`，SVG 固定宽高，文字 `min-width:0` + `overflow-wrap`）。
+- 已验证：`npm run build` / `npm run lint` 全绿；浏览器 375/320 测距 `gap=12`、`overlap=false`。
+- 未验证：真机 Safari/微信内置浏览器。
+- 下一步：无（本任务收口）；用户刷新首页窄屏看 Iconic Places 标题即可。
+
+**done（桌面 Real Moments lightbox）** — 跑马灯点开放大；关闭后从暂停处继续滑动。已验证 `npm run build` / `npm run lint` + 浏览器 open/close 动画态。
+
+### Progress note（桌面 Real Moments lightbox，2026-07-18）
+
+- 目标：Home Real Moments 自动滑动图可点开放大，叉掉后继续滑动。
+- 已读：用户截图、`Home.tsx` Real Moments、`index.css` marquee、Mini-App Moments lightbox 对照。
+- 已改：`Home.tsx`（`RealMomentsSection` + lightbox；打开时 `is-lightbox-open`）；`index.css`（暂停轨道动画 + lightbox 样式）。
+- 已验证：`npm run build` / `npm run lint` 全绿；浏览器点卡 → lightbox；关闭后 `animationPlayState` 从 `paused` 回到 `running`。
+- 未验证：无阻塞项。
+- 下一步：无（本任务收口）。
+
 **done（首页 Curated 转化 + Mini-App 回门户）** — 三卡深链 + 首选 slug/featured 兜底；Mini-App `?route=`；顶栏品牌 + Me 回 `/`。已验证 `npm run build` / `npm run lint`。
 
 ### Progress note（首页 Curated 转化，2026-07-18）

@@ -1,5 +1,5 @@
 import { Routes, Route, useLocation } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import ScrollToTop from './components/ScrollToTop';
@@ -24,9 +24,29 @@ import Account from './pages/Account';
 import { consumeAuthRedirectSession, readStoredAuthSession } from './lib/authClient';
 import { ensureContentDataLoaded } from './lib/contentStore';
 
+/** Matches `chinaTripsMobile.css` Mini-App shell breakpoint (not `useIsMobile` 768). */
+const MINI_APP_MAX_WIDTH_QUERY = '(max-width: 900px)';
+
+function subscribeMiniAppViewport(onChange: () => void) {
+  const media = window.matchMedia(MINI_APP_MAX_WIDTH_QUERY);
+  media.addEventListener('change', onChange);
+  return () => media.removeEventListener('change', onChange);
+}
+
+function getMiniAppViewportSnapshot() {
+  return window.matchMedia(MINI_APP_MAX_WIDTH_QUERY).matches;
+}
+
 function App() {
   const location = useLocation();
   const isAdminRoute = location.pathname === '/admin';
+  const isChinaTripsRoute =
+    location.pathname === '/china-trips' || location.pathname === '/china-tours';
+  const isMiniAppViewport = useSyncExternalStore(
+    subscribeMiniAppViewport,
+    getMiniAppViewportSnapshot,
+    () => false,
+  );
   const [authReady, setAuthReady] = useState(() => {
     const hasCallback = typeof window !== 'undefined' && window.location.hash.includes('access_token');
     const hasSession = typeof window !== 'undefined' && Boolean(readStoredAuthSession());
@@ -77,6 +97,7 @@ function App() {
   }, [authReady]);
 
   const contentReady = isAdminRoute || contentDataLoaded;
+  const hideSiteChrome = isAdminRoute || (isChinaTripsRoute && isMiniAppViewport);
 
   if (!authReady) return null;
   if (!contentReady) return null;
@@ -85,7 +106,7 @@ function App() {
     <div className="min-h-screen flex flex-col">
       <Seo />
       <ScrollToTop />
-      {!isAdminRoute && <Navbar />}
+      {!hideSiteChrome && <Navbar />}
       <main className={isAdminRoute ? 'flex-1 min-h-0' : 'flex-1'}>
         <Routes>
           <Route path="/" element={<Home />} />
@@ -107,7 +128,7 @@ function App() {
           <Route path="/admin" element={<Admin />} />
         </Routes>
       </main>
-      {!isAdminRoute && <Footer />}
+      {!hideSiteChrome && <Footer />}
     </div>
   );
 }

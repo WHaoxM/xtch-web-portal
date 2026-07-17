@@ -14,8 +14,10 @@
 | 内容事实不能从目标站猜 | 先查 `docs/content-resource-map.md` |
 | TOCN 只能作为参考 | 只能参考结构、节奏、交互和信息层级，不能当作 Syncing 事实 |
 | `ChinaTripsMobile` 不是普通长网页 | 先读 `docs/mobile-ios-front-end-context.md`，并检查 320px、375px、390px |
+| Mini-App 顶上出现网站 logo+汉堡 | ≤900px `/china-trips` 不得渲染站点 `Navbar`/`Footer`（见 `App.tsx`）；勿只靠组件内 CSS。断点是 900，不是 `useIsMobile` 的 768 |
 | Mini-App Me → My Orders 跳到桌面 Account | 必须开站内 `myOrders` 视图；禁止 `navigate('/account')`（与搜索、支付回流同一规则） |
 | 首页 Curated「View Itinerary」仍进 `/china-trips` 总览 | 桌面链 `/tours/:slug`；手机链 `/china-trips?route={slug}`（打开详情后清 query） |
+| Home traveler story 又改回 CSS `real-story-slide` 自动切 | 已改为 Embla JS 轮播（交互暂停 + 8s 恢复、圆点可点）；不要恢复无限 CSS 动画；图片 marquee 是另一套，勿混改 |
 | Mini-App 无回门户入口 | 顶栏品牌 Syncing Travel + Me「Back to website」链到 `/`；勿把预订主路径改成外跳 |
 | `AGENTS.md` 不是知识库 | 详细内容放入对应 `docs/` 文件 |
 | 本机 `docker` CLI（`docker ps` 等）在这个 shell 环境里可能一直挂起不返回，即使 Docker Desktop 里真的有容器在跑（可能是 shell 会话拿不到桌面会话的 named pipe） | 不要死等 `docker ps`；改用直连 `pg`/`fetch` 测 `POSTGRES_URL` 指向的端口（如 `localhost:5432`）是否能连通，能连通就说明数据库可用，不用管 `docker` CLI 卡不卡 |

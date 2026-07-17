@@ -1337,7 +1337,7 @@
 
 @media (max-width: 900px) {
   .china-trips-miniapp-nav {
-    display: none;
+    display: none !important;
   }
 }
 

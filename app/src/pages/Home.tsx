@@ -1,10 +1,14 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import useEmblaCarousel from 'embla-carousel-react';
 import {
   ArrowLeft,
   ArrowRight,
   BookOpen,
   CalendarDays,
   Camera,
+  ChevronLeft,
+  ChevronRight,
   Crown,
   Gem,
   Headphones,
@@ -15,9 +19,13 @@ import {
   ShieldCheck,
   Star,
   UsersRound,
+  X,
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { destinationMeta, routeTours, type RouteTour } from '@/lib/contentStore';
+
+const STORY_AUTOPLAY_MS = 8000;
+const STORY_RESUME_MS = 8000;
 
 /** Preferred homepage Curated cards; fill gaps with other `featured` routes. */
 const CURATED_PREFERRED_SLUGS = [
@@ -215,6 +223,11 @@ const travelerMomentCards = [
   },
 ];
 
+type MomentLightbox = {
+  source: 'iconic' | 'traveler';
+  index: number;
+};
+
 const travelerStories = [
   {
     title: 'A Quiet Morning in Zhangjiajie',
@@ -271,6 +284,456 @@ const travelerStories = [
     tags: ['Beijing', 'Great Wall', 'First Visit', 'Family Trip'],
   },
 ];
+
+function TravelerStoryCarousel({ forcePaused }: { forcePaused: boolean }) {
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true, align: 'start' });
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
+  const [interactionPaused, setInteractionPaused] = useState(false);
+  const resumeTimerRef = useRef<number | null>(null);
+  const advanceTimerRef = useRef<number | null>(null);
+  const autoplaySelectRef = useRef(false);
+  const hasInitializedRef = useRef(false);
+
+  const clearResumeTimer = useCallback(() => {
+    if (resumeTimerRef.current !== null) {
+      window.clearTimeout(resumeTimerRef.current);
+      resumeTimerRef.current = null;
+    }
+  }, []);
+
+  const clearAdvanceTimer = useCallback(() => {
+    if (advanceTimerRef.current !== null) {
+      window.clearTimeout(advanceTimerRef.current);
+      advanceTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleResume = useCallback(() => {
+    clearResumeTimer();
+    if (prefersReducedMotion || forcePaused) return;
+    resumeTimerRef.current = window.setTimeout(() => {
+      resumeTimerRef.current = null;
+      setInteractionPaused(false);
+    }, STORY_RESUME_MS);
+  }, [clearResumeTimer, forcePaused, prefersReducedMotion]);
+
+  const noteUserInteraction = useCallback(() => {
+    setInteractionPaused(true);
+    clearAdvanceTimer();
+    if (!isHovering) {
+      scheduleResume();
+    } else {
+      clearResumeTimer();
+    }
+  }, [clearAdvanceTimer, clearResumeTimer, isHovering, scheduleResume]);
+
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const sync = () => setPrefersReducedMotion(media.matches);
+    sync();
+    media.addEventListener('change', sync);
+    return () => media.removeEventListener('change', sync);
+  }, []);
+
+  useEffect(() => {
+    if (!emblaApi) return;
+
+    const onSelect = () => {
+      setSelectedIndex(emblaApi.selectedScrollSnap());
+      if (autoplaySelectRef.current) {
+        autoplaySelectRef.current = false;
+        return;
+      }
+      if (!hasInitializedRef.current) {
+        hasInitializedRef.current = true;
+        return;
+      }
+      noteUserInteraction();
+    };
+
+    const onPointerDown = () => {
+      noteUserInteraction();
+    };
+
+    onSelect();
+    emblaApi.on('select', onSelect);
+    emblaApi.on('pointerDown', onPointerDown);
+    return () => {
+      emblaApi.off('select', onSelect);
+      emblaApi.off('pointerDown', onPointerDown);
+    };
+  }, [emblaApi, noteUserInteraction]);
+
+  const autoplayEnabled =
+    Boolean(emblaApi) &&
+    !prefersReducedMotion &&
+    !forcePaused &&
+    !isHovering &&
+    !interactionPaused;
+
+  useEffect(() => {
+    clearAdvanceTimer();
+    if (!autoplayEnabled || !emblaApi) return;
+
+    advanceTimerRef.current = window.setTimeout(() => {
+      autoplaySelectRef.current = true;
+      emblaApi.scrollNext();
+    }, STORY_AUTOPLAY_MS);
+
+    return clearAdvanceTimer;
+  }, [autoplayEnabled, clearAdvanceTimer, emblaApi, selectedIndex]);
+
+  const wasExternallyPausedRef = useRef(false);
+
+  useEffect(() => {
+    if (forcePaused || prefersReducedMotion) {
+      clearResumeTimer();
+      clearAdvanceTimer();
+      wasExternallyPausedRef.current = true;
+      return;
+    }
+    if (wasExternallyPausedRef.current) {
+      wasExternallyPausedRef.current = false;
+      if (interactionPaused && !isHovering) {
+        scheduleResume();
+      }
+    }
+  }, [
+    clearAdvanceTimer,
+    clearResumeTimer,
+    forcePaused,
+    interactionPaused,
+    isHovering,
+    prefersReducedMotion,
+    scheduleResume,
+  ]);
+
+  useEffect(
+    () => () => {
+      clearResumeTimer();
+      clearAdvanceTimer();
+    },
+    [clearAdvanceTimer, clearResumeTimer],
+  );
+
+  const handleMouseEnter = () => {
+    setIsHovering(true);
+    clearResumeTimer();
+    clearAdvanceTimer();
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovering(false);
+    if (interactionPaused && !prefersReducedMotion && !forcePaused) {
+      scheduleResume();
+    }
+  };
+
+  const goToStory = (index: number) => {
+    if (!emblaApi) return;
+    if (emblaApi.selectedScrollSnap() === index) {
+      noteUserInteraction();
+      return;
+    }
+    emblaApi.scrollTo(index);
+  };
+
+  return (
+    <div
+      className="real-story-carousel"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      <div className="real-story-viewport" ref={emblaRef}>
+        <div className="real-story-track">
+          {travelerStories.map((story) => (
+            <div key={story.title} className="real-story-feature">
+              <article className="real-story-card">
+                <div className="real-story-kicker">
+                  <BookOpen size={29} strokeWidth={1.5} />
+                  <span>Traveler Story</span>
+                </div>
+                <h3>{story.title}</h3>
+                <div className="real-story-byline">
+                  <span className="real-story-avatar">
+                    <img src={story.avatar} alt="" />
+                  </span>
+                  <span>By {story.author}</span>
+                  <i />
+                  <span>{story.country}</span>
+                </div>
+                {story.paragraphs.map((paragraph) => (
+                  <p key={paragraph}>{paragraph}</p>
+                ))}
+                <blockquote>
+                  {story.quote}
+                  <br />
+                  {story.quoteSecondLine}
+                </blockquote>
+                <div className="real-story-tags">
+                  {story.tags.map((tag, index) => {
+                    const Icon = [MapPin, UsersRound, Leaf, Camera][index] ?? MapPin;
+                    return (
+                      <span key={tag}>
+                        <Icon size={14} />
+                        {tag}
+                      </span>
+                    );
+                  })}
+                </div>
+                <Link to="/china-trips" className="real-story-link">
+                  Read full story
+                  <ArrowRight size={18} />
+                </Link>
+              </article>
+
+              <div className="real-story-visual">
+                <img
+                  src={story.mainImage}
+                  alt={story.location}
+                  className="real-story-main-image"
+                />
+                <div className="real-story-location">
+                  <MapPin size={20} />
+                  {story.location}
+                </div>
+                <figure className="real-story-polaroid">
+                  <img src={story.polaroidImage} alt={story.polaroidCaption} />
+                  <figcaption>{story.polaroidCaption}</figcaption>
+                </figure>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="real-story-dots" role="tablist" aria-label="Traveler stories">
+        {travelerStories.map((story, index) => (
+          <button
+            key={story.title}
+            type="button"
+            role="tab"
+            aria-label={`Show story: ${story.title}`}
+            aria-selected={index === selectedIndex}
+            className={index === selectedIndex ? 'active' : undefined}
+            onClick={() => goToStory(index)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RealMomentsSection() {
+  const [lightbox, setLightbox] = useState<MomentLightbox | null>(null);
+  const lightboxCards = lightbox?.source === 'iconic' ? iconicMomentCards : travelerMomentCards;
+  const activeCard = lightbox === null ? null : lightboxCards[lightbox.index] ?? null;
+
+  useEffect(() => {
+    if (!lightbox) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setLightbox(null);
+        return;
+      }
+      if (event.key === 'ArrowLeft') {
+        setLightbox((current) => {
+          if (!current) return null;
+          const cards = current.source === 'iconic' ? iconicMomentCards : travelerMomentCards;
+          return { ...current, index: (current.index - 1 + cards.length) % cards.length };
+        });
+        return;
+      }
+      if (event.key === 'ArrowRight') {
+        setLightbox((current) => {
+          if (!current) return null;
+          const cards = current.source === 'iconic' ? iconicMomentCards : travelerMomentCards;
+          return { ...current, index: (current.index + 1) % cards.length };
+        });
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [lightbox]);
+
+  const closeLightbox = () => setLightbox(null);
+
+  return (
+    <div className={`real-moments-section${lightbox ? ' is-lightbox-open' : ''}`}>
+      <div className="real-moments-header">
+        <span className="real-moments-emblem">亭</span>
+        <h2>REAL MOMENTS</h2>
+        <p className="real-moments-script">From Our Private China Tours</p>
+        <p className="real-moments-copy">
+          Authentic experiences. Local connections. Unforgettable memories.
+          <br />
+          Discover the real China through the eyes of our travelers.
+        </p>
+      </div>
+
+      <div className="real-moment-row">
+        <div className="real-moment-row-head">
+          <div className="real-moment-row-title">
+            <Mountain size={44} strokeWidth={1.4} />
+            <div>
+              <h3>Iconic Places, Timeless Beauty</h3>
+              <p>Curated destinations, beyond the guidebooks.</p>
+            </div>
+          </div>
+          <div className="real-moment-arrows" aria-hidden="true">
+            <button type="button">
+              <ArrowLeft size={24} />
+            </button>
+            <button type="button">
+              <ArrowRight size={24} />
+            </button>
+          </div>
+        </div>
+
+        <div className="real-moment-marquee">
+          <div className="real-moment-track">
+            {[...iconicMomentCards, ...iconicMomentCards].map((card, index) => (
+              <button
+                key={`${card.title}-${index}`}
+                type="button"
+                className="real-place-card"
+                aria-label={`View ${card.title}, ${card.place}`}
+                onClick={() =>
+                  setLightbox({ source: 'iconic', index: index % iconicMomentCards.length })
+                }
+              >
+                <img src={card.image} alt="" />
+                <div className="real-place-card-shade" />
+                <div className="real-place-card-caption">
+                  <MapPin size={24} />
+                  <div>
+                    <h4>{card.title}</h4>
+                    <p>{card.place}</p>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="real-moment-row real-moment-row-second">
+        <div className="real-moment-row-head">
+          <div className="real-moment-row-title">
+            <UsersRound size={44} strokeWidth={1.4} />
+            <div>
+              <h3>Real Travelers, Real Moments</h3>
+              <p>Genuine smiles. Meaningful connections.</p>
+            </div>
+          </div>
+          <div className="real-moment-arrows" aria-hidden="true">
+            <button type="button">
+              <ArrowLeft size={24} />
+            </button>
+            <button type="button">
+              <ArrowRight size={24} />
+            </button>
+          </div>
+        </div>
+
+        <div className="real-moment-marquee real-moment-marquee-reverse">
+          <div className="real-moment-track">
+            {[...travelerMomentCards, ...travelerMomentCards].map((card, index) => (
+              <button
+                key={`${card.title}-${index}`}
+                type="button"
+                className="real-traveler-card"
+                aria-label={`View ${card.title}`}
+                onClick={() =>
+                  setLightbox({ source: 'traveler', index: index % travelerMomentCards.length })
+                }
+              >
+                <img src={card.image} alt="" />
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <TravelerStoryCarousel forcePaused={Boolean(lightbox)} />
+
+      {activeCard && lightbox ? (
+        <div
+          className="real-moments-lightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${activeCard.title} photo`}
+        >
+          <button
+            type="button"
+            className="real-moments-lightbox-backdrop"
+            aria-label="Close photo"
+            onClick={closeLightbox}
+          />
+          <div className="real-moments-lightbox-panel">
+            <header className="real-moments-lightbox-bar">
+              <button type="button" onClick={closeLightbox} aria-label="Close">
+                <X size={22} />
+              </button>
+              <div>
+                <strong>{activeCard.title}</strong>
+                {lightbox.source === 'iconic' ? (
+                  <small>{iconicMomentCards[lightbox.index]?.place}</small>
+                ) : null}
+              </div>
+              <span />
+            </header>
+            <div className="real-moments-lightbox-stage">
+              <button
+                type="button"
+                className="real-moments-lightbox-nav"
+                aria-label="Previous photo"
+                onClick={() =>
+                  setLightbox((current) => {
+                    if (!current) return null;
+                    const cards =
+                      current.source === 'iconic' ? iconicMomentCards : travelerMomentCards;
+                    return {
+                      ...current,
+                      index: (current.index - 1 + cards.length) % cards.length,
+                    };
+                  })
+                }
+              >
+                <ChevronLeft size={28} />
+              </button>
+              <img src={activeCard.image} alt={activeCard.title} />
+              <button
+                type="button"
+                className="real-moments-lightbox-nav"
+                aria-label="Next photo"
+                onClick={() =>
+                  setLightbox((current) => {
+                    if (!current) return null;
+                    const cards =
+                      current.source === 'iconic' ? iconicMomentCards : travelerMomentCards;
+                    return { ...current, index: (current.index + 1) % cards.length };
+                  })
+                }
+              >
+                <ChevronRight size={28} />
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 export default function Home() {
   const isMobile = useIsMobile();
@@ -471,155 +934,8 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="overflow-hidden bg-white py-18 section-padding md:py-24">
-        <div className="real-moments-section">
-          <div className="real-moments-header">
-            <span className="real-moments-emblem">亭</span>
-            <h2>REAL MOMENTS</h2>
-            <p className="real-moments-script">From Our Private China Tours</p>
-            <p className="real-moments-copy">
-              Authentic experiences. Local connections. Unforgettable memories.
-              <br />
-              Discover the real China through the eyes of our travelers.
-            </p>
-          </div>
-
-          <div className="real-moment-row">
-            <div className="real-moment-row-head">
-              <div className="real-moment-row-title">
-                <Mountain size={44} strokeWidth={1.4} />
-                <div>
-                  <h3>Iconic Places, Timeless Beauty</h3>
-                  <p>Curated destinations, beyond the guidebooks.</p>
-                </div>
-              </div>
-              <div className="real-moment-arrows" aria-hidden="true">
-                <button type="button">
-                  <ArrowLeft size={24} />
-                </button>
-                <button type="button">
-                  <ArrowRight size={24} />
-                </button>
-              </div>
-            </div>
-
-            <div className="real-moment-marquee">
-              <div className="real-moment-track">
-                {[...iconicMomentCards, ...iconicMomentCards].map((card, index) => (
-                  <article key={`${card.title}-${index}`} className="real-place-card">
-                    <img src={card.image} alt={card.title} />
-                    <div className="real-place-card-shade" />
-                    <div className="real-place-card-caption">
-                      <MapPin size={24} />
-                      <div>
-                        <h4>{card.title}</h4>
-                        <p>{card.place}</p>
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="real-moment-row real-moment-row-second">
-            <div className="real-moment-row-head">
-              <div className="real-moment-row-title">
-                <UsersRound size={44} strokeWidth={1.4} />
-                <div>
-                  <h3>Real Travelers, Real Moments</h3>
-                  <p>Genuine smiles. Meaningful connections.</p>
-                </div>
-              </div>
-              <div className="real-moment-arrows" aria-hidden="true">
-                <button type="button">
-                  <ArrowLeft size={24} />
-                </button>
-                <button type="button">
-                  <ArrowRight size={24} />
-                </button>
-              </div>
-            </div>
-
-            <div className="real-moment-marquee real-moment-marquee-reverse">
-              <div className="real-moment-track">
-                {[...travelerMomentCards, ...travelerMomentCards].map((card, index) => (
-                  <article key={`${card.title}-${index}`} className="real-traveler-card">
-                    <img src={card.image} alt={card.title} />
-                  </article>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="real-story-carousel">
-            <div className="real-story-track">
-              {travelerStories.map((story) => (
-                <div key={story.title} className="real-story-feature">
-                  <article className="real-story-card">
-                    <div className="real-story-kicker">
-                      <BookOpen size={29} strokeWidth={1.5} />
-                      <span>Traveler Story</span>
-                    </div>
-                    <h3>{story.title}</h3>
-                    <div className="real-story-byline">
-                      <span className="real-story-avatar">
-                        <img src={story.avatar} alt="" />
-                      </span>
-                      <span>By {story.author}</span>
-                      <i />
-                      <span>{story.country}</span>
-                    </div>
-                    {story.paragraphs.map((paragraph) => (
-                      <p key={paragraph}>{paragraph}</p>
-                    ))}
-                    <blockquote>
-                      {story.quote}
-                      <br />
-                      {story.quoteSecondLine}
-                    </blockquote>
-                    <div className="real-story-tags">
-                      {story.tags.map((tag, index) => {
-                        const Icon = [MapPin, UsersRound, Leaf, Camera][index] ?? MapPin;
-                        return (
-                          <span key={tag}>
-                            <Icon size={14} />
-                            {tag}
-                          </span>
-                        );
-                      })}
-                    </div>
-                    <Link to="/china-trips" className="real-story-link">
-                      Read full story
-                      <ArrowRight size={18} />
-                    </Link>
-                  </article>
-
-                  <div className="real-story-visual">
-                    <img
-                      src={story.mainImage}
-                      alt={story.location}
-                      className="real-story-main-image"
-                    />
-                    <div className="real-story-location">
-                      <MapPin size={20} />
-                      {story.location}
-                    </div>
-                    <figure className="real-story-polaroid">
-                      <img src={story.polaroidImage} alt={story.polaroidCaption} />
-                      <figcaption>{story.polaroidCaption}</figcaption>
-                    </figure>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="real-story-dots" aria-hidden="true">
-              {travelerStories.map((story, index) => (
-                <span key={story.title} className={index === 0 ? 'active' : ''} />
-              ))}
-            </div>
-          </div>
-        </div>
+      <section className="overflow-x-hidden bg-white py-18 section-padding md:py-24">
+        <RealMomentsSection />
       </section>
 
       <section className="home-final-cta">
