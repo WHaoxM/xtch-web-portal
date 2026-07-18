@@ -6,6 +6,7 @@
 .codex/
 .cursor/
 .playwright-mcp/
+.superpowers/
 
 # Logs
 *.log

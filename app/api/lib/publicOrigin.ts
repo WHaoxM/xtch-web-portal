@@ -85,7 +85,7 @@ export function resolvePublicOrigin(env: NodeJS.ProcessEnv = process.env): strin
 
   const lan = detectLanIPv4();
   if (lan) {
-    const port = env.SELFHOST_PORT?.trim() || env.PORT?.trim() || '3000';
+    const port = env.SELFHOST_PORT?.trim() || env.PORT?.trim() || '3080';
     const withPort = port && port !== '80' && port !== '443' ? `${lan}:${port}` : lan;
     return normalizeHostOrOrigin(withPort, { preferHttps: false });
   }

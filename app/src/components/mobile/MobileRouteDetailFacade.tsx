@@ -39,7 +39,7 @@ export function MobileRouteDetailFacade({
         <img src={tour.image} alt={tour.title} />
         <div className="iosapp-detail-shade" />
         <div className="iosapp-detail-title">
-          <span className="iosapp-pill">{tour.category || 'Route'}</span>
+          {tour.category ? <span className="iosapp-pill">{tour.category}</span> : null}
           <h1>{tour.title}</h1>
           <p>{destinationNames.join(' · ') || tour.desc || ''}</p>
         </div>

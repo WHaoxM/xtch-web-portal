@@ -28,9 +28,8 @@ export type RouteEditDraft = {
   summary: string;
   durationDays: string;
   groupSizeDisplay: string;
+  /** Derived display label from themes[0]; not independently editable. */
   category: string;
-  /** When true, category is not auto-derived from themes. */
-  categoryManual: boolean;
   themes: string[];
   status: ContentStatus;
   featured: boolean;
@@ -120,7 +119,6 @@ export function emptyRouteDraft(): RouteEditDraft {
     durationDays: '1',
     groupSizeDisplay: DEFAULT_GROUP_SIZE_BY_TYPE.customizable,
     category: '',
-    categoryManual: false,
     themes: [],
     status: 'draft',
     featured: false,
@@ -147,7 +145,6 @@ export function routeToDraft(route: RouteRecord): RouteEditDraft {
     durationDays: String(route.durationDays),
     groupSizeDisplay: route.groupSizeDisplay,
     category: route.category,
-    categoryManual: true,
     themes: route.themes,
     status: route.status,
     featured: route.featured,
@@ -279,10 +276,7 @@ export function draftToRouteRecord(
 ): RouteRecord {
   const durationDays = Number(draft.durationDays);
   const safeDays = Number.isFinite(durationDays) && durationDays > 0 ? durationDays : 1;
-  const category =
-    draft.categoryManual && draft.category.trim()
-      ? draft.category.trim()
-      : deriveCategoryFromThemes(draft.themes, categories) || draft.category.trim();
+  const category = deriveCategoryFromThemes(draft.themes, categories);
   const slug = draft.slug.trim() || slugifyOrFallback(draft.title || 'untitled');
 
   return {
@@ -387,9 +381,7 @@ export function buildRouteSavePayload(
     summary: draft.summary.trim(),
     durationDays: record.durationDays,
     groupSizeDisplay: record.groupSizeDisplay,
-    category: record.category === 'Route' && !draft.category.trim() && draft.themes.length === 0
-      ? ''
-      : record.category,
+    category: deriveCategoryFromThemes(draft.themes, options.categories),
     themes: draft.themes,
     status: options.status,
     featured: draft.featured,

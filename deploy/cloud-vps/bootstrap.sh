@@ -79,7 +79,7 @@ cat <<'EOF'
 Bootstrap finished.
 
 Next (see docs/ops/cloud-vps.md):
-  1. DNS A → this VPS public IP; security group: 80/443 only (not 5432/9000/9001/3000)
+  1. DNS A → this VPS public IP; security group: 80/443 only (not 5432/9000/9001/3080)
   2. Clone into /opt/xtch-web-portal (or edit xtch-app.service WorkingDirectory)
        sudo mkdir -p /opt && sudo chown "$USER:$USER" /opt
        git clone <YOUR_REPO_URL> /opt/xtch-web-portal

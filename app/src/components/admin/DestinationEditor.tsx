@@ -204,11 +204,11 @@ export function DestinationEditor({
               <FieldHint>目的地列表等处的默认排序；数字越小越靠前。</FieldHint>
             </label>
             <div className="space-y-2 text-sm md:col-span-2">
-              <span>旅行风格</span>
+              <span>筛选分类（旅行风格）</span>
               <div className="flex flex-wrap gap-3 rounded-md border border-input p-3">
                 {categories.length === 0 ? (
                   <span className="text-muted-foreground">
-                    暂无目的地分类。请先到「分类」模块创建；也可暂不勾选并先存草稿。
+                    暂无目的地筛选分类。请先到「筛选分类」模块创建；也可暂不勾选并先存草稿。
                   </span>
                 ) : (
                   categories.map((category) => (
@@ -228,7 +228,7 @@ export function DestinationEditor({
                   ))
                 )}
               </div>
-              <FieldHint>决定旅客按风格筛选时能否找到此目的地；空分类不阻草稿保存。</FieldHint>
+              <FieldHint>决定旅客在 Places 筛选栏能否找到此目的地；不勾选不阻草稿保存。</FieldHint>
             </div>
           </div>
         </FormSection>

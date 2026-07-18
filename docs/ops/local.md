@@ -10,6 +10,7 @@ npm run dev          # http://127.0.0.1:3000
 npm run db:migrate   # --env local → env/local/.env
 ```
 
+- 开发固定 `:3000`；生产 `deploy:serve` 用 `:3080`，可同机并行（见 [README.md](./README.md)）
 - Dev Supabase；可开 `DEV_*` bypass（勿用于公网 target）
 - Docker：`docker compose up -d`（Postgres + MinIO，日常库 `xtch` / 桶 `xtch-public`）
 - MinIO 细节：[shared/minio.md](./shared/minio.md)

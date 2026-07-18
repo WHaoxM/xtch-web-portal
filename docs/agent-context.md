@@ -12,7 +12,8 @@
 - UI 基础组件在 `app/src/components/ui/`。
 - 样式主要是 Tailwind CSS + `app/src/index.css`。
 - `@/*` 指向 `app/src/*`。
-- 本地开发端口默认是 `3000`，见 `app/vite.config.ts`。
+- 本地开发端口默认是 `3000`（Vite），见 `app/vite.config.ts`。生产 `deploy:serve` 默认 `3080`（与开发分开）。
+- `npm run deploy:serve` / `selfhost`：读 `env/win11-home`（或 `--target`），默认监听 `:3080`。
 
 ## 必读入口
 
@@ -58,6 +59,7 @@ npm run deploy:serve -- --target win11-home
 ```
 
 - `npm run dev`：先释放占用 `3000` 的旧进程，再启动 Vite；本地 URL 固定为 `http://127.0.0.1:3000`。
+- `npm run deploy:serve`：生产静态+API，默认 `http://127.0.0.1:3080`（与 Vite 可同机并行）。
 - `npm run dev:keep`：不杀旧进程，直接启动（仅在你明确要保留现有监听时用）。
 - 已有健康的 `3000` 服务时优先复用，不要再开第二个。
 - 依赖安装仍在 `app/`：`cd app && npm install`。

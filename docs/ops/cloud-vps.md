@@ -2,7 +2,7 @@
 
 ## 目标 / 非目标
 
-**是什么**：Ubuntu/Debian VPS 上跑与 Win11 同拓扑的生产站——Caddy `:80/:443` → Node `127.0.0.1:3000`（`dist` + `/api` + `/s3`）→ 本机 Docker Postgres/MinIO。仓库内提供脚本与 systemd 单元；**主机开通后再 SSH 落地**。
+**是什么**：Ubuntu/Debian VPS 上跑与 Win11 同拓扑的生产站——Caddy `:80/:443` → Node `127.0.0.1:3080`（`dist` + `/api` + `/s3`）→ 本机 Docker Postgres/MinIO。仓库内提供脚本与 systemd 单元；**主机开通后再 SSH 落地**。
 
 **不是什么**：
 
@@ -13,8 +13,8 @@
 ## 架构
 
 ```text
-Visitor → DNS A → VPS :80/:443 → Caddy (HTTPS) → Node deploy:serve :3000 (127.0.0.1)
-                                                    ├─ static app/dist
+Visitor → DNS A → VPS :80/:443 → Caddy (HTTPS) → Node deploy:serve :3080 (127.0.0.1)
+                                                    ├─ static app/dist/cloud-vps
                                                     ├─ /api/*
                                                     └─ /s3/* → MinIO 127.0.0.1:9000
 API → Postgres 127.0.0.1:5432 (xtch_prod，空库起步)
@@ -26,7 +26,7 @@ API → Postgres 127.0.0.1:5432 (xtch_prod，空库起步)
 ### 1. DNS 与安全组
 
 1. DNS **A 记录** → 云主机公网 IP
-2. 安全组放行 **80/443**；**不要**放行 `5432` / `9000` / `9001` / `3000`
+2. 安全组放行 **80/443**；**不要**放行 `5432` / `9000` / `9001` / `3080`
 
 ### 2. Bootstrap
 
@@ -101,9 +101,9 @@ sudo systemctl reload caddy   # 或 restart
 
 本机冒烟（SSH 上）：
 
-- `curl -sS http://127.0.0.1:3000/` → HTML
-- `curl -sS http://127.0.0.1:3000/api/routes` → JSON
-- `curl -sS http://127.0.0.1:3000/s3/minio/health/live` → MinIO health
+- `curl -sS http://127.0.0.1:3080/` → HTML
+- `curl -sS http://127.0.0.1:3080/api/routes` → JSON
+- `curl -sS http://127.0.0.1:3080/s3/minio/health/live` → MinIO health
 
 ### 7. S1 验收
 
@@ -112,7 +112,7 @@ sudo systemctl reload caddy   # 或 restart
 3. 空/占位名单时 `deploy:serve` 拒启；填真实名单后可起
 4. `GET /api/routes` 正常（空库可为 `[]`）
 5. 同域 `/s3` health 或对象可读
-6. 外网端口扫描：仅 80/443；`5432`/`9000`/`9001`/`3000` 不通
+6. 外网端口扫描：仅 80/443；`5432`/`9000`/`9001`/`3080` 不通
 
 ### 8. 切流量
 

@@ -1,10 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { readStoredAuthSession, clearStoredAuthSession } from '@/lib/authClient';
+import {
+  clearStoredAuthSession,
+  readStoredAuthSession,
+  subscribeAuthSession,
+  type AuthSession,
+} from '@/lib/authClient';
+import { fetchMyOrders, type SafeOrderSummary } from '@/lib/orderClient';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import type { SafeOrderSummary } from '@/lib/orderClient';
 
 function formatCents(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
@@ -29,42 +34,77 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function Account() {
   const navigate = useNavigate();
-  const [session] = useState(() => readStoredAuthSession());
+  const [session, setSession] = useState<AuthSession | null>(() => readStoredAuthSession());
   const [orders, setOrders] = useState<SafeOrderSummary[]>([]);
-  const [status, setStatus] = useState<'loading' | 'error' | 'ready' | 'unauthenticated'>(() =>
-    session ? 'loading' : 'unauthenticated',
-  );
   const [error, setError] = useState('');
+  const [loadedForToken, setLoadedForToken] = useState('');
+
+  const accessToken = session?.accessToken ?? '';
+  const status = !accessToken
+    ? 'unauthenticated'
+    : loadedForToken !== accessToken
+      ? 'loading'
+      : error
+        ? 'error'
+        : 'ready';
 
   useEffect(() => {
-    if (!session) return;
+    const syncSession = (next: AuthSession | null = readStoredAuthSession()) => {
+      setSession((prev) => {
+        if (prev?.accessToken === next?.accessToken && prev?.user.id === next?.user.id) {
+          return prev;
+        }
+        return next;
+      });
+    };
+
+    const unsubscribe = subscribeAuthSession((next) => syncSession(next));
+    const onFocus = () => syncSession();
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('focus', onFocus);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!accessToken) return;
 
     let cancelled = false;
 
-    fetch('/api/my-orders', {
-      headers: { Authorization: `Bearer ${session.accessToken}` },
-    })
-      .then((response) => response.json())
-      .then((data) => {
+    fetchMyOrders(accessToken)
+      .then((result) => {
         if (cancelled) return;
-        if (data.ok && Array.isArray(data.orders)) {
-          setOrders(data.orders);
-          setStatus('ready');
-        } else {
-          setError(data.error || 'We could not load your orders.');
-          setStatus('error');
+        if (result.ok) {
+          setOrders(result.orders);
+          setError('');
+          setLoadedForToken(accessToken);
+          return;
         }
+        if (result.unauthorized) {
+          clearStoredAuthSession();
+          setSession(null);
+          setOrders([]);
+          setError('');
+          setLoadedForToken('');
+          return;
+        }
+        setOrders([]);
+        setError(result.error);
+        setLoadedForToken(accessToken);
       })
       .catch(() => {
         if (cancelled) return;
+        setOrders([]);
         setError('We could not load your orders.');
-        setStatus('error');
+        setLoadedForToken(accessToken);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [session]);
+  }, [accessToken]);
 
   if (status === 'unauthenticated') {
     return (

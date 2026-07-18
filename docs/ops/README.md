@@ -9,9 +9,9 @@
 | 层级 | Target | 用途 | Env 文件 | Supabase | 边缘 / 进程 | 文档 |
 |---|---|---|---|---|---|---|
 | 开发 | `local` | 日常 Vite | `env/local/.env` | **Dev** | Vite `:3000` | [local.md](./local.md) |
-| 测试台 | `tunnel` | 临时公网 | `env/tunnel/.env` | **Dev** | cloudflared | [tunnel.md](./tunnel.md) |
-| 生产 A | `win11-home` | 家宽 Win11 对外站 | `env/win11-home/.env` | **Prod** | [deploy/win11-home/Caddyfile](../../deploy/win11-home/Caddyfile) | [win11-home.md](./win11-home.md) |
-| 生产 B | `cloud-vps` | Linux 云主机对外站 | `env/cloud-vps/.env` | **Prod** | [deploy/cloud-vps/](../../deploy/cloud-vps/) + systemd | [cloud-vps.md](./cloud-vps.md) |
+| 测试台 | `tunnel` | 临时公网 | `env/tunnel/.env` | **Dev** | cloudflared → Vite `:3000` | [tunnel.md](./tunnel.md) |
+| 生产 A | `win11-home` | 家宽 Win11 对外站 | `env/win11-home/.env` | **Prod** | Caddy → Node `:3080` | [win11-home.md](./win11-home.md) |
+| 生产 B | `cloud-vps` | Linux 云主机对外站 | `env/cloud-vps/.env` | **Prod** | Caddy → Node `:3080` | [cloud-vps.md](./cloud-vps.md) |
 
 **别名**：`selfhost` → `win11-home`。npm `build:selfhost` / `selfhost` / `db:migrate:selfhost` 仍可用。
 

@@ -21,7 +21,8 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import OrderSuccess from './pages/OrderSuccess';
 import Admin from './pages/Admin';
 import Account from './pages/Account';
-import { consumeAuthRedirectSession, readStoredAuthSession } from './lib/authClient';
+import AuthCallback from './pages/AuthCallback';
+import { completeAuthRedirectNavigation, urlHasAuthTokens } from './lib/authClient';
 import { ensureContentDataLoaded } from './lib/contentStore';
 
 /** Matches `chinaTripsMobile.css` Mini-App shell breakpoint (not `useIsMobile` 768). */
@@ -40,6 +41,7 @@ function getMiniAppViewportSnapshot() {
 function App() {
   const location = useLocation();
   const isAdminRoute = location.pathname === '/admin';
+  const isAuthCallbackRoute = location.pathname === '/auth/callback';
   const isChinaTripsRoute =
     location.pathname === '/china-trips' || location.pathname === '/china-tours';
   const isMiniAppViewport = useSyncExternalStore(
@@ -47,10 +49,11 @@ function App() {
     getMiniAppViewportSnapshot,
     () => false,
   );
+  // Always block first paint while URL still holds tokens — even if a prior session exists.
+  // (Old logic skipped consumption when hasSession, leaving `#access_token=…` on Home.)
   const [authReady, setAuthReady] = useState(() => {
-    const hasCallback = typeof window !== 'undefined' && window.location.hash.includes('access_token');
-    const hasSession = typeof window !== 'undefined' && Boolean(readStoredAuthSession());
-    return !hasCallback || hasSession;
+    if (typeof window === 'undefined') return true;
+    return !urlHasAuthTokens();
   });
   const [contentDataLoaded, setContentDataLoaded] = useState(false);
 
@@ -71,33 +74,45 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (authReady) return;
+
     let cancelled = false;
 
     async function handleAuthCallback() {
       try {
-        const session = await consumeAuthRedirectSession();
-        if (cancelled) return;
-        if (session) {
-          window.location.hash = '#/account';
-          return;
+        // Root-level token dumps (#access_token=…) — consume and return to pending path.
+        // Dedicated /auth/callback also handles this via AuthCallback page.
+        if (urlHasAuthTokens() && location.pathname !== '/auth/callback') {
+          await completeAuthRedirectNavigation();
         }
-      } catch {
-        // Ignore callback errors; the current page will show its normal UI.
+      } catch (error) {
+        console.error('Auth redirect consumption failed:', error);
+        // Strip broken tokens so the next paint is not stuck on `#access_token=…`.
+        if (urlHasAuthTokens()) {
+          const fallback =
+            window.location.pathname === '/admin' || window.location.hash.includes('admin')
+              ? '#/admin'
+              : '#/';
+          window.history.replaceState(
+            null,
+            '',
+            `${window.location.origin}${window.location.pathname}${fallback}`,
+          );
+        }
       }
       if (!cancelled) setAuthReady(true);
     }
 
-    if (!authReady) {
-      handleAuthCallback();
-    }
+    handleAuthCallback();
 
     return () => {
       cancelled = true;
     };
-  }, [authReady]);
+  }, [authReady, location.pathname]);
 
-  const contentReady = isAdminRoute || contentDataLoaded;
-  const hideSiteChrome = isAdminRoute || (isChinaTripsRoute && isMiniAppViewport);
+  const contentReady = isAdminRoute || isAuthCallbackRoute || contentDataLoaded;
+  const hideSiteChrome =
+    isAdminRoute || isAuthCallbackRoute || (isChinaTripsRoute && isMiniAppViewport);
 
   if (!authReady) return null;
   if (!contentReady) return null;
@@ -125,6 +140,7 @@ function App() {
           <Route path="/search" element={<Search />} />
           <Route path="/orders/:orderNumber" element={<OrderSuccess />} />
           <Route path="/account" element={<Account />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/admin" element={<Admin />} />
         </Routes>
       </main>

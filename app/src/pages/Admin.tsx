@@ -4,9 +4,12 @@ import { Menu, X } from 'lucide-react';
 import {
   readStoredAuthSession,
   signInWithOAuth,
-  sendEmailMagicLink,
+  sendAdminOtp,
+  verifyEmailOtp,
   clearStoredAuthSession,
   consumeAuthRedirectSession,
+  ensureFreshSession,
+  resolvePostAuthReturnPath,
   type AuthSession,
 } from '../lib/authClient';
 import {
@@ -188,7 +191,7 @@ const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     items: [
       { value: 'destinations', label: '目的地' },
       { value: 'routes', label: '路线' },
-      { value: 'categories', label: '分类' },
+      { value: 'categories', label: '筛选分类' },
       { value: 'media', label: '素材' },
     ],
   },
@@ -303,27 +306,70 @@ function inquirySourceSummary(inquiry: {
 
 function SignInView({ onSignedIn }: { onSignedIn: (session: AuthSession) => void }) {
   const [email, setEmail] = useState('');
-  const [status, setStatus] = useState<'idle' | 'loading' | 'sent' | 'error'>('idle');
+  const [otpCode, setOtpCode] = useState('');
+  const [step, setStep] = useState<'email' | 'code'>('email');
+  const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
   const [error, setError] = useState('');
+  const [resendIn, setResendIn] = useState(0);
+
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const timer = window.setTimeout(() => setResendIn((value) => Math.max(0, value - 1)), 1000);
+    return () => window.clearTimeout(timer);
+  }, [resendIn]);
 
   const handleGoogle = async () => {
     try {
-      await signInWithOAuth('google', 'account');
+      await signInWithOAuth('google', 'account', { returnPath: '#/admin' });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign-in failed.');
     }
   };
 
-  const handleEmail = async (event: React.FormEvent) => {
+  const handleSendCode = async (event: React.FormEvent) => {
     event.preventDefault();
     setStatus('loading');
     setError('');
     try {
-      await sendEmailMagicLink(email, 'account');
-      setStatus('sent');
+      await sendAdminOtp(email);
+      setStep('code');
+      setResendIn(60);
+      setStatus('idle');
     } catch (err) {
       setStatus('error');
-      setError(err instanceof Error ? err.message : 'We could not send the magic link.');
+      setError(err instanceof Error ? err.message : 'We could not send the sign-in code.');
+    }
+  };
+
+  const handleVerifyCode = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setStatus('loading');
+    setError('');
+    try {
+      const session = await verifyEmailOtp(email, otpCode);
+      const nextPath = await resolvePostAuthReturnPath(session);
+      if (nextPath !== '#/admin' && !nextPath.startsWith('#/admin?')) {
+        window.location.hash = nextPath;
+        return;
+      }
+      onSignedIn(session);
+    } catch (err) {
+      setStatus('error');
+      setError(err instanceof Error ? err.message : 'We could not verify that code.');
+    }
+  };
+
+  const handleResend = async () => {
+    if (resendIn > 0) return;
+    setStatus('loading');
+    setError('');
+    try {
+      await sendAdminOtp(email);
+      setResendIn(60);
+      setStatus('idle');
+    } catch (err) {
+      setStatus('error');
+      setError(err instanceof Error ? err.message : 'We could not send the sign-in code.');
     }
   };
 
@@ -352,20 +398,60 @@ function SignInView({ onSignedIn }: { onSignedIn: (session: AuthSession) => void
             Continue with Google
           </Button>
           <hr className="border-border" />
-          <form onSubmit={handleEmail} className="space-y-3">
-            <Input
-              type="email"
-              placeholder="Admin email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-            <Button type="submit" className="w-full" disabled={status === 'loading'}>
-              {status === 'loading' ? 'Sending...' : 'Send magic link'}
-            </Button>
-          </form>
-          {status === 'sent' && (
-            <p className="text-sm text-green-600">Check your email for the sign-in link.</p>
+          {step === 'email' ? (
+            <form onSubmit={handleSendCode} className="space-y-3">
+              <Input
+                type="email"
+                placeholder="Admin email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+              />
+              <Button type="submit" className="w-full" disabled={status === 'loading'}>
+                {status === 'loading' ? 'Sending...' : 'Send sign-in code'}
+              </Button>
+            </form>
+          ) : (
+            <form onSubmit={handleVerifyCode} className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Enter the 6-digit code sent to <span className="font-medium text-foreground">{email}</span>.
+              </p>
+              <Input
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="6-digit code"
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                required
+                minLength={6}
+              />
+              <Button type="submit" className="w-full" disabled={status === 'loading' || otpCode.length < 6}>
+                {status === 'loading' ? 'Verifying...' : 'Verify code'}
+              </Button>
+              <div className="flex items-center justify-between gap-2 text-sm">
+                <button
+                  type="button"
+                  className="underline text-muted-foreground"
+                  onClick={() => {
+                    setStep('email');
+                    setOtpCode('');
+                    setError('');
+                  }}
+                >
+                  Use a different email
+                </button>
+                <button
+                  type="button"
+                  className="underline text-muted-foreground disabled:no-underline disabled:opacity-50"
+                  disabled={resendIn > 0 || status === 'loading'}
+                  onClick={() => void handleResend()}
+                >
+                  {resendIn > 0 ? `Resend in ${resendIn}s` : 'Resend code'}
+                </button>
+              </div>
+            </form>
           )}
           {error && <p className="text-sm text-destructive">{error}</p>}
         </CardContent>
@@ -2228,7 +2314,7 @@ function RoutesPanel({
             <TableHeader>
               <TableRow>
                 <TableHead>标题</TableHead>
-                <TableHead>分类</TableHead>
+                <TableHead>展示标签</TableHead>
                 <TableHead>天数</TableHead>
                 <TableHead>推荐</TableHead>
                 <TableHead>状态</TableHead>
@@ -3506,11 +3592,16 @@ export default function Admin() {
       try {
         const redirected = await consumeAuthRedirectSession();
         if (cancelled) return;
-        const stored = readStoredAuthSession();
         if (redirected) {
           setSession(redirected);
-        } else if (stored) {
-          setSession(stored);
+          return;
+        }
+        const fresh = await ensureFreshSession();
+        if (!cancelled && fresh) {
+          setSession(fresh);
+        } else if (!cancelled) {
+          const stored = readStoredAuthSession();
+          if (stored) setSession(stored);
         }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Auth check failed.');
@@ -3535,13 +3626,23 @@ export default function Admin() {
     let cancelled = false;
     fetchAdminMe(session.accessToken)
       .then((me) => {
-        if (!cancelled) setAdminRole(me.role);
+        if (!cancelled) {
+          setAdminRole(me.role);
+          setError('');
+        }
       })
       .catch((err) => {
-        if (!cancelled) {
-          setAdminRole(null);
-          setError(err instanceof Error ? err.message : 'Failed to load admin role.');
+        if (cancelled) return;
+        setAdminRole(null);
+        const message = err instanceof Error ? err.message : 'Failed to load admin role.';
+        // Stale bypass / expired JWT: drop client session so Sign In is shown, not a hollow shell.
+        if (/invalid or expired admin session|admin authentication required/i.test(message)) {
+          clearStoredAuthSession();
+          setSession(null);
+          setError(message);
+          return;
         }
+        setError(message);
       });
 
     return () => {

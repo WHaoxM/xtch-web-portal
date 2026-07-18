@@ -7,7 +7,8 @@
 | Gotcha | 正确处理 |
 |---|---|
 | 根目录也可 `npm run …` | 仓库根 `package.json` 会 `--prefix app` 转发；仍须写 `npm run deploy:serve`（不是裸 `deploy:serve`）。带参数：`npm run deploy:serve -- --target win11-home` |
-| Agent 反复 `npm run dev` 导致端口变成 3001/3002 | 本地固定 `3000`（`strictPort: true`）。需要新开时直接 `npm run dev`（会先跑 `scripts/free-dev-port.mjs` 释放占用）；不要手动换端口。已有健康的 3000 服务时优先复用，勿重复启动 |
+| Agent 反复 `npm run dev` 导致端口变成 3001/3002 | 本地 Vite 固定 `3000`（`strictPort: true`）。需要新开时直接 `npm run dev`（会先跑 `scripts/free-dev-port.mjs` 释放占用）；不要手动换端口。已有健康的 3000 服务时优先复用，勿重复启动 |
+| 开发与生产端口分开 | Vite/`npm run dev` → `:3000`；`deploy:serve` → `:3080`（`SELFHOST_PORT` 可覆盖）。Caddy 反代 `127.0.0.1:3080`。勿把两边都写 3000，否则同机并行会抢端口，且 `free-dev-port` 会误杀生产进程 |
 | 当前路由使用 `HashRouter` | 内部链接和刷新行为要兼容 hash 路由 |
 | 页面路由集中在 `app/src/App.tsx` | 新页面或路由改动先查这里 |
 | `@/*` 指向 `app/src/*` | 应优先使用项目已有别名 |
@@ -43,8 +44,16 @@
 | 公网 deploy 拒启空/占位 Admin 名单（G1） | `win11-home` / `cloud-vps`：名单全空或仅 `you@example.com` 时 `deploy:serve` `process.exit(1)`；不影响 Vite `local` |
 | 自建 MinIO 签名用本机、浏览器走同域 `/s3` | `S3_ENDPOINT=http://127.0.0.1:9000`；浏览器 URL 优先跟请求 Host（`/s3`），否则 `S3_BROWSER_ENDPOINT` / `PUBLIC_DOMAIN`>`PUBLIC_IP`>LAN；勿把签名 Host 写成公网却让代理改掉 Host |
 | 生产多入口（域名/公网IP/局域网） | `deploy:serve` 默认 `SELFHOST_HOST=0.0.0.0`；`VITE_AUTH_REDIRECT_URL` 宜留空；Supabase/Google 须白名单每个会用的 origin |
+| Auth 回调必须消费 `#access_token` | URL 含 token 时 `authReady` 必须为 false 并跑 `completeAuthRedirectNavigation`；**勿**因已有 localStorage session 而跳过（曾卡在首页 `#access_token=…`）。回跳：`auth_next` → localStorage → `/api/admin/me` 成功则 `#/admin` → 旅客默认。Supabase Site URL 常丢掉 query；Redirect URLs：开发 `http://127.0.0.1:3000/**`，生产直连/LAN `http://192.168.x.x:3080/**`（及域名）。`type=recovery` 也会带 token，同样走消费逻辑 |
+| 旅客登录成功勿默认 `#/account` | 无 return path 时回 `#/china-trips`（`TRAVELER_DEFAULT_RETURN_PATH`）并 `markPostAuthMeFocus`；会话真相源是 `@supabase/supabase-js`（勿再双写旧 key `syncing_travel_auth_session`）；401 先 `ensureFreshSession` 再试一次，仍失败再清会话；跨标签用 `subscribeAuthSession` + `focus` |
+| 「看着已登录」却订单要登录 | 先查：① Redirect URL 是否含当前 origin；② 前端 bypass 会话 vs 服务端无 `DEV_AUTH_BYPASS_EMAIL`；③ React `authUser` 与 `readStoredAuthSession()` 是否脱节（点订单前应重读）；④ Supabase 邮件模板是否仍只有链接、未放 `{{ .Token }}` |
+| Admin / 旅客邮箱用 6 位 OTP | Admin：`POST /api/admin/auth-otp`（名单预检，无 `email_redirect_to`）；旅客：客户端 `signInWithOtp`；两端 `verifyOtp({ type: 'email' })`。旧 `/api/admin/auth-magic-link` 一期仍转发到 OTP。Confirm email 保持开启＝仅首次注册确认 |
+| Supabase 邮件模板必须含 Token | Dashboard → Auth → Email Templates → **Magic Link**：正文写 `{{ .Token }}`（Dev+Prod）。不改模板则用户收不到可用 6 位码。代码不改模板 |
+| 本地测真 OTP | 临时去掉 `VITE_DEV_AUTH_BYPASS_EMAIL`，用名单邮箱收 6 位码；测完可再开 bypass |
 | 生产勿共用日常库/桶 | Deploy target 用 `xtch_prod` + `xtch-prod` + `APP_ENV=prod`；日常仍是 `xtch` + `xtch-public`；隧道是 `xtch_tunnel` + `xtch-tunnel`。导入备份见 `docs/ops/shared/content-backup.md`，勿对 `xtch` 跑生产导入 |
-| 公网前端 `VITE_*` 要打进构建 | 用 `npm run build:win11-home` 或 `build:cloud-vps`（`--mode` 读对应 `env/<target>/.env`），再 `npm run deploy:serve`；只改 runtime env 不会更新已构建的 Supabase/redirect。旧 `build:selfhost`/`selfhost` 仍指向 win11-home |
+| 公网前端 `VITE_*` 要打进构建 | 用 `npm run build:win11-home` 或 `build:cloud-vps`（输出到 `app/dist/<target>/`），再 `npm run deploy:serve`；只改 runtime env 不会更新已构建的 Supabase/redirect |
+| 勿用本地 `npm run build` 喂 deploy:serve | **已隔离：** `build` → `app/dist/local/`；`build:win11-home` → `app/dist/win11-home/`；`deploy:serve` 只读 `dist/<target>/` 且校验 `.xtch-build-target`。本地 build 再也盖不掉生产包 |
+| 新增 API 后须重启 deploy:serve | `localApiRoutes` 在进程启动时加载；未重启会 JSON `Not found.`（如 `/api/admin/auth-otp`） |
 | Agent/脚本重定向输出别落在 `app/` 根 | 写到仓库根 `tmp/`（gitignore）；勿再生成 `app/out.txt` / `app/err.txt` / `app/build-out.txt` |
 | 直连 GitHub `443` 失败 | 本机 v2rayN/xray 常见 SOCKS `127.0.0.1:10808`；临时用 `git -c http.proxy=socks5://127.0.0.1:10808 -c https.proxy=socks5://127.0.0.1:10808 …`，勿默写进 global config；经代理会明显变慢 |
 | Shell 若已在 `app/`，`git add app/src/...` 会 pathspec 失败 | `git` 路径相对**仓库根**；在 `app/` 内应 `git add src/...`，或设 `working_directory` 为仓库根再用 `app/src/...` |
@@ -60,6 +69,7 @@
 | Admin 订单详情又变字段 dump / 点列表清空备注 | 用 `OrderDetail` 三块（下一步/客人行程金额/支付技术折叠）；打开详情走 `GET ?orderNumber=` 回显 `internal_notes`；勿 `setNotes('')`；取消申请只警示不假装可批准 |
 | Admin 素材待审与选图上传混淆 / 关联又变 slug 逗号串 | 选图器上传 → `published`（立刻封面）；素材页新建 → 默认 `review`，列表「通过/驳回」；关联用目的地/路线名称勾选，≠ 自动换封面；工作台「待审」只计库内入库 |
 | Admin 分类又露出手填 key / 中文显示名 | 运营只填英文显示名+排序+启用；新建 key 由 `slugify`/`slugifyOrFallback` 自动生成并隐藏；编辑 key 仅「高级」只读；CJK 保存/启用拦截；停用不删已勾选内容上的 key |
+| 路线展示标签必须对齐筛选分类 | `routes.category` 只由 `themes[0]`→`categories.label` 推导（读列表与 `upsertRoute` 强制）；Admin 不可手填；无 themes 则角标不显示。勿再恢复独立「分类文案」手填 |
 | Admin 表单配置又手填 fieldKey / 无旅客预览 | 用 `FormConfigMobilePreview`（完整定制｜路线私人）+ `formFieldDraft`；新建 fieldKey 由 label 转 **snake_case**（非 hyphen slug）自动生成并藏进高级；编辑草稿合并预览带「未保存」角标；列表「整表预览」仅已启用已保存；CJK 拦 label/description；勿做拖拽构建器 |
 | Admin 工作台四卡顺序/文案散落 | 紧急序固定：取消申请 → 待跟进询盘 → 未上架路线 → 待确认素材；文案在 `dashboardOpsCopy`（取消说明复用 `orderOpsCopy`）；有数醒目、零淡化；勿改 `dashboard.ts` 计数或增删卡 |
 

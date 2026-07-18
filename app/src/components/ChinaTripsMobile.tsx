@@ -29,10 +29,14 @@ import {
   clearStoredAuthSession,
   consumeAuthRedirectSession,
   consumePendingAuthIntent,
+  consumePostAuthMeFocus,
   isAuthConfigured,
+  markPostAuthMeFocus,
   readStoredAuthSession,
-  sendEmailMagicLink,
+  sendEmailOtp,
   signInWithOAuth,
+  subscribeAuthSession,
+  verifyEmailOtp,
   type AuthIntent,
   type AuthProvider,
   type AuthUser,
@@ -171,6 +175,9 @@ type CustomTextField = Exclude<
 type CustomChoiceField = 'destinations' | 'interests' | 'contactPreferences';
 type PlaceFilterKey = string;
 type RouteFilterKey = string;
+
+/** Sentinel for unfiltered Destinations/Routes lists; invalid as categories.key (SLUG_PATTERN). */
+const ALL_FILTER_KEY = '__all__';
 
 type GroupTourDeparture = {
   id: string;
@@ -754,7 +761,7 @@ function FeaturedRouteCards({
             whileTap={tapScaleSoft}
           >
             <img src={tour.image} alt={tour.title} />
-            <span className="iosapp-pill">{tour.category}</span>
+            {tour.category ? <span className="iosapp-pill">{tour.category}</span> : null}
             <div>
               <strong>{tour.title}</strong>
               <small>
@@ -1027,7 +1034,7 @@ function SearchResultsView({
                       key={tour.slug}
                       image={tour.image}
                       title={tour.title}
-                      meta={`${tour.duration} · ${tour.category}`}
+                      meta={[tour.duration, tour.category].filter(Boolean).join(' · ')}
                       onClick={() => onOpenRoute(tour.slug)}
                     />
                   ))}
@@ -1095,7 +1102,7 @@ function HomeTab({
 
 function DestinationsTab({ onOpenPlace }: { onOpenPlace: (slug: string) => void }) {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [activeFilter, setActiveFilter] = useState<PlaceFilterKey>('');
+  const [activeFilter, setActiveFilter] = useState<PlaceFilterKey>(ALL_FILTER_KEY);
 
   useEffect(() => {
     let cancelled = false;
@@ -1103,7 +1110,6 @@ function DestinationsTab({ onOpenPlace }: { onOpenPlace: (slug: string) => void 
       .then((result) => {
         if (cancelled) return;
         setCategories(result);
-        setActiveFilter((current) => current || result[0]?.key || '');
       })
       .catch(() => {
         if (!cancelled) setCategories([]);
@@ -1114,9 +1120,15 @@ function DestinationsTab({ onOpenPlace }: { onOpenPlace: (slug: string) => void 
   }, []);
 
   const selectedFilter = categories.find((filter) => filter.key === activeFilter);
-  const destinations = selectedFilter
-    ? destinationMeta.filter((destination) => destination.travelStyles.includes(activeFilter))
-    : destinationMeta;
+  const destinations =
+    activeFilter !== ALL_FILTER_KEY && selectedFilter
+      ? destinationMeta.filter((destination) => destination.travelStyles.includes(activeFilter))
+      : destinationMeta;
+
+  const filterOptions = [
+    { key: ALL_FILTER_KEY, label: 'All' },
+    ...categories.map((category) => ({ key: category.key, label: category.label })),
+  ];
 
   return (
     <motion.div variants={tabPanelVariants} initial="initial" animate="animate" exit="exit">
@@ -1125,11 +1137,7 @@ function DestinationsTab({ onOpenPlace }: { onOpenPlace: (slug: string) => void 
       </motion.div>
       {categories.length > 0 && (
         <motion.div variants={fadeUpItem}>
-          <FilterRail
-            options={categories.map((category) => ({ key: category.key, label: category.label }))}
-            value={activeFilter}
-            onChange={setActiveFilter}
-          />
+          <FilterRail options={filterOptions} value={activeFilter} onChange={setActiveFilter} />
         </motion.div>
       )}
       <motion.p className="iosapp-filter-summary" variants={fadeUpItem}>
@@ -1137,7 +1145,7 @@ function DestinationsTab({ onOpenPlace }: { onOpenPlace: (slug: string) => void 
         {selectedFilter ? ` in ${selectedFilter.label}` : ''}
       </motion.p>
       <motion.div
-        key={activeFilter || 'all'}
+        key={activeFilter}
         className="iosapp-card-list"
         variants={staggerListVariants}
         initial="initial"
@@ -1160,7 +1168,7 @@ function DestinationsTab({ onOpenPlace }: { onOpenPlace: (slug: string) => void 
 
 function RoutesTab({ onOpenRoute }: { onOpenRoute: (slug: string) => void }) {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [activeFilter, setActiveFilter] = useState<RouteFilterKey>('');
+  const [activeFilter, setActiveFilter] = useState<RouteFilterKey>(ALL_FILTER_KEY);
 
   useEffect(() => {
     let cancelled = false;
@@ -1168,7 +1176,6 @@ function RoutesTab({ onOpenRoute }: { onOpenRoute: (slug: string) => void }) {
       .then((result) => {
         if (cancelled) return;
         setCategories(result);
-        setActiveFilter((current) => current || result[0]?.key || '');
       })
       .catch(() => {
         if (!cancelled) setCategories([]);
@@ -1179,9 +1186,15 @@ function RoutesTab({ onOpenRoute }: { onOpenRoute: (slug: string) => void }) {
   }, []);
 
   const selectedFilter = categories.find((filter) => filter.key === activeFilter);
-  const filteredRoutes = selectedFilter
-    ? routeTours.filter((tour) => tour.themes.includes(activeFilter))
-    : routeTours;
+  const filteredRoutes =
+    activeFilter !== ALL_FILTER_KEY && selectedFilter
+      ? routeTours.filter((tour) => tour.themes.includes(activeFilter))
+      : routeTours;
+
+  const filterOptions = [
+    { key: ALL_FILTER_KEY, label: 'All' },
+    ...categories.map((category) => ({ key: category.key, label: category.label })),
+  ];
 
   return (
     <motion.div variants={tabPanelVariants} initial="initial" animate="animate" exit="exit">
@@ -1190,11 +1203,7 @@ function RoutesTab({ onOpenRoute }: { onOpenRoute: (slug: string) => void }) {
       </motion.div>
       {categories.length > 0 && (
         <motion.div variants={fadeUpItem}>
-          <FilterRail
-            options={categories.map((category) => ({ key: category.key, label: category.label }))}
-            value={activeFilter}
-            onChange={setActiveFilter}
-          />
+          <FilterRail options={filterOptions} value={activeFilter} onChange={setActiveFilter} />
         </motion.div>
       )}
       <motion.p className="iosapp-filter-summary" variants={fadeUpItem}>
@@ -1202,7 +1211,7 @@ function RoutesTab({ onOpenRoute }: { onOpenRoute: (slug: string) => void }) {
         {selectedFilter ? ` in ${selectedFilter.label}` : ''}
       </motion.p>
       <motion.div
-        key={activeFilter || 'all'}
+        key={activeFilter}
         className="iosapp-card-list"
         variants={staggerListVariants}
         initial="initial"
@@ -1213,7 +1222,7 @@ function RoutesTab({ onOpenRoute }: { onOpenRoute: (slug: string) => void }) {
             <MobileRouteListCard
               image={tour.image}
               title={tour.title}
-              meta={`${tour.category} · ${tour.duration} · ${tour.groupSize}`}
+              meta={[tour.category, tour.duration, tour.groupSize].filter(Boolean).join(' · ')}
               onClick={() => onOpenRoute(tour.slug)}
             />
           </motion.div>
@@ -1296,7 +1305,7 @@ function PlaceDetailView({
                 key={tour.slug}
                 image={tour.image}
                 title={tour.title}
-                meta={`${tour.category} · ${tour.duration} · ${tour.groupSize}`}
+                meta={[tour.category, tour.duration, tour.groupSize].filter(Boolean).join(' · ')}
                 onClick={() => onOpenRoute(tour.slug)}
               />
             ))}
@@ -1371,7 +1380,7 @@ function RouteDetailView({
           <button type="button" onClick={onOpenCustom}>Plan</button>
         </nav>
         <div className="iosapp-detail-title">
-          <span className="iosapp-pill">{tour.category}</span>
+          {tour.category ? <span className="iosapp-pill">{tour.category}</span> : null}
           <h1>{tour.title}</h1>
           <p>{destinationNames.join(' · ') || tour.desc}</p>
         </div>
@@ -3004,22 +3013,36 @@ function GroupRequestView({
 
 function SignInView({
   email,
+  otpCode,
+  authStep,
   authStatus,
   authMessage,
   authError,
+  resendIn,
   onBack,
   onEmailChange,
+  onOtpChange,
   onProviderSignIn,
   onEmailSignIn,
+  onVerifyOtp,
+  onResendOtp,
+  onEditEmail,
 }: {
   email: string;
+  otpCode: string;
+  authStep: 'email' | 'code';
   authStatus: AuthStatus;
   authMessage: string;
   authError: string;
+  resendIn: number;
   onBack: () => void;
   onEmailChange: (value: string) => void;
+  onOtpChange: (value: string) => void;
   onProviderSignIn: (provider: AuthProvider) => void;
   onEmailSignIn: () => void;
+  onVerifyOtp: () => void;
+  onResendOtp: () => void;
+  onEditEmail: () => void;
 }) {
   const isSigningIn = authStatus === 'loading';
 
@@ -3033,45 +3056,101 @@ function SignInView({
       <main className="iosapp-auth-screen">
         <section className="iosapp-auth-copy">
           <h1>Sign in or create an account</h1>
-          <p>Verify your email before deposit payment, then return anytime to manage requests and receipts.</p>
-        </section>
-        <SignInOptions onSignIn={onProviderSignIn} appearance="dark" disabled={isSigningIn} />
-        <div className="iosapp-auth-divider">
-          <span />
-          <b>or</b>
-          <span />
-        </div>
-        <label
-          className={cx('iosapp-auth-email', authError && !isValidEmail(email.trim()) && 'is-invalid')}
-          data-field-error="email"
-        >
-          <span>Email address</span>
-          <Input
-            value={email}
-            onChange={(event) => onEmailChange(event.target.value)}
-            placeholder="you@example.com"
-            type="email"
-            inputMode="email"
-            autoComplete="email"
-            aria-invalid={Boolean(authError && !isValidEmail(email.trim()))}
-            aria-describedby={authError ? fieldErrorId('email') : undefined}
-          />
-        </label>
-        {authError && (
-          <p id={fieldErrorId('email')} className="iosapp-auth-error" role="alert">
-            {authError}
+          <p>
+            {authStep === 'code'
+              ? 'Enter the 6-digit code from your email to continue.'
+              : 'Verify your email before deposit payment, then return anytime to manage requests and receipts.'}
           </p>
+        </section>
+        {authStep === 'email' ? (
+          <>
+            <SignInOptions onSignIn={onProviderSignIn} appearance="dark" disabled={isSigningIn} />
+            <div className="iosapp-auth-divider">
+              <span />
+              <b>or</b>
+              <span />
+            </div>
+            <label
+              className={cx('iosapp-auth-email', authError && !isValidEmail(email.trim()) && 'is-invalid')}
+              data-field-error="email"
+            >
+              <span>Email address</span>
+              <Input
+                value={email}
+                onChange={(event) => onEmailChange(event.target.value)}
+                placeholder="you@example.com"
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                aria-invalid={Boolean(authError && !isValidEmail(email.trim()))}
+                aria-describedby={authError ? fieldErrorId('email') : undefined}
+              />
+            </label>
+            {authError && (
+              <p id={fieldErrorId('email')} className="iosapp-auth-error" role="alert">
+                {authError}
+              </p>
+            )}
+            {authMessage && <p className="iosapp-auth-message">{authMessage}</p>}
+            <Button
+              type="button"
+              variant="ghost"
+              className="iosapp-auth-submit"
+              disabled={isSigningIn}
+              onClick={onEmailSignIn}
+            >
+              {isSigningIn ? 'Sending code...' : 'Continue with email'}
+            </Button>
+          </>
+        ) : (
+          <>
+            <label className="iosapp-auth-email" data-field-error="otp">
+              <span>Code sent to {email.trim()}</span>
+              <Input
+                value={otpCode}
+                onChange={(event) => onOtpChange(event.target.value.replace(/\D/g, '').slice(0, 8))}
+                placeholder="6-digit code"
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                aria-invalid={Boolean(authError)}
+                aria-describedby={authError ? fieldErrorId('otp') : undefined}
+              />
+            </label>
+            {authError && (
+              <p id={fieldErrorId('otp')} className="iosapp-auth-error" role="alert">
+                {authError}
+              </p>
+            )}
+            {authMessage && <p className="iosapp-auth-message">{authMessage}</p>}
+            <Button
+              type="button"
+              variant="ghost"
+              className="iosapp-auth-submit"
+              disabled={isSigningIn || otpCode.trim().length < 6}
+              onClick={onVerifyOtp}
+            >
+              {isSigningIn ? 'Verifying...' : 'Verify code'}
+            </Button>
+            <div className="iosapp-auth-divider">
+              <span />
+              <b>or</b>
+              <span />
+            </div>
+            <Button type="button" variant="ghost" className="iosapp-auth-submit" onClick={onEditEmail}>
+              Use a different email
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="iosapp-auth-submit"
+              disabled={isSigningIn || resendIn > 0}
+              onClick={onResendOtp}
+            >
+              {resendIn > 0 ? `Resend in ${resendIn}s` : 'Resend code'}
+            </Button>
+          </>
         )}
-        {authMessage && <p className="iosapp-auth-message">{authMessage}</p>}
-        <Button
-          type="button"
-          variant="ghost"
-          className="iosapp-auth-submit"
-          disabled={isSigningIn}
-          onClick={onEmailSignIn}
-        >
-          {isSigningIn ? 'Sending sign-in link...' : 'Continue'}
-        </Button>
       </main>
     </div>
   );
@@ -3540,6 +3619,9 @@ export default function ChinaTripsMobile() {
   const [authStatus, setAuthStatus] = useState<AuthStatus>('idle');
   const [authMessage, setAuthMessage] = useState('');
   const [authError, setAuthError] = useState('');
+  const [authStep, setAuthStep] = useState<'email' | 'code'>('email');
+  const [otpCode, setOtpCode] = useState('');
+  const [otpResendIn, setOtpResendIn] = useState(0);
   const [departures, setDepartures] = useState<GroupTourDeparture[]>([]);
   const [departuresLoading, setDeparturesLoading] = useState(true);
   const [departuresError, setDeparturesError] = useState('');
@@ -3552,6 +3634,18 @@ export default function ChinaTripsMobile() {
   const routeDeepLinkHandledRef = useRef(false);
   const bookingIdentifiersRef = useRef<{ orderNumber: string; sessionId?: string } | null>(null);
   const bookingOrderRef = useRef<SafeOrderSummary | null>(null);
+  const syncAuthFromStorage = () => {
+    const session = readStoredAuthSession();
+    setAuthUser(session?.user ?? null);
+    return session;
+  };
+
+  useEffect(() => {
+    if (otpResendIn <= 0) return;
+    const timer = window.setTimeout(() => setOtpResendIn((value) => Math.max(0, value - 1)), 1000);
+    return () => window.clearTimeout(timer);
+  }, [otpResendIn]);
+
   const isSignedIn = Boolean(authUser);
 
   const selectedDestination = destinationMeta.find((destination) => destination.slug === draft.destinationSlug);
@@ -3568,6 +3662,19 @@ export default function ChinaTripsMobile() {
 
   useEffect(() => {
     let cancelled = false;
+
+    const unsubscribe = subscribeAuthSession((session) => {
+      if (!cancelled) setAuthUser(session?.user ?? null);
+    });
+    const onFocus = () => {
+      syncAuthFromStorage();
+    };
+    window.addEventListener('focus', onFocus);
+
+    if (consumePostAuthMeFocus()) {
+      setActiveTab('me');
+      setActiveView('tabs');
+    }
 
     consumeAuthRedirectSession()
       .then((session) => {
@@ -3602,6 +3709,8 @@ export default function ChinaTripsMobile() {
 
     return () => {
       cancelled = true;
+      unsubscribe();
+      window.removeEventListener('focus', onFocus);
     };
   }, []);
 
@@ -4304,15 +4413,20 @@ export default function ChinaTripsMobile() {
     setAuthStatus('idle');
     setAuthMessage('');
     setAuthError('');
+    setAuthStep('email');
+    setOtpCode('');
+    setOtpResendIn(0);
     setActiveView('signIn');
   };
 
   const loadMyOrders = async () => {
-    const session = readStoredAuthSession();
+    const session = syncAuthFromStorage();
     if (!session?.accessToken) {
       setMyOrders([]);
       setMyOrdersError('Sign in to view your orders.');
       setMyOrdersStatus('error');
+      setActiveView('signIn');
+      setAuthIntent('account');
       return;
     }
 
@@ -4324,11 +4438,22 @@ export default function ChinaTripsMobile() {
       if (result.ok) {
         setMyOrders(result.orders);
         setMyOrdersStatus('ready');
-      } else {
-        setMyOrders([]);
-        setMyOrdersError(result.error);
-        setMyOrdersStatus('error');
+        return;
       }
+
+      setMyOrders([]);
+      if (result.unauthorized) {
+        clearStoredAuthSession();
+        setAuthUser(null);
+        setMyOrdersError('Sign in to view your orders.');
+        setMyOrdersStatus('error');
+        setActiveView('signIn');
+        setAuthIntent('account');
+        return;
+      }
+
+      setMyOrdersError(result.error);
+      setMyOrdersStatus('error');
     } catch {
       setMyOrders([]);
       setMyOrdersError('We could not load your orders.');
@@ -4337,6 +4462,11 @@ export default function ChinaTripsMobile() {
   };
 
   const openMyOrders = () => {
+    const session = syncAuthFromStorage();
+    if (!session?.accessToken) {
+      beginSignIn('account');
+      return;
+    }
     setActiveView('myOrders');
     void loadMyOrders();
   };
@@ -4390,6 +4520,29 @@ export default function ChinaTripsMobile() {
     }
   };
 
+  const finishEmailOtpSession = async (sessionUser: AuthUser) => {
+    setAuthUser(sessionUser);
+    setAuthStep('email');
+    setOtpCode('');
+    setAuthStatus('idle');
+    setAuthError('');
+    setAuthMessage('');
+
+    if (authIntent === 'checkout') {
+      setPostSignInCheckoutDraft(
+        normalizeGroupDraft({
+          ...draft,
+          email: draft.email || sessionUser.email,
+        }),
+      );
+      return;
+    }
+
+    markPostAuthMeFocus();
+    setActiveTab('me');
+    setActiveView('tabs');
+  };
+
   const submitEmailSignIn = async () => {
     const email = draft.email.trim().toLowerCase();
     setAuthMessage('');
@@ -4419,13 +4572,41 @@ export default function ChinaTripsMobile() {
           email,
         });
       }
-      await sendEmailMagicLink(email, authIntent);
+      await sendEmailOtp(email, authIntent);
+      setAuthStep('code');
+      setOtpResendIn(60);
       setAuthStatus('message');
-      setAuthMessage('Check your email for a secure sign-in link, then return here to continue.');
+      setAuthMessage('We sent a 6-digit code to your email. Enter it below.');
     } catch (error) {
       setAuthStatus('error');
-      setAuthError(error instanceof Error ? error.message : 'We could not send the sign-in email.');
+      setAuthError(error instanceof Error ? error.message : 'We could not send the sign-in code.');
     }
+  };
+
+  const submitEmailOtpVerify = async () => {
+    const email = draft.email.trim().toLowerCase();
+    setAuthMessage('');
+    setAuthError('');
+
+    if (otpCode.trim().length < 6) {
+      setAuthStatus('error');
+      setAuthError('Enter the 6-digit code from your email.');
+      return;
+    }
+
+    setAuthStatus('loading');
+    try {
+      const session = await verifyEmailOtp(email, otpCode);
+      await finishEmailOtpSession(session.user);
+    } catch (error) {
+      setAuthStatus('error');
+      setAuthError(error instanceof Error ? error.message : 'We could not verify that code.');
+    }
+  };
+
+  const resendEmailOtp = async () => {
+    if (otpResendIn > 0) return;
+    await submitEmailSignIn();
   };
 
   const handleAccountSignIn = (provider: AuthProvider) => {
@@ -4554,10 +4735,20 @@ export default function ChinaTripsMobile() {
       <motion.div key="signIn" variants={pageVariants} initial="initial" animate="animate" exit="exit">
         <SignInView
           email={draft.email}
+          otpCode={otpCode}
+          authStep={authStep}
           authStatus={authStatus}
           authMessage={authMessage}
           authError={authError}
+          resendIn={otpResendIn}
           onBack={() => {
+            if (authStep === 'code') {
+              setAuthStep('email');
+              setOtpCode('');
+              setAuthError('');
+              setAuthMessage('');
+              return;
+            }
             if (authIntent === 'account') {
               setActiveTab('me');
               setActiveView('tabs');
@@ -4566,8 +4757,17 @@ export default function ChinaTripsMobile() {
             }
           }}
           onEmailChange={(value) => updateDraft('email', value)}
+          onOtpChange={setOtpCode}
           onProviderSignIn={(provider) => void handleProviderSignIn(provider)}
           onEmailSignIn={() => void submitEmailSignIn()}
+          onVerifyOtp={() => void submitEmailOtpVerify()}
+          onResendOtp={() => void resendEmailOtp()}
+          onEditEmail={() => {
+            setAuthStep('email');
+            setOtpCode('');
+            setAuthError('');
+            setAuthMessage('');
+          }}
         />
       </motion.div>
     );

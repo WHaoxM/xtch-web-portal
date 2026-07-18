@@ -1,11 +1,12 @@
 /**
  * Production-ish deploy serve: static dist + Vercel-like /api handlers + /s3 → MinIO.
- * Default listen 0.0.0.0 (LAN/public IP reachable); set SELFHOST_HOST=127.0.0.1 for loopback-only.
+ * Default listen 0.0.0.0:3080 (LAN/public IP reachable); set SELFHOST_HOST=127.0.0.1 for loopback-only.
+ * Port 3080 keeps deploy:serve off Vite's fixed :3000. Override with SELFHOST_PORT if needed.
  * Put Caddy in front for domain HTTPS on 80/443.
  *
  * Usage (from app/ or repo root):
- *   npm run build:win11-home   # or build:cloud-vps / build:selfhost
- *   npm run deploy:serve       # DEPLOY_TARGET or --target (default win11-home)
+ *   npm run build:win11-home   # writes app/dist/win11-home/ (isolated from local)
+ *   npm run deploy:serve       # serves app/dist/<target>/ ; DEPLOY_TARGET or --target (default win11-home)
  *   npm run selfhost           # alias → win11-home
  *
  * Env: env/<target>/.env (legacy app/.env.<target>.local still falls back).
@@ -25,14 +26,22 @@ import {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const appRoot = path.resolve(__dirname, '..');
-const distRoot = path.join(appRoot, 'dist');
 
 const VALID_TARGETS = new Set(['win11-home', 'cloud-vps']);
 
 const HOST = process.env.SELFHOST_HOST?.trim() || '0.0.0.0';
-const PORT = Number(process.env.SELFHOST_PORT || 3000);
+// Prod default 3080 so it never collides with Vite dev on 3000 (or free-dev-port).
+const PORT = Number(process.env.SELFHOST_PORT || 3080);
 const MINIO_HOST = '127.0.0.1';
 const MINIO_PORT = 9000;
+
+/** Deploy static root is isolated per target: app/dist/<target>/ (never shared with local build). */
+function distRootForTarget(target) {
+  return path.join(appRoot, 'dist', target);
+}
+
+/** Set in main() after target is known. */
+let distRoot = '';
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -110,6 +119,40 @@ function assertSafeForPublicDeploy(envPath) {
     for (const line of blockers) console.error(`  - ${line}`);
     console.error(`Fix these in ${envPath} and restart.`);
     process.exit(1);
+  }
+}
+
+/** Catch wrong-target or local-bypass dist before serving. */
+function assertDistSafeForPublicDeploy(distRoot, target) {
+  const markerPath = path.join(distRoot, '.xtch-build-target');
+  if (!fs.existsSync(markerPath)) {
+    console.error('Refusing to start public deploy target (safety):');
+    console.error(`  - Missing ${path.relative(appRoot, markerPath)} (build marker).`);
+    console.error(`  - Local \`npm run build\` writes to dist/local/ and cannot feed deploy:serve.`);
+    console.error(`Rebuild with: npm run build:${target}, then restart.`);
+    process.exit(1);
+  }
+  const marked = fs.readFileSync(markerPath, 'utf8').trim();
+  if (marked !== target) {
+    console.error('Refusing to start public deploy target (safety):');
+    console.error(`  - dist marker is "${marked}" but serve target is "${target}".`);
+    console.error(`Rebuild with: npm run build:${target}, then restart.`);
+    process.exit(1);
+  }
+
+  const assetsDir = path.join(distRoot, 'assets');
+  if (!fs.existsSync(assetsDir)) return;
+  const jsFiles = fs.readdirSync(assetsDir).filter((name) => name.endsWith('.js'));
+  for (const name of jsFiles) {
+    const text = fs.readFileSync(path.join(assetsDir, name), 'utf8');
+    if (text.includes('dev-bypass-token')) {
+      console.error('Refusing to start public deploy target (safety):');
+      console.error(
+        `  - ${path.relative(appRoot, distRoot)} was built with VITE_DEV_AUTH_BYPASS_EMAIL (contains dev-bypass-token).`,
+      );
+      console.error(`Rebuild with: npm run build:${target} (production env must not set bypass), then restart.`);
+      process.exit(1);
+    }
   }
 }
 
@@ -256,7 +299,7 @@ function serveStatic(req, res, urlPathname) {
   if (!fs.existsSync(indexHtml)) {
     res.statusCode = 503;
     res.setHeader('content-type', 'text/plain; charset=utf-8');
-    res.end('Missing app/dist. Run npm run build:<target> before npm run deploy:serve.');
+    res.end('Missing deploy static files. Run npm run build:<target> before npm run deploy:serve.');
     return;
   }
   if (req.method === 'HEAD') {
@@ -290,10 +333,18 @@ function main() {
   const envPath = loaded.path;
   assertSafeForPublicDeploy(envPath);
 
+  distRoot = distRootForTarget(target);
+  const legacyFlatDist = path.join(appRoot, 'dist', 'index.html');
   if (!fs.existsSync(path.join(distRoot, 'index.html'))) {
-    console.error(`Missing app/dist/index.html. Run: npm run build:${target}`);
+    console.error(`Missing ${path.relative(appRoot, distRoot)}/index.html. Run: npm run build:${target}`);
+    if (fs.existsSync(legacyFlatDist)) {
+      console.error(
+        'Note: found legacy app/dist/index.html — ignored. Builds are isolated under app/dist/<target>/.',
+      );
+    }
     process.exit(1);
   }
+  assertDistSafeForPublicDeploy(distRoot, target);
 
   const server = http.createServer(async (req, res) => {
     const url = req.url || '/';

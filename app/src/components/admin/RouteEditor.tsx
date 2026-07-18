@@ -129,11 +129,11 @@ export function RouteEditor({
           ? current.themes
           : [...current.themes, key]
         : current.themes.filter((item) => item !== key);
-      const category =
-        current.categoryManual
-          ? current.category
-          : deriveCategoryFromThemes(themes, categories);
-      return { ...current, themes, category };
+      return {
+        ...current,
+        themes,
+        category: deriveCategoryFromThemes(themes, categories),
+      };
     });
   }
 
@@ -327,10 +327,10 @@ export function RouteEditor({
           )}
         </div>
         <div className="space-y-2 text-sm md:col-span-2">
-          <span>主题 / 分类（可选）</span>
+          <span>筛选分类（可选）</span>
           <div className="flex flex-wrap gap-3 rounded-md border border-input p-3">
             {categories.length === 0 ? (
-              <span className="text-muted-foreground">暂无路线分类。可到「分类」模块创建。</span>
+              <span className="text-muted-foreground">暂无路线筛选分类。可到「筛选分类」模块创建。</span>
             ) : (
               categories.map((category) => (
                 <label key={category.id} className="flex items-center gap-2">
@@ -345,7 +345,7 @@ export function RouteEditor({
             )}
           </div>
           <FieldHint>
-            分类文案默认取首个已选主题：{draft.category || '（未设置）'}
+            展示标签强制对齐首个已选筛选分类：{draft.category || '（未勾选则不显示角标）'}
           </FieldHint>
         </div>
       </div>
@@ -378,16 +378,13 @@ export function RouteEditor({
       <TabsContent value="display" className="space-y-4 pt-4">
         <FormSection title="展示与筛选">
           <div className="grid gap-4 md:grid-cols-2">
-            <label className="space-y-2 text-sm">
-              <span>分类文案</span>
-              <Input
-                value={draft.category}
-                onChange={(event) =>
-                  patchDraft({ category: event.target.value, categoryManual: true })
-                }
-              />
-              <FieldHint>勾选主题时默认自动写入；此处修改后不再自动覆盖。</FieldHint>
-            </label>
+            <div className="space-y-2 text-sm">
+              <span>展示标签（只读）</span>
+              <Input value={draft.category || '（未勾选筛选分类）'} disabled readOnly />
+              <FieldHint>
+                与「筛选分类」强制对齐：取首个已选分类的英文显示名。旅客端卡片角标同源；不可再手填漂移文案。
+              </FieldHint>
+            </div>
             <label className="flex items-start gap-2 text-sm md:col-span-2">
               <input
                 type="checkbox"

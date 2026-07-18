@@ -117,6 +117,7 @@ function mapCategoryRow(row: Record<string, unknown>): Category {
 }
 
 function mapRouteRow(row: Record<string, unknown>, itineraryDays: ItineraryDay[] = []): RouteRecord {
+  const themes = Array.isArray(row.themes) ? (row.themes as string[]) : [];
   return {
     slug: String(row.slug),
     legacyNumericId: row.legacy_numeric_id == null ? null : Number(row.legacy_numeric_id),
@@ -126,7 +127,7 @@ function mapRouteRow(row: Record<string, unknown>, itineraryDays: ItineraryDay[]
     durationDays: Number(row.duration_days ?? 0),
     groupSizeDisplay: String(row.group_size_display ?? ''),
     category: String(row.category ?? ''),
-    themes: Array.isArray(row.themes) ? (row.themes as string[]) : [],
+    themes,
     status: (row.status as ContentStatus) ?? 'published',
     featured: Boolean(row.featured),
     heroImage: String(row.hero_image ?? ''),
@@ -141,6 +142,42 @@ function mapRouteRow(row: Record<string, unknown>, itineraryDays: ItineraryDay[]
     includedSupport: Array.isArray(row.included_support) ? (row.included_support as string[]) : [],
     itineraryDays,
   };
+}
+
+/** Display/storage label must come from themes[0] → categories.label (never orphan free text). */
+export function alignRouteCategory(
+  themes: string[],
+  labelByKey: Map<string, string>,
+): string {
+  const first = themes[0];
+  if (!first) return '';
+  return labelByKey.get(first) ?? first;
+}
+
+async function loadRouteCategoryLabelMap(): Promise<Map<string, string>> {
+  await ensureContentTables();
+  const result = await sql`
+    SELECT key, label FROM categories
+    WHERE scope = 'route'
+    ORDER BY enabled DESC, sort_order ASC, label ASC
+  `;
+  const map = new Map<string, string>();
+  for (const row of result.rows as Record<string, unknown>[]) {
+    const key = String(row.key ?? '');
+    if (!key || map.has(key)) continue;
+    map.set(key, String(row.label ?? key));
+  }
+  return map;
+}
+
+function applyAlignedCategories(
+  routes: RouteRecord[],
+  labelByKey: Map<string, string>,
+): RouteRecord[] {
+  return routes.map((route) => ({
+    ...route,
+    category: alignRouteCategory(route.themes, labelByKey),
+  }));
 }
 
 function mapItineraryDayRow(row: Record<string, unknown>): ItineraryDay {
@@ -326,7 +363,8 @@ export async function listPublicRoutes(options?: { destinationSlug?: string }): 
       `;
   const rows = result.rows as Record<string, unknown>[];
   const itineraryByRoute = await listItineraryDaysByRouteSlugs(rows.map((row) => String(row.slug)));
-  return rows.map((row) => mapRouteRow(row, itineraryByRoute.get(String(row.slug)) ?? []));
+  const mapped = rows.map((row) => mapRouteRow(row, itineraryByRoute.get(String(row.slug)) ?? []));
+  return applyAlignedCategories(mapped, await loadRouteCategoryLabelMap());
 }
 
 export async function listAdminRoutes(options?: {
@@ -356,7 +394,8 @@ export async function listAdminRoutes(options?: {
   `;
   const rows = result.rows as Record<string, unknown>[];
   const itineraryByRoute = await listItineraryDaysByRouteSlugs(rows.map((row) => String(row.slug)));
-  return rows.map((row) => mapRouteRow(row, itineraryByRoute.get(String(row.slug)) ?? []));
+  const mapped = rows.map((row) => mapRouteRow(row, itineraryByRoute.get(String(row.slug)) ?? []));
+  return applyAlignedCategories(mapped, await loadRouteCategoryLabelMap());
 }
 
 export type RouteInput = {
@@ -492,6 +531,8 @@ export async function upsertRoute(
   input: RouteInput,
 ): Promise<{ slug: string } | { error: string; status: number }> {
   await ensureContentTables();
+  const labelByKey = await loadRouteCategoryLabelMap();
+  const category = alignRouteCategory(input.themes, labelByKey);
   try {
     await sql.begin(async (tx) => {
       await tx`
@@ -502,7 +543,7 @@ export async function upsertRoute(
           experience, moments, included_support
         ) VALUES (
           ${input.slug}, ${input.legacyNumericId}, ${input.title}, ${input.subtitle}, ${input.summary},
-          ${input.durationDays}, ${input.groupSizeDisplay}, ${input.category},
+          ${input.durationDays}, ${input.groupSizeDisplay}, ${category},
           ${input.themes}, ${input.status}, ${input.featured}, ${input.heroImage},
           ${input.pdfUrl}, ${input.priceMode}, ${input.priceDisplay}, ${input.primaryType},
           ${input.availableTypes}, ${input.experience}, ${input.moments}, ${input.includedSupport}

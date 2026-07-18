@@ -115,10 +115,12 @@ export function toRouteTour(route: RouteRecord): RouteTour {
     featured: route.featured,
     pdfUrl: route.pdfUrl,
     destinationSlugs: route.destinationSlugs,
-    heroKicker: `${duration} / ${route.category}`,
+    heroKicker: route.category ? `${duration} / ${route.category}` : duration,
     highlights: [
       `${duration} route shaped for ${route.groupSizeDisplay.toLowerCase()}`,
-      `Focused on ${route.category.toLowerCase()} travel with private planning support`,
+      route.category
+        ? `Focused on ${route.category.toLowerCase()} travel with private planning support`
+        : 'Private planning support shaped around season, hotel level, transport, guides, and pace',
       'Can be adjusted around season, hotel level, transport, guides, and pace',
     ],
     itinerarySummary: [

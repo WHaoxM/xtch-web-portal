@@ -1,3 +1,4 @@
+import { ensureFreshSession } from './authClient';
 import { normalizeDateOnly } from './dateOnly';
 
 export type SafeOrderSummary = {
@@ -75,17 +76,45 @@ export function formatConfirmationEmailNote(email: string, status?: string | nul
 
 export async function fetchMyOrders(
   accessToken: string,
-): Promise<{ ok: true; orders: SafeOrderSummary[] } | { ok: false; error: string }> {
-  const response = await fetch('/api/my-orders', {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  const data = (await response.json()) as { ok: boolean; orders?: SafeOrderSummary[]; error?: string };
+): Promise<
+  | { ok: true; orders: SafeOrderSummary[]; accessToken?: string }
+  | { ok: false; error: string; unauthorized?: boolean }
+> {
+  const attempt = async (token: string) => {
+    const response = await fetch('/api/my-orders', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = (await response.json()) as { ok: boolean; orders?: SafeOrderSummary[]; error?: string };
 
-  if (!response.ok || !data.ok || !Array.isArray(data.orders)) {
-    return { ok: false, error: data.error || 'We could not load your orders.' };
+    if (!response.ok || !data.ok || !Array.isArray(data.orders)) {
+      return {
+        ok: false as const,
+        error: data.error || 'We could not load your orders.',
+        unauthorized: response.status === 401,
+        status: response.status,
+      };
+    }
+
+    return { ok: true as const, orders: data.orders, accessToken: token };
+  };
+
+  let result = await attempt(accessToken);
+  if (!result.ok && result.unauthorized) {
+    const fresh = await ensureFreshSession();
+    if (fresh?.accessToken) {
+      result = await attempt(fresh.accessToken);
+    }
   }
 
-  return { ok: true, orders: data.orders };
+  if (!result.ok) {
+    return {
+      ok: false,
+      error: result.error,
+      unauthorized: result.unauthorized,
+    };
+  }
+
+  return { ok: true, orders: result.orders, accessToken: result.accessToken };
 }
 
 export async function fetchOrderSummary(

@@ -1,6 +1,7 @@
 /**
  * Free the Vite dev port (default 3000) before starting `npm run dev`.
  * Prevents Vite from hopping to 3001/3002 when a previous Agent left a server running.
+ * Does not touch deploy:serve on 3080.
  */
 import { execSync } from 'node:child_process';
 

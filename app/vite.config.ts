@@ -1,4 +1,5 @@
 import path from "path"
+import fs from "node:fs"
 import type { IncomingMessage } from 'node:http'
 import react from "@vitejs/plugin-react"
 import { defineConfig, loadEnv, type Plugin } from "vite"
@@ -96,9 +97,31 @@ export default defineConfig(({ mode }) => {
   const target = normalizeTarget(mode);
   loadTargetEnv(target, { override: true });
 
+  const outDir = path.join('dist', target);
+
   return {
     base: './',
-    plugins: [localApiPlugin(), inspectAttr(), react()],
+    plugins: [
+      localApiPlugin(),
+      inspectAttr(),
+      react(),
+      {
+        name: 'xtch-write-build-target-marker',
+        closeBundle() {
+          const markerDir = path.resolve(__dirname, outDir);
+          fs.mkdirSync(markerDir, { recursive: true });
+          fs.writeFileSync(
+            path.join(markerDir, '.xtch-build-target'),
+            `${target}\n`,
+            'utf8',
+          );
+        },
+      },
+    ],
+    build: {
+      outDir,
+      emptyOutDir: true,
+    },
     server: {
       port: 3000,
       strictPort: true,

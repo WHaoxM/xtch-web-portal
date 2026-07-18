@@ -2,6 +2,110 @@
 
 ## Status
 
+**done（开发/生产端口拆分）** — Vite `:3000`；`deploy:serve` 默认 `:3080`。
+
+### Progress note（开发/生产端口拆分，2026-07-18）
+
+- 目标：开发与生产各用固定端口，同机可并行、避免 `free-dev-port` 误杀生产。
+- 决定：开发 `3000`（不变）；生产 `3080`（新默认）。
+- 已改：`serve-selfhost.mjs`、`publicOrigin.ts`、两份 Caddyfile、`env/*/`.env.example、ops/gotchas/context/workflows、`.cursor/rules/dev-server-port.mdc`、`bootstrap.sh`。
+- 已验证：默认值与 Caddy 反代指向 `3080`（代码审阅）；未重启本机已在跑的 `deploy:serve`（若仍在 3000 需重启）。
+- 下一步：用户若有运行中的 serve/Caddy，重启并核对 `http://127.0.0.1:3080`；Supabase Redirect 补 `:3080` LAN 入口。
+
+**in-progress（deploy:serve 拒启）** — dist 含 `dev-bypass-token`；用 `build:win11-home` 重建后重启 serve。
+
+### Progress note（deploy:serve 拒启，2026-07-18）
+
+- 现象：`npm run deploy:serve` 拒绝启动，因 `app/dist` 含 `dev-bypass-token`（本地 `npm run build` 打进了 `VITE_DEV_AUTH_BYPASS_EMAIL`）。
+- 处理：`npm run build:win11-home` → 确认 dist 无 bypass → `npm run deploy:serve`。
+- 备注：已在 `app/` 时不要再 `cd app`（没有 `app/app`）。
+
+**done（dist 按 target 隔离）** — `build`→`dist/local/`；`build:win11-home`→`dist/win11-home/`；serve 只读对应目录 + marker。
+
+### Progress note（dist target 隔离，2026-07-18）
+
+- 目标：杜绝本地 `npm run build` 污染 `deploy:serve` 静态包。
+- 已改：`vite.config.ts`（`outDir=dist/<target>` + `.xtch-build-target`）；`serve-selfhost.mjs`（按 target 读 dist、校验 marker/bypass）；`package.json` build/preview；gotchas/ops 路径。
+- 已验证：`build:win11-home` → `dist/win11-home/` 无 bypass；随后 `build` → `dist/local/`，`dist/win11-home` 仍在。
+- 下一步：用户 `npm run deploy:serve`（读 `dist/win11-home`）。
+
+**done（路线展示标签强制对齐筛选分类）** — 读/写均由 themes[0]→label；Admin 手填关闭；无 themes 无角标。
+
+### Progress note（展示标签强制对齐，2026-07-18）
+
+- 目标：首页角标不再出现与「筛选分类」无关的漂移文案。
+- 已改：`contentQueries`（list + upsert 强制 `alignRouteCategory`）；`routeDraft` 去掉 `categoryManual`；`RouteEditor` 展示标签只读；旅客端无 category 则不渲染 pill；gotchas。
+- 已验证：`npm run build` / `lint` 绿。
+- 下一步：硬刷新后看 Browse routes；未勾选筛选分类的路线应无角标；勾选后角标=该分类英文名。
+
+**done（分类筛选默认 All + 文案拆开）** — Places/Routes 默认 All；Admin「分类文案」→「展示标签」、侧栏「筛选分类」。浏览器已验通。
+
+### Progress note（分类后列表空白 + 文案止痛，2026-07-18）
+
+- 目标：修建筛选分类后列表变空；文案拆开展示标签 vs 筛选分类。
+- 已改：`ChinaTripsMobile.tsx`（`ALL_FILTER_KEY`、Destinations/Routes 默认 All）；`RouteEditor` / `DestinationEditor` / `Admin` 用词。
+- 已验证：`build`/`lint`；本地写入测试筛选分类后浏览器：Places 默认 All=12 → Culture=0 → All=12；Routes API 有 Classic。
+- 未提交：与 Auth WIP 同文件混杂。
+- 下一步：用户本机硬刷新验收；需要时拆开 commit。
+
+**done（Auth Session + Email OTP P0，代码）** — `@supabase/supabase-js` 续期 + Admin/旅客 6 位 OTP；build/lint 绿；浏览器与 Dashboard 模板待用户验。
+
+### Progress note（Auth Session OTP P0，2026-07-18）
+
+- 目标：同设备 refresh 静默续期；邮箱 OTP 同页校验；Admin 名单预检后发码；去掉 magic link 主 CTA。
+- 已读：计划、`authClient` / Admin SignIn / ChinaTrips SignIn / gotchas / win11-home。
+- 已改：spec/plan；`@supabase/supabase-js`；`supabaseClient.ts`；`authClient.ts`（SDK 会话、迁移旧 key、OTP、`ensureFreshSession`）；`api/admin/auth-otp.ts` + magic-link 别名；`localApiRoutes`；Admin/ChinaTrips OTP 两步 UI；`orderClient`/`adminSessionClient` 401 续期一次；Account `subscribeAuthSession`；gotchas/win11-home。
+- 已验证：`npm run build` / `lint`；`build:win11-home`（dist `dev-bypass-token=0`）；`deploy:serve` 已重启（25 routes，含 `auth-otp`）；Admin UI 显示「Send sign-in code」；非名单 403；名单发码触达 Supabase 但当前被 **email rate limit** 拦下。
+- 未验证：收信 + 同页输码 + 刷新续期 + 60s 倒计时 UI（需限流过后再点）；Dashboard 模板 `{{ .Token }}`。
+- 下一步：等 Supabase 发信限流解除 → 硬刷新 `http://127.0.0.1:3000/#/admin` 或 LAN hint → 发码验收；确认 Magic Link 模板含 `{{ .Token }}`。
+
+**in-progress（Admin Auth token consume）** — 修卡在首页 `#access_token=…`：强制消费 token + admin/me 回退。
+
+### Progress note（Admin Auth 卡在 #access_token，2026-07-18）
+
+- 现象：魔法链接落到 `#access_token=…&type=recovery`，停在首页，未进 Admin。
+- 根因：(1) 已有 session 时跳过消费；(2) Site URL 丢掉 `auth_next`。
+- 已改：`App.tsx`、`authClient.ts`（admin/me → `#/admin`）、gotchas；已 `build:win11-home` + 重启 serve。
+- 未验证：浏览器再点**新**魔法链接（勿用旧 recovery 链接）。
+- 下一步：用户硬刷新后从 `#/admin` 重发链接验收。
+
+**in-progress（旅客登录↔订单）** — grill 确认 C：默认回 `#/china-trips`+Me；token 门禁；401 清会话；Account/Me 跨标签同步。
+
+### Progress note（旅客登录↔订单，2026-07-18）
+
+- 目标：修「像已登录、点订单仍要登录」；验收：双入口 + 刷新后仍可拉 `/api/my-orders`（可空列表）。
+- 已读：grill 共识、`authClient`/`AuthCallback`/`Account`/`ChinaTripsMobile`/`my-orders`。
+- 已改：`authClient.ts`（旅客默认回 china-trips + Me focus）、`AuthCallback.tsx`、`Account.tsx`、`orderClient.ts`（401 标记）、`ChinaTripsMobile.tsx`（重读会话/401/storage）。
+- 已验证：`npm run build` / `npm run lint`。
+- 未验证：浏览器邮箱 magic link round-trip（Me 订单 + `#/account`）。
+- 下一步：用户本机验收标准 B。
+
+**in-progress（Admin Auth return path）** — 修魔法链接误跳 `#/account`：回跳改 `localStorage` + `?auth_next=`。
+
+### Progress note（Admin Auth 误跳 account，2026-07-18）
+
+- 现象：Admin 登录后到 `http://192.168.99.248:3000/#/account`（旅客空订单页）。
+- 根因：回跳只写在 `sessionStorage`；邮件魔法链接常开**新标签**，读不到 `#/admin`，intent 回退 `#/account`。
+- 已改：`authClient.ts`（localStorage+TTL、`?auth_next=`、Admin/OAuth/旅客 magic link 带 next）；`Admin.tsx` Google `returnPath`；gotchas / win11-home Redirect 通配说明。
+- 已验证：`npm run build` / `npm run lint` 绿。
+- 未验证：浏览器 Admin 魔法链接 / Google 回跳仍进 `#/admin`（需 `build:win11-home` + 重启 serve；Supabase Redirect 加 `http://192.168.x.x:3000/**`）。
+- 下一步：重建部署后硬刷新 `#/admin` 再登录验收。
+
+### Progress note（Admin Auth deploy mismatch，2026-07-18）
+
+- 现象：壳显示 freezingm… 但 API `Invalid or expired admin session`；发魔法链接 `Not found.`。
+- 根因：`dist` 用 `npm run build`（local）打进 `VITE_DEV_AUTH_BYPASS_EMAIL`；`deploy:serve` 拒 bypass。运行中进程仅 23 routes（缺 `auth-magic-link`）。
+- 已改：`build:win11-home` 重建（dist 无 bypass）；`serve-selfhost` 拒绝含 `dev-bypass-token` 的 dist；Admin `/me` 401 清会话；魔法链接 404 文案；gotchas。
+- 已验证：`build:win11-home`；dist `dev-bypass=0` / `auth-magic-link=1`；正在重启 `deploy:serve`。
+- 未验证：用户硬刷新后魔法链接收信 round-trip。
+- 下一步：硬刷新 `#/admin` → 发魔法链接 → 应回 Admin 且工作台有数。
+
+### Progress note（Admin Auth callback，2026-07-18）
+
+- 目标：修魔法链接落在 `#access_token` / 误跳 `#/account`；回登录发起页；Admin 仅名单可发链接。
+- 已改：`authClient.ts`、`AuthCallback.tsx`、`App.tsx`、`Admin.tsx` SignIn、`api/admin/auth-magic-link.ts`、`localApiRoutes`、gotchas、`win11-home.md`。
+- 已验证：`build`/`lint`；后续见「deploy mismatch」note。
+
 **done（Prod multi-origin）** — `deploy:serve` 默认 `0.0.0.0`；`publicOrigin`（域名 > PUBLIC_IP > LAN）；S3/Auth 跟请求 Host；`VITE_AUTH_REDIRECT_URL` 宜留空。
 
 ### Progress note（Prod multi-origin，2026-07-18）

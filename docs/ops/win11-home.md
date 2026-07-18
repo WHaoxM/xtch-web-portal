@@ -14,8 +14,8 @@
 ## 架构
 
 ```text
-Visitor → Router :80/:443 → Caddy (HTTPS) → Node deploy:serve :3000 (127.0.0.1)
-                                              ├─ static app/dist (HashRouter)
+Visitor → Router :80/:443 → Caddy (HTTPS) → Node deploy:serve :3080 (127.0.0.1)
+                                              ├─ static app/dist/win11-home (HashRouter; per-target outDir)
                                               ├─ /api/* → app/api handlers
                                               └─ /s3/* → MinIO 127.0.0.1:9000
 API → Postgres 127.0.0.1:5432 (xtch_prod)
@@ -27,7 +27,7 @@ Presign 签本机 MinIO（桶 xtch-prod）；浏览器 PUT/GET 走 https://YOUR_
 1. 域名 DNS **A 记录**指向当前公网 IP（家宽 IP 变了要改或上动态 DNS）
 2. 路由器把 **TCP 80、443** 转到这台 Win11
 3. 运营商未封锁入站 80/443
-4. Win11 防火墙：域名 HTTPS 放行 80/443；局域网调试可放行 3000；**不要**对公网放行 5432/9000/9001（3000 仅在你明确要直连调试时对局域网开放）
+4. Win11 防火墙：域名 HTTPS 放行 80/443；局域网调试可放行 **3080**（`deploy:serve`）；**不要**对公网放行 5432/9000/9001（3080 仅在你明确要直连调试时对局域网开放）。日常 Vite 开发仍用 **3000**，与生产端口分开。
 
 ## 安全（必读）
 
@@ -73,10 +73,23 @@ Copy-Item env\win11-home\.env.example env\win11-home\.env
 | `PUBLIC_DOMAIN` | 有域名时填（最高优先，默认 https） |
 | `PUBLIC_IP` | 可选公网 IP（次优先，http） |
 | `SELFHOST_HOST` | 默认 `0.0.0.0`（局域网/公网网卡可达）；本机-only 用 `127.0.0.1` |
+| `SELFHOST_PORT` | 默认 `3080`（与 Vite 开发 `:3000` 分开；可用 env 覆盖） |
 
 `S3_BROWSER_ENDPOINT` / `S3_PUBLIC_BASE_URL` 可留空：浏览器 `/s3` **跟当前访问 Host**；无请求时按 `PUBLIC_DOMAIN` > `PUBLIC_IP` > 局域网侦测。
 
-`VITE_AUTH_REDIRECT_URL` 建议**留空**（前端用 `window.location.origin`）。在 Supabase / Google 白名单登记会用到的每个 origin（域名、公网 IP、局域网 IP）。`VITE_*` 在 **构建时** 打进前端，改完需 `build:win11-home`。
+`VITE_AUTH_REDIRECT_URL` 建议**留空**（前端默认 `{origin}/#/auth/callback`；Admin 登录会变成 `{origin}/?auth_next=/admin#/auth/callback`）。在 Supabase **Redirect URLs** 登记每个入口，建议用通配以免 query 被拒：
+
+- `http://127.0.0.1:3080/**`
+- `http://192.168.x.x:3080/**`（本机局域网 IP；`deploy:serve` 默认端口）
+- `https://你的域名/**`（有域名时）
+
+也可同时保留精确的 `/#/auth/callback`。Site URL 可仍用主入口；**Confirm email** 保持开启（仅首次注册确认）。
+
+> 开发 Vite 仍是 `:3000`；生产直连/局域网用 `:3080`。Supabase Redirect 两边入口都要登记。
+
+**邮箱 OTP（P0）：** Admin / 旅客主路径是 6 位码，不是 magic link。在 **Dev 与 Prod** Supabase → Authentication → Email Templates → **Magic Link** 正文加入 `{{ .Token }}`（建议主文案写 “Your code is …”）。Admin 发码走 `POST /api/admin/auth-otp`（仅双名单邮箱；旧 `auth-magic-link` 路径仍转发）。OAuth（Google）仍需要 Redirect URLs。`VITE_*` 在 **构建时** 打进前端，改完需 `build:win11-home`。
+
+验收清单（本机）：同设备登录后刷新仍在；Admin/旅客 OTP 同页校验；连续点发送有约 60s 倒计时；游客下单不被登录拦住。
 
 内容从备份迁入生产隔离库：见 [shared/content-backup.md](./shared/content-backup.md)。
 
@@ -101,11 +114,11 @@ npm run deploy:serve
 
 本机冒烟：
 
-- `http://127.0.0.1:3000/` → 首页 HTML
-- `http://127.0.0.1:3000/api/routes` → JSON（库空则为 `[]`）
-- `http://127.0.0.1:3000/s3/minio/health/live` → MinIO health（若代理路径可用；否则用桶对象测）
+- `http://127.0.0.1:3080/` → 首页 HTML
+- `http://127.0.0.1:3080/api/routes` → JSON（库空则为 `[]`）
+- `http://127.0.0.1:3080/s3/minio/health/live` → MinIO health（若代理路径可用；否则用桶对象测）
 
-默认监听 `0.0.0.0:3000`（启动日志会打印规范 Origin 与 LAN hint）。域名 HTTPS 仍建议前面挂 Caddy；直连 IP/局域网用 HTTP。
+默认监听 `0.0.0.0:3080`（启动日志会打印规范 Origin 与 LAN hint）。域名 HTTPS 仍建议前面挂 Caddy；直连 IP/局域网用 HTTP。与日常 Vite `:3000` 可同机并行。
 
 ### 5. Caddy
 
@@ -129,7 +142,7 @@ caddy run --config D:\XTCH_PROJECT\xtch-web-portal\deploy\win11-home\Caddyfile
 |---|---|
 | Docker Desktop | 设置里开启开机启动；compose 已 `restart: unless-stopped` |
 | Node | 任务计划程序或 NSSM：工作目录 `app/`，程序 `npm` 参数 `run deploy:serve`（或 `run selfhost`）。依赖 Docker healthy 后再起（可延迟 30–60s） |
-| Caddy | Windows 服务，依赖 Node 已监听 3000 |
+| Caddy | Windows 服务，依赖 Node 已监听 3080 |
 
 重启后按验收清单第 5 项自测。
 
@@ -149,7 +162,7 @@ caddy run --config D:\XTCH_PROJECT\xtch-web-portal\deploy\win11-home\Caddyfile
 补充（运维）：
 
 - 媒体：presign → PUT `https://YOUR_DOMAIN/s3/...` → 前台同域显示（非 403）
-- 外网只扫到 80/443；`5432` / `9000` / `9001` / `3000` 外网不通
+- 外网只扫到 80/443；`5432` / `9000` / `9001` / `3080` 外网不通
 - 重启 Win11 后 Docker + Caddy + Node 自动恢复
 
 ## 日常命令
