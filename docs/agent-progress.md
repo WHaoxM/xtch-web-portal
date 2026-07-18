@@ -2,15 +2,46 @@
 
 ## Status
 
-**in-progress（旅客邮件勿跳 Admin）** — 已改 authClient + admin auth-otp；待 build:win11-home 部署验证。
+**done（Me 页 Google/Apple 无反馈）** — OAuth 先进入 Sign In 再发起；失败可见错误；build/lint 绿。
+
+### Progress note（Me 页 Google/Apple，2026-07-19）
+
+- 根因：Me 点 Google/Apple 不跳 Sign In，错误写在 `authError` 但 Me 不渲染 → 像「点不进去」；邮箱会 `beginSignIn`。
+- 已改：`handleProviderSignIn` 对 OAuth 先 `setActiveView('signIn')`；`handleAccountSignIn` 统一走该路径；gotchas。
+- 已验证：`npm run build`、`npm run lint`。
+- 未验证：真机点 Google（应跳 Google）；Apple 未启用时应见红字提示。
+- 下一步：硬刷新 Me → Continue with Google。
+
+**done（Admin 无权限独立页）** — 非名单账号只见 Access denied 卡，不见侧栏/工作台；build/lint 绿。
+
+### Progress note（Admin 无权限独立页，2026-07-19）
+
+- 目标：已登录但不在 Admin 名单 → 独立提示页，不渲染 Admin 壳。
+- 已改：`Admin.tsx` 增加 `roleStatus` + `AccessDeniedView`；`/api/admin/me` 失败（非过期会话）不再进侧栏；gotchas 补充。
+- 已验证：`npm run build`、`npm run lint`。
+- 未验证：浏览器用非名单 Google 账号再进 `#/admin`。
+- 下一步：硬刷新 `#/admin`；要进后台需把邮箱写入 `ADMIN_*_EMAIL_ALLOWLIST`。
+
+**done（订单凭证认领）** — 表单邮箱≠登录邮箱时，可用 order+token / session_id 绑到当前账号；build/lint 绿。
+
+### Progress note（订单凭证认领，2026-07-19）
+
+- 目标：方案 2 — 确认信/成功页凭证绑定，不依赖 lead_email === auth email。
+- 已改：`claimOrderByProof` + `/api/claim-orders` 扩展；`orderClient` 解析链接；`LinkOrderToAccount`；OrderSuccess / Account / Mini-App 成功页与 My Orders。
+- 规则：有 token 或 Stripe `session_id` 即可认领；已绑他人账号 → 409；邮箱自动认领仍保留。
+- 已验证：`npm run build`、`npm run lint`。
+- 未验证：真支付回流 / 确认信粘贴端到端。
+- 下一步：用户用 DEV bypass 或真单测「不同邮箱登录 + 成功页/粘贴链接」。
+
+**done（旅客邮件勿跳 Admin）** — 已推 `dev`+`main`（`bb833dc`）；生产需 `build:win11-home` + 重启 `deploy:serve` 后验。
 
 ### Progress note（旅客邮件勿跳 Admin，2026-07-19）
 
 - 目标：移动端旅客注册/登录点邮件链接不再进 `#/admin`。
-- 根因：(1) 旅客 OTP 未带 `emailRedirectTo`，邮件落到 Site URL；(2) 无 `auth_next` 时用 allowlist 推断 `#/admin`，邮件 App 无 localStorage 时误伤。
-- 已改：`authClient.ts`（旅客带 `emailRedirectTo`；去掉 allowlist→admin 推断；Admin 发码带 `auth_next=admin`）、`auth-otp.ts`（校验并转发 redirect）、gotchas/task-board。
-- 未验证：`build:win11-home` + 重启 serve；真机点旅客确认邮件。
-- Dashboard：Site URL 必须是 `https://www.xuntingtravel.com`（不要 `/#/admin`）。
+- 根因：(1) 旅客 OTP 未带 `emailRedirectTo`；(2) 无 `auth_next` 时用 allowlist 推断 `#/admin`。
+- 已改并推送：`authClient.ts`、`auth-otp.ts`、gotchas；commit `bb833dc` → `origin/dev` + `origin/main`。
+- 未验证：生产 rebuild 后真机点旅客确认邮件。
+- Dashboard：Site URL 用 `https://www.xuntingtravel.com`（不要 `/#/admin`）。
 
 **in-progress（正式域名 xuntingtravel.com）** — env PUBLIC_DOMAIN + Caddyfile 已写；等 DNS/证书/Supabase OTP 模板。
 

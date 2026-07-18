@@ -16,7 +16,7 @@
 | TOCN 只能作为参考 | 只能参考结构、节奏、交互和信息层级，不能当作 Syncing 事实 |
 | `ChinaTripsMobile` 不是普通长网页 | 先读 `docs/mobile-ios-front-end-context.md`，并检查 320px、375px、390px |
 | Mini-App 顶上出现网站 logo+汉堡 | ≤900px `/china-trips` 不得渲染站点 `Navbar`/`Footer`（见 `App.tsx`）；勿只靠组件内 CSS。断点是 900，不是 `useIsMobile` 的 768 |
-| Mini-App Me → My Orders 跳到桌面 Account | 必须开站内 `myOrders` 视图；禁止 `navigate('/account')`（与搜索、支付回流同一规则） |
+| 订单 Account 看不到、但确认信有 | 登录认领只按 `lead_email`；邮箱不一致时用确认信/成功页链接绑定：`POST /api/claim-orders` + `orderNumber`+`token` 或 `sessionId`（OrderSuccess / My Orders 粘贴） |
 | 首页 Curated「View Itinerary」仍进 `/china-trips` 总览 | 桌面链 `/tours/:slug`；手机链 `/china-trips?route={slug}`（打开详情后清 query） |
 | Home traveler story 又改回 CSS `real-story-slide` 自动切 | 已改为 Embla JS 轮播（交互暂停 + 8s 恢复、圆点可点）；不要恢复无限 CSS 动画；图片 marquee 是另一套，勿混改 |
 | Mini-App 无回门户入口 | 顶栏品牌 Syncing Travel + Me「Back to website」链到 `/`；勿把预订主路径改成外跳 |
@@ -40,12 +40,13 @@
 | Deploy target：同一时刻一个公网 DNS | `win11-home` 与 `cloud-vps` 换的是机器/域名/env/Caddy；勿两边同时接同一域名。索引见 `docs/ops/README.md` |
 | 公网部署勿把 5432/9000 暴露 | `docker-compose.yml` 端口须绑 `127.0.0.1`；只放行 80/443；公网前改掉 postgres/minio 默认口令。见 `docs/ops/win11-home.md` / `cloud-vps.md` |
 | 公网 deploy 禁止 auth/checkout bypass | `env/win11-home/.env` / `env/cloud-vps/.env` 不得设 `DEV_CHECKOUT_BYPASS` / `DEV_AUTH_BYPASS_*`；`npm run deploy:serve` 会拒绝启动 |
-| Admin 双名单 + 角色 | 服务端 `resolveAdminRole`：`ADMIN_TECH_EMAIL_ALLOWLIST` / `ADMIN_OPS_EMAIL_ALLOWLIST`；两边都有 → tech；旧 `ADMIN_EMAIL_ALLOWLIST` 仅在新名单皆空时兼容为全部 tech。bypass 邮箱也必须落在名单内 |
+| Admin 双名单 + 角色 | 服务端 `resolveAdminRole`：`ADMIN_TECH_EMAIL_ALLOWLIST` / `ADMIN_OPS_EMAIL_ALLOWLIST`；两边都有 → tech；旧 `ADMIN_EMAIL_ALLOWLIST` 仅在新名单皆空时兼容为全部 tech。bypass 邮箱也必须落在名单内。**非名单账号**：`/api/admin/me` 403 后前端只渲染独立 Access denied 页，不展示侧栏/工作台壳 |
 | 公网 deploy 拒启空/占位 Admin 名单（G1） | `win11-home` / `cloud-vps`：名单全空或仅 `you@example.com` 时 `deploy:serve` `process.exit(1)`；不影响 Vite `local` |
 | 自建 MinIO 签名用本机、浏览器走同域 `/s3` | `S3_ENDPOINT=http://127.0.0.1:9000`；上传签名 URL 跟请求 Host 改写；**入库的 `public_url`/`hero_image`/`image` 用相对 `/s3/<bucket>/…`**（勿存 `http://127.0.0.1:3000/s3/...`，否则 ngrok/LAN 裂图）。历史绝对路径跑迁移 `010_relative_s3_public_urls` |
 | 生产多入口（域名/公网IP/局域网） | `deploy:serve` 默认 `SELFHOST_HOST=0.0.0.0`；`VITE_AUTH_REDIRECT_URL` 宜留空；Supabase/Google 须白名单每个会用的 origin |
 | Auth 回调必须消费 `#access_token` | URL 含 token 时 `authReady` 必须为 false 并跑 `completeAuthRedirectNavigation`；**勿**因已有 localStorage session 而跳过（曾卡在首页 `#access_token=…`）。回跳：`auth_next` / localStorage → 否则旅客默认 `#/china-trips`（**不要**仅因 allowlist 推断 `#/admin`）。旅客 OTP 须带 `emailRedirectTo`（含 `auth_next`）；Admin OTP 链接回跳须带 `auth_next=admin`。Site URL 用站点根（如 `https://www.xuntingtravel.com`），**不要**写成 `/#/admin`。Redirect URLs：`https://www.xuntingtravel.com/**` 等。`type=recovery` 同样走消费逻辑 |
 | 旅客登录成功勿默认 `#/account` | 无 return path 时回 `#/china-trips`（`TRAVELER_DEFAULT_RETURN_PATH`）并 `markPostAuthMeFocus`；会话真相源是 `@supabase/supabase-js`（勿再双写旧 key `syncing_travel_auth_session`）；401 先 `ensureFreshSession` 再试一次，仍失败再清会话；跨标签用 `subscribeAuthSession` + `focus` |
+| Me 页 Google/Apple「点不进去」 | Me 无 loading/error UI；OAuth 须先 `setActiveView('signIn')` 再 `signInWithOAuth`。邮箱走 `beginSignIn` 故看似正常。Apple 未在 Supabase 启用时会在 Sign In 页报错，不是按钮坏了 |
 | 「看着已登录」却订单要登录 | 先查：① Redirect URL 是否含当前 origin；② 前端 bypass 会话 vs 服务端无 `DEV_AUTH_BYPASS_EMAIL`；③ React `authUser` 与 `readStoredAuthSession()` 是否脱节（点订单前应重读）；④ Supabase 邮件模板是否仍只有链接、未放 `{{ .Token }}` |
 | Admin / 旅客邮箱用 6 位 OTP | Admin：`POST /api/admin/auth-otp`（名单预检；可带 `emailRedirectTo` 含 `auth_next=admin` 作链接回退）；旅客：客户端 `signInWithOtp` + `emailRedirectTo`→`#/china-trips`；两端 `verifyOtp({ type: 'email' })`。旧 `/api/admin/auth-magic-link` 一期仍转发到 OTP。Confirm email 保持开启＝仅首次注册确认 |
 | Supabase 邮件模板必须含 Token | Dashboard → Auth → Email Templates → **Magic Link**：正文写 `{{ .Token }}`（Dev+Prod）。不改模板则用户收不到可用 6 位码。代码不改模板 |
