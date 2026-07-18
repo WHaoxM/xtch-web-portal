@@ -43,6 +43,7 @@ import {
 } from '@/lib/authClient';
 import { createFixedDepartureCheckoutSession } from '@/lib/checkoutClient';
 import { endDateFromDuration, normalizeDateOnly } from '@/lib/dateOnly';
+import { LinkOrderToAccount } from '@/components/LinkOrderToAccount';
 import {
   fetchMyOrders,
   fetchOrderSummary,
@@ -2582,6 +2583,7 @@ function MyOrdersView({
   onExplore,
   onOpenOrder,
   onRetry,
+  onLinkedOrder,
 }: {
   email: string | null | undefined;
   status: MyOrdersStatus;
@@ -2591,12 +2593,20 @@ function MyOrdersView({
   onExplore: () => void;
   onOpenOrder: (order: SafeOrderSummary) => void;
   onRetry: () => void;
+  onLinkedOrder: () => void;
 }) {
   return (
     <div className="china-trips-mobile-page iosapp-page">
       <BackBar title="My Orders" onBack={onBack} />
       <main className="iosapp-screen">
         {email && <p className="iosapp-orders-email">{email}</p>}
+
+        <LinkOrderToAccount
+          allowPaste
+          autoClaim={false}
+          variant="mobile"
+          onLinked={onLinkedOrder}
+        />
 
         {status === 'loading' && (
           <p className="iosapp-orders-status">Loading your orders...</p>
@@ -3099,7 +3109,7 @@ function SignInView({
               disabled={isSigningIn}
               onClick={onEmailSignIn}
             >
-              {isSigningIn ? 'Sending code...' : 'Continue with email'}
+              {isSigningIn ? 'Signing in...' : 'Continue with email'}
             </Button>
           </>
         ) : (
@@ -3288,12 +3298,16 @@ function BookingConfirmedView({
   error,
   onBack,
   mode = 'success',
+  claimProof = null,
+  onLinkedOrder,
 }: {
   order: SafeOrderSummary | null;
   status: BookingConfirmedStatus;
   error: string;
   onBack: () => void;
   mode?: 'success' | 'detail';
+  claimProof?: { orderNumber: string; token?: string; sessionId?: string } | null;
+  onLinkedOrder?: () => void;
 }) {
   const navTitle = mode === 'detail' ? 'Order details' : 'Booking confirmed';
   const backLabel = mode === 'detail' ? 'Back to My Orders' : 'Back to China Trips';
@@ -3391,6 +3405,14 @@ function BookingConfirmedView({
             {backLabel}
           </button>
         </div>
+
+        {mode === 'success' && claimProof && (
+          <LinkOrderToAccount
+            proof={claimProof}
+            variant="mobile"
+            onLinked={onLinkedOrder}
+          />
+        )}
 
         {mode === 'success' && (
           <p className="iosapp-checkout-note">
@@ -3633,6 +3655,10 @@ export default function ChinaTripsMobile() {
   const bookingHandledRef = useRef(false);
   const routeDeepLinkHandledRef = useRef(false);
   const bookingIdentifiersRef = useRef<{ orderNumber: string; sessionId?: string } | null>(null);
+  const [bookingClaimProof, setBookingClaimProof] = useState<{
+    orderNumber: string;
+    sessionId?: string;
+  } | null>(null);
   const bookingOrderRef = useRef<SafeOrderSummary | null>(null);
   const syncAuthFromStorage = () => {
     const session = readStoredAuthSession();
@@ -3740,6 +3766,9 @@ export default function ChinaTripsMobile() {
     setBookingViewMode('success');
     setBookingReturnView('tabs');
     bookingIdentifiersRef.current = { orderNumber, sessionId };
+    setBookingClaimProof(
+      orderNumber && sessionId ? { orderNumber, sessionId } : null,
+    );
     setBookingStatus('loading');
     setBookingError('');
 
@@ -4503,10 +4532,14 @@ export default function ChinaTripsMobile() {
       savePendingGroupDraft(draft);
     }
 
+    // Always surface OAuth on the Sign In screen — Me tab has no error/loading UI.
+    setAuthIntent(intent);
+    setAuthStep('email');
+    setActiveView('signIn');
+
     if (!isAuthConfigured()) {
       setAuthStatus('error');
       setAuthError('Supabase Auth is not configured.');
-      setActiveView('signIn');
       return;
     }
 
@@ -4610,11 +4643,6 @@ export default function ChinaTripsMobile() {
   };
 
   const handleAccountSignIn = (provider: AuthProvider) => {
-    if (provider === 'email') {
-      beginSignIn('account');
-      return;
-    }
-
     void handleProviderSignIn(provider, 'account');
   };
 
@@ -4794,6 +4822,8 @@ export default function ChinaTripsMobile() {
           status={bookingStatus}
           error={bookingError}
           mode={bookingViewMode}
+          claimProof={bookingViewMode === 'success' ? bookingClaimProof : null}
+          onLinkedOrder={() => void loadMyOrders()}
           onBack={handleBookingBack}
         />
       </motion.div>
@@ -4816,6 +4846,7 @@ export default function ChinaTripsMobile() {
           }}
           onOpenOrder={openOrderFromList}
           onRetry={() => void loadMyOrders()}
+          onLinkedOrder={() => void loadMyOrders()}
         />
       </motion.div>
     );

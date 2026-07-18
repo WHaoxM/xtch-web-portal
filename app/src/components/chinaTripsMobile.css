@@ -4329,6 +4329,20 @@ span.iosapp-provider-mark {
   width: 100%;
 }
 
+.iosapp-booking-link-account {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 4px;
+  padding: 14px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.iosapp-booking-link-account .iosapp-primary-button {
+  width: 100%;
+}
+
 .iosapp-booking-cta-note {
   margin: -2px 0 4px;
   color: var(--ios-muted);
