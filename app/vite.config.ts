@@ -1,36 +1,10 @@
-import fs from 'node:fs'
 import path from "path"
 import type { IncomingMessage } from 'node:http'
 import react from "@vitejs/plugin-react"
 import { defineConfig, loadEnv, type Plugin } from "vite"
 import { inspectAttr } from 'kimi-plugin-inspect-react'
-
-const localApiRoutes: Record<string, string> = {
-  '/api/inquiries': '/api/inquiries.ts',
-  '/api/checkout-session': '/api/checkout-session.ts',
-  '/api/auth-provider-status': '/api/auth-provider-status.ts',
-  '/api/departures': '/api/departures.ts',
-  '/api/stripe-webhook': '/api/stripe-webhook.ts',
-  '/api/orders': '/api/orders.ts',
-  '/api/my-orders': '/api/my-orders.ts',
-  '/api/claim-orders': '/api/claim-orders.ts',
-  '/api/admin/orders': '/api/admin/orders.ts',
-  '/api/admin/dashboard': '/api/admin/dashboard.ts',
-  '/api/admin/inquiries': '/api/admin/inquiries.ts',
-  '/api/admin/departures': '/api/admin/departures.ts',
-  '/api/custom-trip-form': '/api/custom-trip-form.ts',
-  '/api/admin/custom-trip-form': '/api/admin/custom-trip-form.ts',
-  '/api/destinations': '/api/destinations.ts',
-  '/api/routes': '/api/routes.ts',
-  '/api/admin/destinations': '/api/admin/destinations.ts',
-  '/api/admin/routes': '/api/admin/routes.ts',
-  '/api/admin/media': '/api/admin/media.ts',
-  '/api/admin/media-presign': '/api/admin/media-presign.ts',
-  '/api/categories': '/api/categories.ts',
-  '/api/admin/categories': '/api/admin/categories.ts',
-};
-
-const rawBodyRoutes = new Set(['/api/stripe-webhook']);
+import { localApiRoutes, rawBodyRoutes } from './scripts/localApiRoutes'
+import { loadTargetEnv, normalizeTarget } from '../scripts/env/targetEnv'
 
 type VercelResponseLike = {
   status: (code: number) => VercelResponseLike;
@@ -113,38 +87,14 @@ async function readRawBody(req: IncomingMessage): Promise<Buffer> {
   return Buffer.concat(chunks);
 }
 
-/** Apply a dotenv file so its values win over existing process.env. */
-function applyEnvFile(filePath: string) {
-  if (!fs.existsSync(filePath)) return;
-  const text = fs.readFileSync(filePath, 'utf8');
-  for (const line of text.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const eq = trimmed.indexOf('=');
-    if (eq <= 0) continue;
-    const key = trimmed.slice(0, eq).trim();
-    let value = trimmed.slice(eq + 1).trim();
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-    process.env[key] = value;
-  }
-}
-
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   Object.assign(process.env, env);
-  // loadEnv prefers existing process.env over .env files. After Vite's in-process
-  // restart (editing .env.local), an earlier empty RESEND_API_KEY would stick.
-  // Re-apply local env files so updated secrets win for the local API middleware.
-  applyEnvFile(path.resolve(process.cwd(), '.env'));
-  applyEnvFile(path.resolve(process.cwd(), `.env.${mode}`));
-  applyEnvFile(path.resolve(process.cwd(), '.env.local'));
-  applyEnvFile(path.resolve(process.cwd(), `.env.${mode}.local`));
+  // Canonical secrets: env/<target>/.env (legacy app/.env.*.local still falls back).
+  // Re-apply with override so Vite in-process restarts pick up edited secrets.
+  const target = normalizeTarget(mode);
+  loadTargetEnv(target, { override: true });
 
   return {
     base: './',

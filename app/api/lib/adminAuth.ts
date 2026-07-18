@@ -1,11 +1,12 @@
 import crypto from 'node:crypto';
+import { resolveAdminRole, type AdminRole } from './adminAllowlist';
 
 type VercelRequestLike = {
   headers: Record<string, string | string[] | undefined>;
 };
 
 type AdminAuthResult =
-  | { ok: true; email: string }
+  | { ok: true; email: string; role: AdminRole }
   | { ok: false; error: string; status: number };
 
 export async function requireAdminAuth(req: VercelRequestLike): Promise<AdminAuthResult> {
@@ -21,10 +22,15 @@ export async function requireAdminAuth(req: VercelRequestLike): Promise<AdminAut
 
   const bypassEmail = process.env.DEV_AUTH_BYPASS_EMAIL;
   if (bypassEmail && token === 'dev-bypass-token') {
-    if (!isAdminEmail(bypassEmail)) {
-      return { ok: false, error: 'Dev bypass email is not in the admin allowlist.', status: 403 };
+    const role = resolveAdminRole(bypassEmail);
+    if (!role) {
+      return {
+        ok: false,
+        error: 'Dev bypass email is not in the admin ops/tech allowlist.',
+        status: 403,
+      };
     }
-    return { ok: true, email: bypassEmail };
+    return { ok: true, email: bypassEmail, role };
   }
 
   const supabaseUrl = process.env.VITE_SUPABASE_URL;
@@ -53,24 +59,30 @@ export async function requireAdminAuth(req: VercelRequestLike): Promise<AdminAut
       return { ok: false, error: 'Admin email not found.', status: 401 };
     }
 
-    if (!isAdminEmail(email)) {
+    const role = resolveAdminRole(email);
+    if (!role) {
       return { ok: false, error: 'You are not authorized to access admin features.', status: 403 };
     }
 
-    return { ok: true, email };
+    return { ok: true, email, role };
   } catch (error) {
     console.error('Admin auth verification failed:', error);
     return { ok: false, error: 'Admin authentication failed.', status: 500 };
   }
 }
 
-function isAdminEmail(email: string): boolean {
-  const allowlist = (process.env.ADMIN_EMAIL_ALLOWLIST || '')
-    .split(',')
-    .map((entry) => entry.trim().toLowerCase())
-    .filter(Boolean);
-
-  return allowlist.includes(email.toLowerCase());
+/** Same as requireAdminAuth, but rejects ops (and any non-tech) with 403. */
+export async function requireTechAdminAuth(req: VercelRequestLike): Promise<AdminAuthResult> {
+  const admin = await requireAdminAuth(req);
+  if (!admin.ok) return admin;
+  if (admin.role !== 'tech') {
+    return {
+      ok: false,
+      error: 'Tech admin access required for this action.',
+      status: 403,
+    };
+  }
+  return admin;
 }
 
 function headerValue(value: string | string[] | undefined): string | undefined {

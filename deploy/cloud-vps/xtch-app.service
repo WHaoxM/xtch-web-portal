@@ -1,0 +1,32 @@
+# systemd unit for Node deploy serve (cloud-vps).
+# Install (as root), after cloning the repo and filling env/cloud-vps/.env:
+#
+#   sudo cp deploy/cloud-vps/xtch-app.service /etc/systemd/system/xtch-app.service
+#   # Edit WorkingDirectory / paths below if the clone is not under /opt/xtch-web-portal
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now xtch-app
+#
+# Requires: Node 20+, npm deps installed in app/, dist built (npm run build:cloud-vps),
+# Docker Postgres/MinIO healthy on 127.0.0.1.
+
+[Unit]
+Description=XTCH web portal (cloud-vps deploy serve)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=xtch
+Group=xtch
+WorkingDirectory=/opt/xtch-web-portal/app
+Environment=DEPLOY_TARGET=cloud-vps
+Environment=NODE_ENV=production
+# Prefer npx/tsx from local node_modules
+ExecStart=/usr/bin/npm run deploy:serve
+Restart=on-failure
+RestartSec=5
+# Give Docker a moment after reboot
+ExecStartPre=/bin/sleep 15
+
+[Install]
+WantedBy=multi-user.target

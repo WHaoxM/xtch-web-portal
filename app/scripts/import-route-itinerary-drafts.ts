@@ -19,6 +19,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { ensureContentTables } from '../api/lib/contentSchema';
 import { sql } from '../api/lib/db';
+import { loadTargetEnv } from '../../scripts/env/targetEnv';
 
 type DraftDay = {
   dayNumber: number;
@@ -42,25 +43,7 @@ type Draft = {
   days: DraftDay[];
 };
 
-function loadEnvLocal() {
-  try {
-    const content = readFileSync(resolve(import.meta.dirname, '../.env.local'), 'utf-8');
-    for (const line of content.split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) continue;
-      const eqIndex = trimmed.indexOf('=');
-      if (eqIndex === -1) continue;
-      const key = trimmed.slice(0, eqIndex).trim();
-      let value = trimmed.slice(eqIndex + 1).trim();
-      if (value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1);
-      if (!(key in process.env)) process.env[key] = value;
-    }
-  } catch {
-    // optional
-  }
-}
-
-loadEnvLocal();
+loadTargetEnv('local', { override: false });
 
 const dryRun = process.argv.includes('--dry-run');
 const draftsDir = resolve(import.meta.dirname, '../../data/route-itinerary-drafts/drafts');
@@ -141,7 +124,7 @@ function foldGiftDay(day: DraftDay): string {
 
 async function main() {
   if (!process.env.POSTGRES_URL) {
-    throw new Error('POSTGRES_URL is missing. Set it in app/.env.local');
+    throw new Error('POSTGRES_URL is missing. Set it in env/local/.env');
   }
 
   const files = readdirSync(draftsDir)

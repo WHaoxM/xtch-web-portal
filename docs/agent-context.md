@@ -47,18 +47,27 @@
 
 ## 常用命令
 
-在 `app/` 目录执行：
+仓库根或 `app/` 均可（根 `package.json` 转发到 `app/`）：
 
 ```bash
 npm run dev
 npm run build
 npm run lint
 npm run preview
+npm run deploy:serve -- --target win11-home
 ```
 
 - `npm run dev`：先释放占用 `3000` 的旧进程，再启动 Vite；本地 URL 固定为 `http://127.0.0.1:3000`。
 - `npm run dev:keep`：不杀旧进程，直接启动（仅在你明确要保留现有监听时用）。
 - 已有健康的 `3000` 服务时优先复用，不要再开第二个。
+- 依赖安装仍在 `app/`：`cd app && npm install`。
+
+## 环境与部署入口
+
+- **环境分层总览**（四层：`local` / `tunnel` / `win11-home` / `cloud-vps`；两套生产；`selfhost` 仅为 win11-home 旧别名）：`docs/ops/README.md`
+- 配置真相源：`env/<target>/.env`（说明见 `env/README.md`、`app/ENV.md`）
+- 切公网 DNS / 各 target 运维清单：`docs/ops/win11-home.md`、`docs/ops/cloud-vps.md`
+- 边缘资产：`deploy/win11-home/`、`deploy/cloud-vps/`
 
 ## 验证原则
 

@@ -1,13 +1,27 @@
 {
   "name": "xtch-web-portal",
   "private": true,
-  "description": "Repo root proxy — npm scripts run in app/",
+  "description": "Repo root proxy — npm scripts forward into app/",
   "scripts": {
     "dev": "npm run dev --prefix app",
     "dev:keep": "npm run dev:keep --prefix app",
+    "dev:tunnel": "npm run dev:tunnel --prefix app",
+    "testbed:tunnel": "npm run testbed:tunnel --prefix app",
     "build": "npm run build --prefix app",
+    "build:win11-home": "npm run build:win11-home --prefix app",
+    "build:cloud-vps": "npm run build:cloud-vps --prefix app",
+    "build:selfhost": "npm run build:selfhost --prefix app",
     "lint": "npm run lint --prefix app",
     "preview": "npm run preview --prefix app",
-    "typecheck": "npm run typecheck --prefix app"
+    "typecheck": "npm run typecheck --prefix app",
+    "deploy:serve": "npm run deploy:serve --prefix app --",
+    "selfhost": "npm run selfhost --prefix app --",
+    "db:migrate": "npm run db:migrate --prefix app --",
+    "db:migrate:tunnel": "npm run db:migrate:tunnel --prefix app",
+    "db:migrate:win11-home": "npm run db:migrate:win11-home --prefix app",
+    "db:migrate:cloud-vps": "npm run db:migrate:cloud-vps --prefix app",
+    "db:migrate:selfhost": "npm run db:migrate:selfhost --prefix app",
+    "test:s3": "npm run test:s3 --prefix app",
+    "test:admin-allowlist": "npm run test:admin-allowlist --prefix app"
   }
 }

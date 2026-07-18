@@ -2,6 +2,79 @@
 
 ## Status
 
+**done（Prod multi-origin）** — `deploy:serve` 默认 `0.0.0.0`；`publicOrigin`（域名 > PUBLIC_IP > LAN）；S3/Auth 跟请求 Host；`VITE_AUTH_REDIRECT_URL` 宜留空。
+
+### Progress note（Prod multi-origin，2026-07-18）
+
+- 目标：执行生产多入口计划。
+- 已改：`serve-selfhost.mjs`、`publicOrigin.ts`(+test)、`s3.ts`/`media-presign`、env examples + 本机 win11-home/cloud-vps `.env`、`win11-home.md`、gotchas、`test:s3`。
+- 已验证：`npm run test:s3`（13 pass）、`build`、`lint`。
+- 未验证：局域网 IP 浏览器冒烟（需用户本机防火墙）。
+- 下一步：`npm run build:win11-home` 后 `deploy:serve`；Supabase/Google 白名单加局域网 origin。
+
+**done（Env folder layering）** — 配置迁入 `env/<target>/.env`；共享 `scripts/env/targetEnv.ts`；docs/ops 按 target+shared 分层；旧 `app/.env.*.local` 仅回退一轮。
+
+### Progress note（Env folder layering，2026-07-18）
+
+- 目标：执行 `.cursor/plans/env_folder_layering_abe46b57.plan.md`。
+- 已读：计划、既有 loaders（vite/serve/migrate/tunnel/import/小脚本）、四套 example、ops 文档。
+- 已改：`scripts/env/targetEnv.ts`；`env/{local,tunnel,win11-home,cloud-vps}/.env.example` + README；本机复制真实 `.env`（未提交）；根 `.gitignore`；接线 vite/serve/migrate/tunnel/import/小脚本；`docs/ops/README.md` + target/shared + 旧路径跳转；`app/ENV.md`；删 `app/.env*.example`；gotchas/context；bootstrap 注释。
+- 已验证：`git check-ignore` 忽略 `env/*/.env`、跟踪 example；`db:migrate --env local` → `env\local\.env`；`cloud-vps` 缺文件报新文案；`build:win11-home` / `build` / `lint` 绿；`deploy:serve` 读到 `env/win11-home/.env`（G1 空名单拒启，路径正确）。
+- 未验证：浏览器 `npm run dev` 全链路；用户手删旧 `app/.env.*.local`。
+- 下一步：确认新路径 OK 后可手删旧 `app/.env.*.local`；公网前填 `env/win11-home/.env` 真实 Admin 名单。
+
+**done（Env layer cleanup）** — 四层环境总览收口；gitignore 忽略 `*.secrets*`；example 注释对齐；未搬目录、未删 selfhost 回退。
+
+### Progress note（Env layer cleanup，2026-07-18）
+
+- 目标：执行 `.cursor/plans/env_layer_cleanup_486d8e8c.plan.md`（方案 C）。
+- 已读：计划、`docs/ops/deploy/README.md`、gotchas/context、四套 env example、`app/.gitignore`。
+- 已改：`docs/ops/deploy/README.md`（四层总览 + selfhost 别名）、`docs/agent-context.md`、`docs/agent-gotchas.md`、`app/.gitignore`、`app/.env.{local,tunnel,win11-home,cloud-vps,selfhost}.local.example` 头注释。
+- 已验证：`git check-ignore -v app/.env.selfhost.secrets.local.txt` → `app/.gitignore:*.secrets.local.txt`。
+- 未验证 / 不做：真实 `.env.*.local` 改名；硬删 selfhost 回退；env 搬目录。
+- 下一步：可选本机复制 `.env.selfhost.local` → `.env.win11-home.local`；需要时再开 D 方案搬目录。
+
+**done（Prod Admin S1）** — 双名单 ops/tech + `GET /api/admin/me` + Admin 角色展示/`minRole` 钩子 + 生产 G1 拒启 + S1 运维文档。未建 Prod Supabase、未写真实邮箱进 git。
+
+### Progress note（Prod Admin S1，2026-07-18）
+
+- 目标：执行 `.cursor/plans/prod_admin_s1_5ffd86d2.plan.md`。
+- 已改：`adminAllowlist.ts`(+test)、`adminAuth.ts`、`admin/me.ts`、`adminSessionClient.ts`、`Admin.tsx`、`localApiRoutes.ts`、`serve-selfhost.mjs`、env examples、deploy/tunnel/gotchas、`package.json` `test:admin-allowlist`。
+- 已验证：`npm run test:admin-allowlist`（8 pass）；`npm run build` / `lint`；G1 空名单与 `you@example.com` 拒启；填 `smoke-admin@example.test` 后 `deploy:serve --target cloud-vps` 可起（临时 env 已删）。
+- 未验证：浏览器登录后 `/api/admin/me` 与侧栏「运营/技术」；本机旧单名单进 Admin；用户 Prod Supabase 建项与真邮箱配置。
+- 下一步：用户按 `docs/ops/deploy/win11-home.md` S1 清单配 Prod keys + 双名单；若 `.env.win11-home.local` 仍只有 `you@example.com` 需改真实邮箱否则拒启。
+
+**done（MinIO/DB 多库隔离 + 备份导入）** — 生产隔离 `xtch_prod` + `xtch-prod`；备份包已导入并重写 `dev/`→`prod/`；627 对象在生产桶可读。
+
+### Progress note（MinIO/DB 多库隔离，2026-07-18）
+
+- 目标：把 `D:\XTCH_PROJECT\db\xtch-content-minio-backup-2026-07-17\2026-07-17T22-30-35` 迁入生产隔离，不污染日常 `xtch` / `xtch-public`。
+- 已读：备份 `manifest`/`IMPORT.md`/`media-map`、compose、`migrate.ts`、`docs/ops/deploy/win11-home.md`、content schema。
+- 已改：`docker/postgres/init-extra-db.sql`（`xtch_prod`）、`docker-compose.yml`（桶 `xtch-prod`）、`app/scripts/import-content-backup.ts`、`docs/ops/content-backup.md`、env examples / `.env.selfhost.local`、gotchas/minio 文档、备份包 `IMPORT.md`/`OBJECTS.md`。
+- 已验证：`CREATE DATABASE xtch_prod`；`minio-init` 建桶；`db:migrate:selfhost`→`xtch_prod` 9 条；import 12/20/627/111；`mc mirror` 后 `xtch-prod/prod/` **627** 对象；样例 JPG HTTP 200；URL 为 `…/s3/xtch-prod/prod/…`；日常 `xtch` 仍独立有 20 路线。
+- 未验证：`deploy:serve` 读生产库后的全站浏览器冒烟；公网域名下的 `/s3`；建议复制 `.env.selfhost.local`→`.env.win11-home.local`。
+- 下一步：本机 `npm run selfhost` / `deploy:serve` 验收图片与 `/api/routes`；公网前改密。
+
+**done（Deploy target layering）** — `win11-home` / `cloud-vps` 分层 + cloud-vps 部署包（脚本/env/systemd/文档）。本机 build/serve 冒烟通过；无 SSH、无数据迁移。
+
+### Progress note（Deploy target layering，2026-07-18）
+
+- 目标：执行 `.cursor/plans/deploy_target_layering_66193799.plan.md`。
+- 已改：`serve-selfhost.mjs`（`--target`/`DEPLOY_TARGET`）、`migrate.ts`（win11-home/cloud-vps + selfhost 别名）、`package.json` scripts、env examples、`deploy/win11-home`+`cloud-vps`、`docs/ops/deploy/*`、ops/旧文档重定向、gotchas/context/minio、vite win11-home→selfhost env 回退。
+- 已验证：`npm run build:win11-home`；`npm run deploy:serve` 冒烟（target=win11-home，env 回退 `.env.selfhost.local`；`/` `/api/routes` `/s3/minio/health/live` 皆 200）；`db:migrate:cloud-vps` 缺 env 明确报错。
+- 未验证：真机 SSH/证书/切 DNS；Win11→云数据迁移（本期不做）。
+- 下一步：云主机开通后按 `docs/ops/deploy/cloud-vps.md` 上机；建议本机复制 `.env.selfhost.local` → `.env.win11-home.local`。
+
+**done（Win11 selfhost）** — serve-selfhost + `S3_BROWSER_ENDPOINT` + compose 绑 `127.0.0.1` + Caddy/运维文档。本机冒烟通过；外网 HTTPS/端口映射待用户环境。
+
+### Progress note（Win11 selfhost，2026-07-18）
+
+- 目标：执行 `.cursor/plans/win11_selfhost_server_2b93f7f0.plan.md`。
+- 已改：`serve-selfhost.mjs`、`localApiRoutes.ts`、`s3.ts`（浏览器 URL 改写）、`.env.selfhost.local.example`、`docker-compose.yml`、`ops/Caddyfile`、`docs/ops/win11-selfhost.md`、gotchas/migrate `--env selfhost`、`build:selfhost`/`selfhost` scripts。
+- 已验证：`npm run test:s3`；`npm run build`；`npm run selfhost` 冒烟（`/` HTML、`/api/routes` 200、`/s3/minio/health/live` 200、SPA fallback）。
+- 未验证：公网 DNS/路由 80·443、Caddy 证书、Admin 真登录、媒体 PUT 全链路、开机自启、外网端口扫描。
+- 下一步：用户按 `docs/ops/win11-selfhost.md` 填域名/改密/起 Caddy 做外网验收。
+
 **done（Admin 表单配置通俗化）** — 预览优先：完整定制/路线私人手机框 + 自动 fieldKey（snake）+ 草稿合并「未保存」角标 + 列表整表预览 + CJK 门闩。已验证 build/lint。
 
 ### Progress note（Admin 表单配置通俗化，2026-07-18）

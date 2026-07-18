@@ -1,0 +1,6 @@
+# Moved: maintained file is deploy/win11-home/Caddyfile
+# Prefer running Caddy against that path directly. This stub imports it so old
+# scripts (`caddy run --config …/ops/Caddyfile`) keep working.
+# Docs: docs/ops/deploy/win11-home.md
+
+import ../deploy/win11-home/Caddyfile

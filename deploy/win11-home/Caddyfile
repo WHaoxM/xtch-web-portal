@@ -1,0 +1,12 @@
+# Win11 home edge proxy (deploy target: win11-home).
+# Replace YOUR_DOMAIN with the DNS A-record hostname that points at this machine.
+# Install Caddy, then run as a Windows service with this file, e.g.:
+#   caddy run --config C:\path\to\xtch-web-portal\deploy\win11-home\Caddyfile
+#
+# Caddy obtains and renews HTTPS certificates automatically (needs public 80/443).
+# Docs: docs/ops/deploy/win11-home.md
+
+YOUR_DOMAIN {
+	encode gzip
+	reverse_proxy 127.0.0.1:3000
+}

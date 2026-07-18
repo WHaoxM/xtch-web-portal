@@ -4,6 +4,7 @@ import {
   buildObjectKey,
   mediaTypeFromContentType,
   resolveStorageEnv,
+  rewriteSignedUploadUrlForBrowser,
   sanitizeObjectFilename,
 } from './s3.ts';
 
@@ -37,4 +38,31 @@ test('buildObjectKey uses env/type/yyyy/mm/uuid-name', () => {
 
 test('sanitizeObjectFilename strips path segments', () => {
   assert.equal(sanitizeObjectFilename('C:\\tmp\\a b.png'), 'a-b.png');
+});
+
+test('rewriteSignedUploadUrlForBrowser maps MinIO URL onto /s3 public origin', () => {
+  const signed =
+    'http://127.0.0.1:9000/xtch-public/prod/image/x.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-SignedHeaders=host';
+  const rewritten = rewriteSignedUploadUrlForBrowser(signed, {
+    S3_BROWSER_ENDPOINT: 'https://cdn.example.com/s3',
+  });
+  assert.equal(
+    rewritten,
+    'https://cdn.example.com/s3/xtch-public/prod/image/x.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-SignedHeaders=host',
+  );
+});
+
+test('rewriteSignedUploadUrlForBrowser prefers requestOrigin over S3_BROWSER_ENDPOINT', () => {
+  const signed = 'http://127.0.0.1:9000/xtch-public/key?sig=1';
+  const rewritten = rewriteSignedUploadUrlForBrowser(
+    signed,
+    { S3_BROWSER_ENDPOINT: 'https://cdn.example.com/s3' },
+    'http://192.168.1.10:3000',
+  );
+  assert.equal(rewritten, 'http://192.168.1.10:3000/s3/xtch-public/key?sig=1');
+});
+
+test('rewriteSignedUploadUrlForBrowser is a no-op without browser endpoint or public origin', () => {
+  const signed = 'http://127.0.0.1:9000/xtch-public/key?sig=1';
+  assert.equal(rewriteSignedUploadUrlForBrowser(signed, {}), signed);
 });

@@ -1,0 +1,12 @@
+# Linux VPS edge proxy (deploy target: cloud-vps).
+# Replace YOUR_DOMAIN with the DNS A-record hostname that points at this VPS.
+# Install via deploy/cloud-vps/bootstrap.sh or docs/ops/deploy/cloud-vps.md, then:
+#   sudo caddy run --config /path/to/xtch-web-portal/deploy/cloud-vps/Caddyfile
+# or point the Caddy systemd unit at this file.
+#
+# Caddy obtains and renews HTTPS certificates automatically (needs public 80/443).
+
+YOUR_DOMAIN {
+	encode gzip
+	reverse_proxy 127.0.0.1:3000
+}

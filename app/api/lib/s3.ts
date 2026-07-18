@@ -1,5 +1,10 @@
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import {
+  isPlaceholderUrl,
+  resolvePublicOrigin,
+  resolveS3BrowserEndpoint,
+} from './publicOrigin';
 
 export type S3Config = {
   endpoint: string;
@@ -10,13 +15,23 @@ export type S3Config = {
   publicBaseUrl: string;
 };
 
-export function getS3Config(): S3Config | null {
-  const endpoint = process.env.S3_ENDPOINT?.trim();
-  const accessKeyId = process.env.S3_ACCESS_KEY_ID?.trim();
-  const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY?.trim();
-  const bucket = process.env.S3_BUCKET?.trim();
-  const region = process.env.S3_REGION?.trim() || 'us-east-1';
-  const publicBaseUrl = process.env.S3_PUBLIC_BASE_URL?.trim().replace(/\/$/, '');
+export function getS3Config(env: NodeJS.ProcessEnv = process.env): S3Config | null {
+  const endpoint = env.S3_ENDPOINT?.trim();
+  const accessKeyId = env.S3_ACCESS_KEY_ID?.trim();
+  const secretAccessKey = env.S3_SECRET_ACCESS_KEY?.trim();
+  const bucket = env.S3_BUCKET?.trim();
+  const region = env.S3_REGION?.trim() || 'us-east-1';
+  let publicBaseUrl = env.S3_PUBLIC_BASE_URL?.trim().replace(/\/$/, '') || '';
+
+  if (publicBaseUrl && isPlaceholderUrl(publicBaseUrl)) {
+    publicBaseUrl = '';
+  }
+  if (!publicBaseUrl && bucket) {
+    const origin = resolvePublicOrigin(env);
+    if (origin) {
+      publicBaseUrl = `${origin}/s3/${bucket}`;
+    }
+  }
 
   if (!endpoint || !accessKeyId || !secretAccessKey || !bucket || !publicBaseUrl) {
     return null;
@@ -97,6 +112,8 @@ export async function createPresignedUploadUrl(input: {
   objectKey: string;
   contentType: string;
   expiresInSeconds?: number;
+  /** Browser request origin (scheme://host[:port]); preferred for /s3 rewrite. */
+  requestOrigin?: string | null;
 }): Promise<{ uploadUrl: string; publicUrl: string }> {
   const config = getS3Config();
   if (!config) {
@@ -110,12 +127,43 @@ export async function createPresignedUploadUrl(input: {
     ContentType: input.contentType,
   });
 
-  const uploadUrl = await getSignedUrl(client, command, {
+  const signedUploadUrl = await getSignedUrl(client, command, {
     expiresIn: input.expiresInSeconds ?? 900,
   });
 
+  const requestOrigin = input.requestOrigin?.trim() || null;
+  let publicUrl = publicUrlForKey(input.objectKey, config);
+  if (requestOrigin) {
+    const encodedKey = input.objectKey
+      .split('/')
+      .map((segment) => encodeURIComponent(segment))
+      .join('/');
+    publicUrl = `${requestOrigin.replace(/\/$/, '')}/s3/${config.bucket}/${encodedKey}`;
+  }
+
   return {
-    uploadUrl,
-    publicUrl: publicUrlForKey(input.objectKey, config),
+    uploadUrl: rewriteSignedUploadUrlForBrowser(signedUploadUrl, process.env, requestOrigin),
+    publicUrl,
   };
+}
+
+/**
+ * Sign against local MinIO (S3_ENDPOINT=http://127.0.0.1:9000) so SigV4 Host
+ * matches what the reverse proxy sends after changeOrigin. Rewrite the URL the
+ * browser uses to the same-origin /s3 path (request Host, else S3_BROWSER_ENDPOINT,
+ * else resolvePublicOrigin()/s3).
+ */
+export function rewriteSignedUploadUrlForBrowser(
+  signedUploadUrl: string,
+  env: NodeJS.ProcessEnv = process.env,
+  requestOrigin?: string | null,
+): string {
+  const browserEndpoint = resolveS3BrowserEndpoint(env, requestOrigin);
+  if (!browserEndpoint) return signedUploadUrl;
+
+  const signed = new URL(signedUploadUrl);
+  const browser = new URL(browserEndpoint);
+  const browserPath = browser.pathname.replace(/\/$/, '');
+  const combinedPath = `${browserPath}${signed.pathname}` || '/';
+  return `${browser.origin}${combinedPath}${signed.search}`;
 }

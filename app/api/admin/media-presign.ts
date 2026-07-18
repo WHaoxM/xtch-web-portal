@@ -1,5 +1,6 @@
 import { requireAdminAuth, hashIp } from '../lib/adminAuth';
 import { writeAuditLog } from '../lib/auditLog';
+import { resolveRequestOrigin } from '../lib/publicOrigin';
 import { buildObjectKey, createPresignedUploadUrl, isS3Configured } from '../lib/s3';
 
 type VercelRequestLike = {
@@ -61,7 +62,12 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
     }
 
     const objectKey = buildObjectKey(filename, contentType);
-    const presigned = await createPresignedUploadUrl({ objectKey, contentType });
+    const requestOrigin = resolveRequestOrigin(req);
+    const presigned = await createPresignedUploadUrl({
+      objectKey,
+      contentType,
+      requestOrigin,
+    });
 
     await writeAuditLog({
       actorType: 'admin',

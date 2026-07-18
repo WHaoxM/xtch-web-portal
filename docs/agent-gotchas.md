@@ -6,7 +6,7 @@
 
 | Gotcha | 正确处理 |
 |---|---|
-| npm 命令不在仓库根目录执行 | 在 `app/` 目录执行 `npm run build`、`npm run lint`、`npm run dev` |
+| 根目录也可 `npm run …` | 仓库根 `package.json` 会 `--prefix app` 转发；仍须写 `npm run deploy:serve`（不是裸 `deploy:serve`）。带参数：`npm run deploy:serve -- --target win11-home` |
 | Agent 反复 `npm run dev` 导致端口变成 3001/3002 | 本地固定 `3000`（`strictPort: true`）。需要新开时直接 `npm run dev`（会先跑 `scripts/free-dev-port.mjs` 释放占用）；不要手动换端口。已有健康的 3000 服务时优先复用，勿重复启动 |
 | 当前路由使用 `HashRouter` | 内部链接和刷新行为要兼容 hash 路由 |
 | 页面路由集中在 `app/src/App.tsx` | 新页面或路由改动先查这里 |
@@ -26,14 +26,26 @@
 | `ensureContentTables` 等自愈 DDL 在首屏会并发触发 | 必须用 in-flight Promise 串行化；`CREATE INDEX IF NOT EXISTS` 在并发下仍可能报 `pg_class_relname_nsp_index`（23505），需忽略该碰撞 |
 | 本地 Postgres 空库时 `/api/destinations` `/api/routes` 会 200 但返回空数组；`App` 仍会渲染 | 页面组件不得假设 `routeTours[0]` / `destinationMeta[0]` 一定存在；需要内容时跑 `npx tsx scripts/backfill-content.ts`（在 `app/` 下） |
 | `CREATE TABLE IF NOT EXISTS` 不会修复旧表缺列 | 查询/更新新增列时，同步在对应 ensure schema 里加 `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`，不能只改建表 SQL |
-| 本地未配 `STRIPE_SECRET_KEY` 时点 Pay 会报 `Checkout is not configured.` | 在 `app/.env.local` 设 `DEV_CHECKOUT_BYPASS=1`（示例已有）；会本地建单并确认，跳 Mini-App `Booking confirmed`，并走确认邮件（`console` 只打终端预览）。生产/部署环境该开关强制无效；真测 Stripe 时填 test key 并去掉 bypass；真收信设 `BOOKING_EMAIL_MODE=resend` + `RESEND_API_KEY` |
+| 本地未配 `STRIPE_SECRET_KEY` 时点 Pay 会报 `Checkout is not configured.` | 在 `env/local/.env` 设 `DEV_CHECKOUT_BYPASS=1`（示例已有）；会本地建单并确认，跳 Mini-App `Booking confirmed`，并走确认邮件（`console` 只打终端预览）。生产/部署环境该开关强制无效；真测 Stripe 时填 test key 并去掉 bypass；真收信设 `BOOKING_EMAIL_MODE=resend` + `RESEND_API_KEY` |
 | Resend `onboarding@resend.dev` 报只能发到本人邮箱 | 试用发件域只能发到 Resend 账号邮箱。本地设 `BOOKING_EMAIL_OVERRIDE_TO=<账号邮箱>`（见 `email.ts`）；表单可填任意 lead email，实际投递走 override。验证自有域名后可去掉 override |
-| 改 `.env.local` 后仍报 `RESEND_API_KEY is not configured.` | Vite 热重启会保留进程里旧的空 env；`vite.config.ts` 已强制让 `.env.local` 覆盖。若仍异常，停掉终端里的 dev 再 `npm run dev`（完整重启进程） |
+| 改 env 后仍报 `RESEND_API_KEY is not configured.` | Vite 热重启会保留进程里旧的空 env；`vite.config.ts` 经 `loadTargetEnv` 强制覆盖。若仍异常，停掉终端里的 dev 再 `npm run dev`（完整重启进程） |
 | 订单 `route_snapshot` 日期出现 ISO（如 `…T16:00:00.000Z`） | `pg` DATE 在事务里是 `Date`；写入 snapshot 前必须 `formatDate` 成 `YYYY-MM-DD`，禁止直接 `JSON.stringify(Date)`。展示侧用 `normalizeDateOnly` / `formatOrderDateRange`。历史脏数据跑迁移 `009_normalize_order_route_snapshot_dates` |
-| 隧道测试台 env 覆盖顺序 | `vite --mode tunnel` 最后加载 `.env.tunnel.local`（覆盖 `.env.local`）。迁移必须用 `npm run db:migrate:tunnel`，勿对日常 `xtch` 库跑隧道迁移。见 `docs/ops/tunnel-testbed.md` |
+| 隧道测试台 env | `vite --mode tunnel` 加载 `env/tunnel/.env`。迁移必须用 `npm run db:migrate:tunnel`，勿对日常 `xtch` 库跑隧道迁移。见 `docs/ops/tunnel.md` |
 | 隧道 Host 被 Vite 拦 | `Blocked request... not allowed` → `vite --mode tunnel` 需 `server.allowedHosts: ['.trycloudflare.com']`（仅 tunnel mode） |
-| 隧道下 MinIO 直连 `127.0.0.1:9000` 会签名失败 | Presign Host 须等于浏览器访问的隧道域名。用 Vite `/s3` 反代 + `S3_ENDPOINT=https://<tunnel>/s3`（`testbed:tunnel` 会回写） |
+| 隧道下 MinIO 直连 `127.0.0.1:9000` 会签名失败 | Presign Host 须等于浏览器访问的隧道域名。用 Vite `/s3` 反代 + `S3_ENDPOINT=https://<tunnel>/s3`（`testbed:tunnel` 会回写 `env/tunnel/.env`） |
 | 隧道上的 Admin / auth bypass 不是生产 | `DEV_CHECKOUT_BYPASS` + bypass 邮箱在公网裸奔；用完 Ctrl+C 关隧道，勿当正式站 |
+| 环境分层：两套生产，不是 selfhost vs cloud | 四层 = `local` / `tunnel` / `win11-home` / `cloud-vps`。配置在 `env/<target>/.env`；生产只有 **win11-home + cloud-vps**；`selfhost` 只是旧别名。总览：`docs/ops/README.md` |
+| Env 路径 | 真相源 `env/<target>/.env`；旧 `app/.env.*.local` 仅一轮回退（`targetEnv` 会 warn）。勿再新增 `app/.env*.example` |
+| Deploy target：同一时刻一个公网 DNS | `win11-home` 与 `cloud-vps` 换的是机器/域名/env/Caddy；勿两边同时接同一域名。索引见 `docs/ops/README.md` |
+| 公网部署勿把 5432/9000 暴露 | `docker-compose.yml` 端口须绑 `127.0.0.1`；只放行 80/443；公网前改掉 postgres/minio 默认口令。见 `docs/ops/win11-home.md` / `cloud-vps.md` |
+| 公网 deploy 禁止 auth/checkout bypass | `env/win11-home/.env` / `env/cloud-vps/.env` 不得设 `DEV_CHECKOUT_BYPASS` / `DEV_AUTH_BYPASS_*`；`npm run deploy:serve` 会拒绝启动 |
+| Admin 双名单 + 角色 | 服务端 `resolveAdminRole`：`ADMIN_TECH_EMAIL_ALLOWLIST` / `ADMIN_OPS_EMAIL_ALLOWLIST`；两边都有 → tech；旧 `ADMIN_EMAIL_ALLOWLIST` 仅在新名单皆空时兼容为全部 tech。bypass 邮箱也必须落在名单内 |
+| 公网 deploy 拒启空/占位 Admin 名单（G1） | `win11-home` / `cloud-vps`：名单全空或仅 `you@example.com` 时 `deploy:serve` `process.exit(1)`；不影响 Vite `local` |
+| 自建 MinIO 签名用本机、浏览器走同域 `/s3` | `S3_ENDPOINT=http://127.0.0.1:9000`；浏览器 URL 优先跟请求 Host（`/s3`），否则 `S3_BROWSER_ENDPOINT` / `PUBLIC_DOMAIN`>`PUBLIC_IP`>LAN；勿把签名 Host 写成公网却让代理改掉 Host |
+| 生产多入口（域名/公网IP/局域网） | `deploy:serve` 默认 `SELFHOST_HOST=0.0.0.0`；`VITE_AUTH_REDIRECT_URL` 宜留空；Supabase/Google 须白名单每个会用的 origin |
+| 生产勿共用日常库/桶 | Deploy target 用 `xtch_prod` + `xtch-prod` + `APP_ENV=prod`；日常仍是 `xtch` + `xtch-public`；隧道是 `xtch_tunnel` + `xtch-tunnel`。导入备份见 `docs/ops/shared/content-backup.md`，勿对 `xtch` 跑生产导入 |
+| 公网前端 `VITE_*` 要打进构建 | 用 `npm run build:win11-home` 或 `build:cloud-vps`（`--mode` 读对应 `env/<target>/.env`），再 `npm run deploy:serve`；只改 runtime env 不会更新已构建的 Supabase/redirect。旧 `build:selfhost`/`selfhost` 仍指向 win11-home |
+| Agent/脚本重定向输出别落在 `app/` 根 | 写到仓库根 `tmp/`（gitignore）；勿再生成 `app/out.txt` / `app/err.txt` / `app/build-out.txt` |
 | 直连 GitHub `443` 失败 | 本机 v2rayN/xray 常见 SOCKS `127.0.0.1:10808`；临时用 `git -c http.proxy=socks5://127.0.0.1:10808 -c https.proxy=socks5://127.0.0.1:10808 …`，勿默写进 global config；经代理会明显变慢 |
 | Shell 若已在 `app/`，`git add app/src/...` 会 pathspec 失败 | `git` 路径相对**仓库根**；在 `app/` 内应 `git add src/...`，或设 `working_directory` 为仓库根再用 `app/src/...` |
 | PowerShell 不能用 bash `$(cat <<'EOF')` 写 commit message | 用 `git commit -m "…"` 或 PowerShell here-string `@'…'@` |

@@ -1,12 +1,20 @@
-import { readFileSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url';
 import { sql, type SqlClient } from '../../app/api/lib/db';
+import {
+  loadTargetEnv,
+  normalizeTarget,
+  repoRoot,
+  resolveTargetEnvFile,
+  resolveTargetEnvPath,
+  targetEnvExampleHint,
+  TARGETS,
+} from '../env/targetEnv';
 
-const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(scriptDir, '../..');
 const migrationsDir = path.join(repoRoot, 'app', 'api', 'migrations');
+
+const KNOWN_ENVS = `${TARGETS.join('|')}|selfhost (alias of win11-home)`;
 
 function parseArgs(argv: string[]) {
   let envName = 'local';
@@ -17,7 +25,7 @@ function parseArgs(argv: string[]) {
     if (arg === '--env') {
       const value = argv[i + 1];
       if (!value || value.startsWith('-')) {
-        throw new Error('Missing value for --env (expected local|tunnel)');
+        throw new Error(`Missing value for --env (expected ${KNOWN_ENVS})`);
       }
       envName = value;
       i += 1;
@@ -33,41 +41,6 @@ function parseArgs(argv: string[]) {
   }
 
   return { envName, command };
-}
-
-function resolveEnvFile(envName: string) {
-  if (envName === 'local' || envName === 'dev') {
-    return path.join(repoRoot, 'app', '.env.local');
-  }
-  if (envName === 'tunnel') {
-    return path.join(repoRoot, 'app', '.env.tunnel.local');
-  }
-  throw new Error(`Unknown --env ${envName}. Use local or tunnel.`);
-}
-
-function loadEnvFile(filePath: string, { override }: { override: boolean }) {
-  try {
-    const content = readFileSync(filePath, 'utf-8');
-    for (const line of content.split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) continue;
-      const eqIndex = trimmed.indexOf('=');
-      if (eqIndex === -1) continue;
-      const key = trimmed.slice(0, eqIndex).trim();
-      let value = trimmed.slice(eqIndex + 1).trim();
-      if (
-        (value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"))
-      ) {
-        value = value.slice(1, -1);
-      }
-      if (override || !(key in process.env)) {
-        process.env[key] = value;
-      }
-    }
-  } catch {
-    // File may not exist; POSTGRES_URL can still come from the shell.
-  }
 }
 
 export type Migration = {
@@ -119,11 +92,25 @@ async function getAppliedMigrationNames(): Promise<Set<string>> {
   return new Set(result.rows.map((row) => row.name));
 }
 
+function isDeployEnv(envName: string) {
+  const target = normalizeTarget(envName);
+  return target === 'win11-home' || target === 'cloud-vps';
+}
+
 async function main() {
   const { envName, command } = parseArgs(process.argv.slice(2));
-  const envFile = resolveEnvFile(envName);
+  const target = normalizeTarget(envName);
+  const resolved = resolveTargetEnvFile(envName);
+
+  if (isDeployEnv(envName) && !resolved) {
+    throw new Error(
+      `Missing env for ${target}. ${targetEnvExampleHint(target)} and fill secrets before migrating.`,
+    );
+  }
+
   // Tunnel mode must win over any shell leftovers so we never migrate the daily `xtch` DB by accident.
-  loadEnvFile(envFile, { override: envName === 'tunnel' });
+  const loaded = loadTargetEnv(envName, { override: envName === 'tunnel' || target === 'tunnel' });
+  const envFile = loaded?.path ?? resolveTargetEnvPath(target);
 
   if (command !== 'up') {
     console.error(`Unknown command: ${command}. Only 'up' is supported.`);

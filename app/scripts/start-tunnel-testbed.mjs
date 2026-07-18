@@ -3,7 +3,7 @@
  *
  * Prerequisites (manual):
  * - docker compose up -d (Postgres + MinIO; xtch_tunnel DB + xtch-tunnel bucket)
- * - app/.env.tunnel.local filled (from .env.tunnel.local.example), including Resend
+ * - env/tunnel/.env filled (from env/tunnel/.env.example), including Resend
  * - cloudflared on PATH
  * - npm run db:migrate:tunnel already applied once
  *
@@ -13,10 +13,16 @@ import { spawn, execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  resolveTargetEnvFile,
+  resolveTargetEnvPath,
+  targetEnvExampleHint,
+} from '../../scripts/env/targetEnv.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const appRoot = path.resolve(__dirname, '..');
-const envPath = path.join(appRoot, '.env.tunnel.local');
+const resolved = resolveTargetEnvFile('tunnel');
+const envPath = resolved?.path ?? resolveTargetEnvPath('tunnel');
 const PORT = 3000;
 
 function whichCloudflared() {
@@ -110,10 +116,7 @@ function main() {
   }
 
   if (!fs.existsSync(envPath)) {
-    console.error(
-      `[testbed:tunnel] Missing ${envPath}\n` +
-        'Copy app/.env.tunnel.local.example → app/.env.tunnel.local and fill Resend + bypass emails.',
-    );
+    console.error(`[testbed:tunnel] Missing ${envPath}\n${targetEnvExampleHint('tunnel')}`);
     process.exit(1);
   }
 
@@ -159,7 +162,7 @@ function main() {
     .then((tunnelUrl) => {
       console.log(`[testbed:tunnel] Public URL: ${tunnelUrl}`);
       applyTunnelUrls(tunnelUrl);
-      console.log('[testbed:tunnel] Updated S3_ENDPOINT / S3_PUBLIC_BASE_URL / redirect URLs in .env.tunnel.local');
+      console.log(`[testbed:tunnel] Updated S3_ENDPOINT / S3_PUBLIC_BASE_URL / redirect URLs in ${envPath}`);
 
       console.log('[testbed:tunnel] Starting vite --mode tunnel ...');
       console.log('[testbed:tunnel] When finished: Ctrl+C (closes Vite + cloudflared).');
@@ -182,8 +185,8 @@ function main() {
         }
       });
     })
-    .catch((error) => {
-      console.error('[testbed:tunnel]', error instanceof Error ? error.message : error);
+    .catch((err) => {
+      console.error('[testbed:tunnel]', err instanceof Error ? err.message : err);
       try {
         cloudflared.kill('SIGTERM');
       } catch {

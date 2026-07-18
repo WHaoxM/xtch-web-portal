@@ -9,6 +9,11 @@ import {
   consumeAuthRedirectSession,
   type AuthSession,
 } from '../lib/authClient';
+import {
+  adminRoleLabel,
+  fetchAdminMe,
+  type AdminRole,
+} from '../lib/adminSessionClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { InquiryDetail } from '@/components/admin/InquiryDetail';
@@ -142,7 +147,30 @@ import {
 } from '@/lib/dashboardOpsCopy';
 import { cn } from '@/lib/utils';
 
-const ADMIN_NAV_GROUPS = [
+type AdminTab =
+  | 'dashboard'
+  | 'orders'
+  | 'inquiries'
+  | 'departures'
+  | 'destinations'
+  | 'routes'
+  | 'categories'
+  | 'media'
+  | 'custom-trip-form';
+
+type AdminNavItem = {
+  value: AdminTab;
+  label: string;
+  /** When set, only that role (and above) may see the item. Omit = ops and tech. */
+  minRole?: 'tech';
+};
+
+type AdminNavGroup = {
+  title: string;
+  items: AdminNavItem[];
+};
+
+const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
   {
     title: '',
     items: [{ value: 'dashboard', label: '工作台' }],
@@ -170,10 +198,20 @@ const ADMIN_NAV_GROUPS = [
       { value: 'custom-trip-form', label: '表单配置' },
     ],
   },
-] as const;
+];
 
-type AdminNavItem = (typeof ADMIN_NAV_GROUPS)[number]['items'][number];
-type AdminTab = AdminNavItem['value'];
+function navItemVisible(item: AdminNavItem, role: AdminRole | null): boolean {
+  if (!item.minRole) return true;
+  if (!role) return false;
+  return item.minRole === 'tech' ? role === 'tech' : true;
+}
+
+function filterNavGroups(role: AdminRole | null): AdminNavGroup[] {
+  return ADMIN_NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => navItemVisible(item, role)),
+  })).filter((group) => group.items.length > 0);
+}
 
 type PendingListFilter =
   | { tab: 'inquiries'; status: string }
@@ -3394,15 +3432,18 @@ function MediaPanel({
 function AdminNav({
   activeTab,
   onSelect,
+  role,
   className,
 }: {
   activeTab: AdminTab;
   onSelect: (tab: AdminTab) => void;
+  role: AdminRole | null;
   className?: string;
 }) {
+  const groups = filterNavGroups(role);
   return (
     <nav className={cn('flex flex-col gap-4', className)} aria-label="Admin modules">
-      {ADMIN_NAV_GROUPS.map((group) => (
+      {groups.map((group) => (
         <div key={group.title || group.items[0]?.value} className="flex flex-col gap-1">
           {group.title ? (
             <p className="px-3 text-xs font-medium text-muted-foreground">{group.title}</p>
@@ -3449,6 +3490,7 @@ function AdminShellActions({
 
 export default function Admin() {
   const [session, setSession] = useState<AuthSession | null>(null);
+  const [adminRole, setAdminRole] = useState<AdminRole | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
@@ -3485,6 +3527,35 @@ export default function Admin() {
   }, []);
 
   useEffect(() => {
+    if (!session) {
+      setAdminRole(null);
+      return;
+    }
+
+    let cancelled = false;
+    fetchAdminMe(session.accessToken)
+      .then((me) => {
+        if (!cancelled) setAdminRole(me.role);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setAdminRole(null);
+          setError(err instanceof Error ? err.message : 'Failed to load admin role.');
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session]);
+
+  useEffect(() => {
+    const visible = filterNavGroups(adminRole).flatMap((group) => group.items);
+    if (visible.some((item) => item.value === activeTab)) return;
+    setActiveTab('dashboard');
+  }, [adminRole, activeTab]);
+
+  useEffect(() => {
     if (!mobileNavOpen) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -3503,6 +3574,7 @@ export default function Admin() {
   const handleSignOut = () => {
     clearStoredAuthSession();
     setSession(null);
+    setAdminRole(null);
     setMobileNavOpen(false);
   };
 
@@ -3540,6 +3612,7 @@ export default function Admin() {
 
   const activeLabel =
     ADMIN_NAV_ITEMS.find((item) => item.value === activeTab)?.label ?? 'Admin';
+  const roleLabel = adminRole ? adminRoleLabel(adminRole) : null;
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -3547,9 +3620,12 @@ export default function Admin() {
         <div className="border-b border-border px-4 py-5">
           <h1 className="text-lg font-bold">Admin</h1>
           <p className="mt-1 truncate text-xs text-muted-foreground">{session.user.email}</p>
+          {roleLabel ? (
+            <p className="mt-0.5 text-xs text-muted-foreground">{roleLabel}</p>
+          ) : null}
         </div>
         <div className="flex flex-1 flex-col justify-between gap-6 p-3">
-          <AdminNav activeTab={activeTab} onSelect={handleSelectTab} />
+          <AdminNav activeTab={activeTab} onSelect={handleSelectTab} role={adminRole} />
           <AdminShellActions onSignOut={handleSignOut} />
         </div>
       </aside>
@@ -3567,6 +3643,9 @@ export default function Admin() {
               <div className="min-w-0">
                 <p className="font-semibold">Admin</p>
                 <p className="truncate text-xs text-muted-foreground">{session.user.email}</p>
+                {roleLabel ? (
+                  <p className="text-xs text-muted-foreground">{roleLabel}</p>
+                ) : null}
               </div>
               <Button
                 type="button"
@@ -3579,7 +3658,7 @@ export default function Admin() {
               </Button>
             </div>
             <div className="flex flex-1 flex-col justify-between gap-6 p-3">
-              <AdminNav activeTab={activeTab} onSelect={handleSelectTab} />
+              <AdminNav activeTab={activeTab} onSelect={handleSelectTab} role={adminRole} />
               <AdminShellActions onSignOut={handleSignOut} />
             </div>
           </div>
@@ -3600,14 +3679,20 @@ export default function Admin() {
           </Button>
           <div className="min-w-0">
             <p className="truncate font-semibold">{activeLabel}</p>
-            <p className="truncate text-xs text-muted-foreground">{session.user.email}</p>
+            <p className="truncate text-xs text-muted-foreground">
+              {session.user.email}
+              {roleLabel ? ` · ${roleLabel}` : ''}
+            </p>
           </div>
         </header>
 
         <div className="min-w-0 flex-1 overflow-x-auto p-4 md:p-6">
           <div className="mb-6 hidden md:block">
             <h2 className="text-2xl font-bold">{activeLabel}</h2>
-            <p className="text-sm text-muted-foreground">Signed in as {session.user.email}</p>
+            <p className="text-sm text-muted-foreground">
+              Signed in as {session.user.email}
+              {roleLabel ? ` · ${roleLabel}` : ''}
+            </p>
           </div>
 
           {error && <p className="mb-4 text-destructive">{error}</p>}

@@ -9,8 +9,6 @@
 
 # Logs
 *.log
-app/err.txt
-app/out.txt
 
 # Local installer / executables
 Codex Installer.exe
@@ -21,12 +19,23 @@ app/node-jiti/
 # Root lockfile (no root package.json)
 /package-lock.json
 
-# Local noise
+# Ephemeral agent/script redirects (see tmp/README.md)
+/tmp/**
+!/tmp/README.md
+# Legacy one-off dumps (if recreated at old paths)
 build-out.txt
 lint-out.txt
+app/build-out.txt
 app/build-exit.txt
+app/err.txt
+app/out.txt
 **/__pycache__/
 *.pyc
+
+# Target env secrets (examples are tracked)
+/env/**/.env
+/env/**/*.secrets*
+!/env/**/.env.example
 
 # Local-only reference / intake (not part of origin/dev portal tree)
 /data/
