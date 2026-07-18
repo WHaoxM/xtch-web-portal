@@ -14,7 +14,7 @@ type VercelResponseLike = {
 /**
  * Send a Supabase email OTP only for Admin allowlist emails.
  * Does not require an existing session (this is the sign-in step).
- * Omits email_redirect_to so the Magic Link template's {{ .Token }} is the primary path.
+ * Primary UX is {{ .Token }} on the same page; email_redirect_to is link fallback only.
  */
 export default async function handler(req: VercelRequestLike, res: VercelResponseLike) {
   if (req.method !== 'POST') {
@@ -26,6 +26,7 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
   const email = String(body.email || '')
     .trim()
     .toLowerCase();
+  const emailRedirectTo = sanitizeAdminEmailRedirectTo(body.emailRedirectTo ?? body.email_redirect_to);
 
   if (!email || !email.includes('@')) {
     res.status(400).json({ ok: false, error: 'A valid email is required.' });
@@ -51,6 +52,14 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
   }
 
   try {
+    const otpBody: Record<string, unknown> = {
+      email,
+      create_user: false,
+    };
+    if (emailRedirectTo) {
+      otpBody.email_redirect_to = emailRedirectTo;
+    }
+
     const response = await fetch(`${supabaseUrl}/auth/v1/otp`, {
       method: 'POST',
       headers: {
@@ -58,10 +67,7 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
         authorization: `Bearer ${anonKey}`,
         'content-type': 'application/json',
       },
-      body: JSON.stringify({
-        email,
-        create_user: false,
-      }),
+      body: JSON.stringify(otpBody),
     });
 
     if (!response.ok) {
@@ -89,5 +95,21 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
   } catch (error) {
     console.error('Admin auth OTP failed:', error);
     res.status(500).json({ ok: false, error: 'Could not send sign-in code.' });
+  }
+}
+
+/** Only allow http(s) redirects that explicitly target Admin (`auth_next=admin`). */
+function sanitizeAdminEmailRedirectTo(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const value = raw.trim();
+  if (!value || value.length > 2048) return undefined;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return undefined;
+    const next = (url.searchParams.get('auth_next') || '').replace(/^\/+/, '');
+    if (next !== 'admin' && !next.startsWith('admin?')) return undefined;
+    return value;
+  } catch {
+    return undefined;
   }
 }

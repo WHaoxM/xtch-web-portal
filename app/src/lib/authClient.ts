@@ -348,16 +348,24 @@ export async function signInWithOAuth(
   }
 }
 
-/** Traveler email OTP: send 6-digit code (no magic-link redirect). */
+/** Traveler email OTP: send 6-digit code; email link also returns to Mini-App (not Admin). */
 export async function sendEmailOtp(email: string, intent: AuthIntent) {
   const client = requireSupabaseClient();
   setPendingReturnPath();
   setPendingAuthIntent(intent);
 
+  // Mail apps often open the link in a fresh browser with empty localStorage.
+  // Embed auth_next so confirmation/magic links never fall through to Admin.
+  let nextHash = peekStoredReturnPath() || TRAVELER_DEFAULT_RETURN_PATH;
+  if (nextHash === '#/admin' || nextHash.startsWith('#/admin?')) {
+    nextHash = TRAVELER_DEFAULT_RETURN_PATH;
+  }
+
   const { error } = await client.auth.signInWithOtp({
     email: email.trim().toLowerCase(),
     options: {
       shouldCreateUser: true,
+      emailRedirectTo: getAuthRedirectTo({ nextHash }),
     },
   });
 
@@ -381,6 +389,8 @@ export async function sendAdminOtp(email: string) {
     headers: { 'content-type': 'application/json', accept: 'application/json' },
     body: JSON.stringify({
       email: email.trim(),
+      // Link fallback when user clicks email instead of entering the 6-digit code.
+      emailRedirectTo: getAuthRedirectTo({ nextHash: '#/admin' }),
     }),
   });
 
@@ -496,10 +506,12 @@ export async function completeAuthRedirectNavigation(): Promise<boolean> {
 }
 
 /**
- * Prefer stored/auth_next path; else Admin allowlist → `#/admin`; else traveler default.
- * Safe to call when the OAuth tab lost sessionStorage/query.
+ * Prefer stored/auth_next path; else traveler default.
+ * Never infer `#/admin` from allowlist alone — traveler mail-app browsers lose
+ * localStorage, and allowlisted test emails must still return to Mini-App.
+ * Admin links must carry `?auth_next=admin` (or stored `#/admin`).
  */
-export async function resolvePostAuthReturnPath(session: AuthSession): Promise<string> {
+export async function resolvePostAuthReturnPath(_session: AuthSession): Promise<string> {
   const intent = consumePendingAuthIntent();
   const returnPath = consumePendingReturnPath('');
   if (returnPath) {
@@ -507,31 +519,10 @@ export async function resolvePostAuthReturnPath(session: AuthSession): Promise<s
     return returnPath;
   }
 
-  // Site URL often strips `?auth_next=` and drops us on `#access_token=…`.
-  if (await isAdminSession(session.accessToken)) {
-    return '#/admin';
-  }
-
   if (intent === 'checkout') return '#/china-trips';
 
   if (intent === 'account') markPostAuthMeFocus();
   return TRAVELER_DEFAULT_RETURN_PATH;
-}
-
-async function isAdminSession(accessToken: string): Promise<boolean> {
-  try {
-    const response = await fetch('/api/admin/me', {
-      headers: {
-        authorization: `Bearer ${accessToken}`,
-        accept: 'application/json',
-      },
-    });
-    if (!response.ok) return false;
-    const body = (await response.json().catch(() => null)) as { ok?: boolean } | null;
-    return Boolean(body?.ok);
-  } catch {
-    return false;
-  }
 }
 
 /** After traveler account sign-in, China Trips should open the Me tab once. */

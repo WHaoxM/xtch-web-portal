@@ -20,6 +20,7 @@
 
 | Agent | Goal | Owns | May Touch | Must Not Touch | Status | Last Update |
 |---|---|---|---|---|---|---|
+| Auto (traveler-auth-no-admin) | 旅客邮件链接勿误跳 `#/admin`：OTP 带 emailRedirectTo + 去掉 allowlist 回跳推断 | `app/src/lib/authClient.ts`, `app/api/admin/auth-otp.ts` | `docs/agent-gotchas.md`, `docs/agent-progress.md`, `docs/agent-task-board.md` | 关 Confirm email、改 SMTP、生产库、新依赖 | in-progress | 2026-07-19 |
 | Auto (s3-relative-urls) | 媒体/封面 URL 改为同域相对 `/s3/...`，避免 ngrok/LAN 裂图 | `app/api/lib/s3.ts`, `app/api/lib/s3Key.test.ts`, `app/api/lib/contentQueries.ts`, `app/api/migrations/010_relative_s3_public_urls.ts` | `docs/agent-gotchas.md`, `docs/agent-progress.md`, `docs/agent-task-board.md`, `xtch_prod` 数据（仅 /s3 URL 规范化） | 改桶策略、删对象、改非 /s3 外链、cloud-vps 真机 | done（migrate 010 + API 相对路径；ngrok 图 200） | 2026-07-18 |
 | Auto (prod-turnstile) | 生产询盘 Turnstile：配 site/secret → build:win11-home → 重启 deploy:serve；见 `.cursor/plans/生产表单_turnstile_026d5be9.plan.md` | `env/win11-home/.env`（Turnstile/Resend 相关键，不提交） | `docs/ops/win11-home.md`, `docs/agent-gotchas.md`, `docs/agent-progress.md`, `docs/agent-task-board.md` | 改表单绕过 Turnstile、公网用测试 key、把真实密钥写进 git/example、改询盘业务代码 | done（serve:3080；浏览器/ngrok 未验） | 2026-07-18 |
 | Auto (prod-biz-data) | 按真实情况补生产库业务数据；逐项询问用户确认后写入 | `xtch_prod` 业务表数据（routes/destinations/categories/departures/media 等，经用户确认） | `docs/agent-progress.md`, `docs/agent-task-board.md` | 未确认的假数据、Stripe live、删生产订单、改 Auth 配置 | in-progress（摸底完成，等用户定优先项） | 2026-07-18 |

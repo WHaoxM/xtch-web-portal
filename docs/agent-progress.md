@@ -2,6 +2,16 @@
 
 ## Status
 
+**in-progress（旅客邮件勿跳 Admin）** — 已改 authClient + admin auth-otp；待 build:win11-home 部署验证。
+
+### Progress note（旅客邮件勿跳 Admin，2026-07-19）
+
+- 目标：移动端旅客注册/登录点邮件链接不再进 `#/admin`。
+- 根因：(1) 旅客 OTP 未带 `emailRedirectTo`，邮件落到 Site URL；(2) 无 `auth_next` 时用 allowlist 推断 `#/admin`，邮件 App 无 localStorage 时误伤。
+- 已改：`authClient.ts`（旅客带 `emailRedirectTo`；去掉 allowlist→admin 推断；Admin 发码带 `auth_next=admin`）、`auth-otp.ts`（校验并转发 redirect）、gotchas/task-board。
+- 未验证：`build:win11-home` + 重启 serve；真机点旅客确认邮件。
+- Dashboard：Site URL 必须是 `https://www.xuntingtravel.com`（不要 `/#/admin`）。
+
 **in-progress（正式域名 xuntingtravel.com）** — env PUBLIC_DOMAIN + Caddyfile 已写；等 DNS/证书/Supabase OTP 模板。
 
 ### Progress note（正式域名 A+B，2026-07-18）
