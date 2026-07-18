@@ -512,6 +512,7 @@ export async function completeAuthRedirectNavigation(): Promise<boolean> {
  * Admin links must carry `?auth_next=admin` (or stored `#/admin`).
  */
 export async function resolvePostAuthReturnPath(_session: AuthSession): Promise<string> {
+  void _session;
   const intent = consumePendingAuthIntent();
   const returnPath = consumePendingReturnPath('');
   if (returnPath) {

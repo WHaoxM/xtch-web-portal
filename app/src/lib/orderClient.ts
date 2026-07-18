@@ -143,3 +143,147 @@ export async function fetchOrderSummary(
 
   return { ok: true, order: data.order! };
 }
+
+export type ClaimOrderProof = {
+  orderNumber: string;
+  token?: string;
+  sessionId?: string;
+};
+
+export type ClaimOrderResult =
+  | { ok: true; status: 'claimed' | 'already_linked' | 'email_claim'; claimedCount?: number }
+  | { ok: false; error: string; status?: string; unauthorized?: boolean };
+
+/** Parse confirmation / success URLs into order claim proof. */
+export function parseOrderClaimInput(input: string): ClaimOrderProof | null {
+  const raw = input.trim();
+  if (!raw) return null;
+
+  let orderNumber = '';
+  let token = '';
+  let sessionId = '';
+
+  try {
+    const asUrl = raw.includes('://') ? new URL(raw) : null;
+    if (asUrl) {
+      token = asUrl.searchParams.get('token') || '';
+      sessionId = asUrl.searchParams.get('session_id') || '';
+      const hash = asUrl.hash.replace(/^#/, '');
+      const hashPath = hash.split('?')[0] || '';
+      const hashQuery = hash.includes('?') ? hash.slice(hash.indexOf('?') + 1) : '';
+      const hashParams = new URLSearchParams(hashQuery);
+      token = token || hashParams.get('token') || '';
+      sessionId = sessionId || hashParams.get('session_id') || '';
+      orderNumber =
+        hashParams.get('order') ||
+        asUrl.searchParams.get('order') ||
+        (hashPath.match(/orders\/([^/?#]+)/i)?.[1] ?? '') ||
+        '';
+    } else {
+      const hashIndex = raw.indexOf('#');
+      const queryPart = raw.includes('?') ? raw.slice(raw.indexOf('?') + 1) : '';
+      const params = new URLSearchParams(queryPart.split('#')[0]);
+      token = params.get('token') || '';
+      sessionId = params.get('session_id') || '';
+      orderNumber = params.get('order') || '';
+      if (!orderNumber && hashIndex >= 0) {
+        const hash = raw.slice(hashIndex + 1);
+        const hashPath = hash.split('?')[0] || '';
+        const hashQuery = hash.includes('?') ? hash.slice(hash.indexOf('?') + 1) : '';
+        const hashParams = new URLSearchParams(hashQuery);
+        token = token || hashParams.get('token') || '';
+        sessionId = sessionId || hashParams.get('session_id') || '';
+        orderNumber =
+          hashParams.get('order') || hashPath.match(/orders\/([^/?#]+)/i)?.[1] || '';
+      }
+      if (!orderNumber && /^ST-[A-Z0-9-]+$/i.test(raw.split(/[\s?&#]/)[0] || '')) {
+        orderNumber = raw.split(/[\s?&#]/)[0] || '';
+      }
+    }
+  } catch {
+    return null;
+  }
+
+  orderNumber = decodeURIComponent(orderNumber).trim();
+  token = token.trim();
+  sessionId = sessionId.trim();
+
+  if (!orderNumber || (!token && !sessionId)) {
+    return null;
+  }
+
+  return {
+    orderNumber,
+    token: token || undefined,
+    sessionId: sessionId || undefined,
+  };
+}
+
+export async function claimOrderToAccount(
+  accessToken: string,
+  proof?: ClaimOrderProof,
+): Promise<ClaimOrderResult> {
+  const attempt = async (token: string) => {
+    const response = await fetch('/api/claim-orders', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(
+        proof
+          ? {
+              orderNumber: proof.orderNumber,
+              token: proof.token,
+              sessionId: proof.sessionId,
+            }
+          : {},
+      ),
+    });
+    const data = (await response.json()) as {
+      ok?: boolean;
+      error?: string;
+      status?: string;
+      claimedCount?: number;
+    };
+
+    if (response.status === 401) {
+      return {
+        ok: false as const,
+        error: data.error || 'Sign in to save this booking.',
+        unauthorized: true,
+      };
+    }
+
+    if (!response.ok || !data.ok) {
+      return {
+        ok: false as const,
+        error: data.error || 'We could not link this booking to your account.',
+        status: data.status,
+      };
+    }
+
+    const status: 'claimed' | 'already_linked' | 'email_claim' =
+      data.status === 'already_linked'
+        ? 'already_linked'
+        : data.status === 'email_claim'
+          ? 'email_claim'
+          : 'claimed';
+
+    return {
+      ok: true as const,
+      status,
+      claimedCount: data.claimedCount,
+    };
+  };
+
+  let result = await attempt(accessToken);
+  if (!result.ok && result.unauthorized) {
+    const fresh = await ensureFreshSession();
+    if (fresh?.accessToken) {
+      result = await attempt(fresh.accessToken);
+    }
+  }
+
+  return result;
+}

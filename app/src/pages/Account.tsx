@@ -7,6 +7,7 @@ import {
   type AuthSession,
 } from '@/lib/authClient';
 import { fetchMyOrders, type SafeOrderSummary } from '@/lib/orderClient';
+import { LinkOrderToAccount } from '@/components/LinkOrderToAccount';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -38,6 +39,7 @@ export default function Account() {
   const [orders, setOrders] = useState<SafeOrderSummary[]>([]);
   const [error, setError] = useState('');
   const [loadedForToken, setLoadedForToken] = useState('');
+  const [ordersEpoch, setOrdersEpoch] = useState(0);
 
   const accessToken = session?.accessToken ?? '';
   const status = !accessToken
@@ -104,7 +106,7 @@ export default function Account() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken]);
+  }, [accessToken, ordersEpoch]);
 
   if (status === 'unauthenticated') {
     return (
@@ -162,6 +164,13 @@ export default function Account() {
           <p className="text-muted-foreground">{session.user.email}</p>
         )}
       </div>
+
+      <LinkOrderToAccount
+        allowPaste
+        autoClaim={false}
+        className="mb-8"
+        onLinked={() => setOrdersEpoch((value) => value + 1)}
+      />
 
       {orders.length === 0 ? (
         <Card>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
+import { LinkOrderToAccount } from '@/components/LinkOrderToAccount';
 import { fetchOrderSummary, formatConfirmationEmailNote, formatOrderDateRange, type SafeOrderSummary } from '@/lib/orderClient';
 
 export default function OrderSuccess() {
@@ -9,6 +10,13 @@ export default function OrderSuccess() {
   const [status, setStatus] = useState<'loading' | 'error' | 'ready'>(() => (orderNumber ? 'loading' : 'error'));
   const [error, setError] = useState<string>(() => (orderNumber ? '' : 'Order number is missing.'));
   const orderRef = useRef(order);
+
+  const token = searchParams.get('token') || undefined;
+  const sessionId = searchParams.get('session_id') || undefined;
+  const claimProof =
+    orderNumber && (token || sessionId)
+      ? { orderNumber, token, sessionId }
+      : null;
 
   useEffect(() => {
     orderRef.current = order;
@@ -149,6 +157,8 @@ export default function OrderSuccess() {
         <div className="mt-6 text-sm text-muted-foreground">
           <p>{formatConfirmationEmailNote(order.lead_email, order.confirmation_email_status)}</p>
         </div>
+
+        {claimProof && <LinkOrderToAccount proof={claimProof} />}
       </div>
     </div>
   );

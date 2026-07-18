@@ -1,4 +1,5 @@
 import { sql } from './db';
+import { hashToken } from './orders';
 import type { Order } from './bookingSchema';
 
 export async function findOrderByOrderNumber(orderNumber: string): Promise<Order | null> {
@@ -340,6 +341,74 @@ export async function claimOrdersByEmail(userId: string, email: string): Promise
       AND user_id IS NULL
   `;
   return result.rowCount ?? 0;
+}
+
+export type ClaimOrderByProofResult =
+  | { status: 'claimed' }
+  | { status: 'already_linked' }
+  | { status: 'linked_elsewhere' }
+  | { status: 'not_found' }
+  | { status: 'invalid_proof' };
+
+/** Bind one order to the signed-in user using order access token and/or Stripe session id. */
+export async function claimOrderByProof(
+  userId: string,
+  params: { orderNumber: string; token?: string; sessionId?: string },
+): Promise<ClaimOrderByProofResult> {
+  const orderNumber = params.orderNumber.trim();
+  const token = params.token?.trim() || '';
+  const sessionId = params.sessionId?.trim() || '';
+
+  if (!orderNumber || (!token && !sessionId)) {
+    return { status: 'invalid_proof' };
+  }
+
+  const order = await findOrderByOrderNumber(orderNumber);
+  if (!order) {
+    return { status: 'not_found' };
+  }
+
+  let proofOk = false;
+  if (token) {
+    if (order.access_token_hash === hashToken(token)) {
+      proofOk = true;
+    }
+  }
+  if (!proofOk && sessionId) {
+    if (order.stripe_checkout_session_id && order.stripe_checkout_session_id === sessionId) {
+      proofOk = true;
+    }
+  }
+
+  if (!proofOk) {
+    return { status: 'invalid_proof' };
+  }
+
+  if (order.user_id === userId) {
+    return { status: 'already_linked' };
+  }
+  if (order.user_id) {
+    return { status: 'linked_elsewhere' };
+  }
+
+  const result = await sql`
+    UPDATE orders
+    SET user_id = ${userId},
+        updated_at = NOW()
+    WHERE order_number = ${orderNumber}
+      AND user_id IS NULL
+  `;
+
+  if ((result.rowCount ?? 0) > 0) {
+    return { status: 'claimed' };
+  }
+
+  // Race: another request linked it between SELECT and UPDATE.
+  const refreshed = await findOrderByOrderNumber(orderNumber);
+  if (refreshed?.user_id === userId) {
+    return { status: 'already_linked' };
+  }
+  return { status: 'linked_elsewhere' };
 }
 
 export async function listOrdersByLeadEmail(email: string): Promise<SafeOrderSummary[]> {
