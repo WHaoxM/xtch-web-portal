@@ -460,6 +460,41 @@ function SignInView({ onSignedIn }: { onSignedIn: (session: AuthSession) => void
   );
 }
 
+function AccessDeniedView({
+  email,
+  message,
+  onSignOut,
+}: {
+  email: string;
+  message: string;
+  onSignOut: () => void;
+}) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background p-6">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>Access denied</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Signed in as <span className="font-medium text-foreground">{email}</span>, but this account
+            is not on the admin allowlist.
+          </p>
+          {message ? <p className="text-sm text-destructive">{message}</p> : null}
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button type="button" variant="outline" className="flex-1" onClick={onSignOut}>
+              Sign out
+            </Button>
+            <Button type="button" className="flex-1" asChild>
+              <Link to="/">View site</Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function AdminEditShell({
   title,
   onBack,
@@ -3577,6 +3612,7 @@ function AdminShellActions({
 export default function Admin() {
   const [session, setSession] = useState<AuthSession | null>(null);
   const [adminRole, setAdminRole] = useState<AdminRole | null>(null);
+  const [roleStatus, setRoleStatus] = useState<'pending' | 'ok' | 'denied'>('pending');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
@@ -3620,14 +3656,18 @@ export default function Admin() {
   useEffect(() => {
     if (!session) {
       setAdminRole(null);
+      setRoleStatus('pending');
       return;
     }
 
     let cancelled = false;
+    setRoleStatus('pending');
+    setAdminRole(null);
     fetchAdminMe(session.accessToken)
       .then((me) => {
         if (!cancelled) {
           setAdminRole(me.role);
+          setRoleStatus('ok');
           setError('');
         }
       })
@@ -3639,10 +3679,13 @@ export default function Admin() {
         if (/invalid or expired admin session|admin authentication required/i.test(message)) {
           clearStoredAuthSession();
           setSession(null);
+          setRoleStatus('pending');
           setError(message);
           return;
         }
+        // Not on allowlist (or other gate failure): never render the admin shell/nav.
         setError(message);
+        setRoleStatus('denied');
       });
 
     return () => {
@@ -3676,6 +3719,8 @@ export default function Admin() {
     clearStoredAuthSession();
     setSession(null);
     setAdminRole(null);
+    setRoleStatus('pending');
+    setError('');
     setMobileNavOpen(false);
   };
 
@@ -3711,9 +3756,27 @@ export default function Admin() {
     return <SignInView onSignedIn={setSession} />;
   }
 
+  if (roleStatus === 'pending') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <p className="text-muted-foreground">Checking access...</p>
+      </div>
+    );
+  }
+
+  if (roleStatus === 'denied' || !adminRole) {
+    return (
+      <AccessDeniedView
+        email={session.user.email}
+        message={error || 'You are not authorized to access admin features.'}
+        onSignOut={handleSignOut}
+      />
+    );
+  }
+
   const activeLabel =
     ADMIN_NAV_ITEMS.find((item) => item.value === activeTab)?.label ?? 'Admin';
-  const roleLabel = adminRole ? adminRoleLabel(adminRole) : null;
+  const roleLabel = adminRoleLabel(adminRole);
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -3721,9 +3784,7 @@ export default function Admin() {
         <div className="border-b border-border px-4 py-5">
           <h1 className="text-lg font-bold">Admin</h1>
           <p className="mt-1 truncate text-xs text-muted-foreground">{session.user.email}</p>
-          {roleLabel ? (
-            <p className="mt-0.5 text-xs text-muted-foreground">{roleLabel}</p>
-          ) : null}
+          <p className="mt-0.5 text-xs text-muted-foreground">{roleLabel}</p>
         </div>
         <div className="flex flex-1 flex-col justify-between gap-6 p-3">
           <AdminNav activeTab={activeTab} onSelect={handleSelectTab} role={adminRole} />
@@ -3744,9 +3805,7 @@ export default function Admin() {
               <div className="min-w-0">
                 <p className="font-semibold">Admin</p>
                 <p className="truncate text-xs text-muted-foreground">{session.user.email}</p>
-                {roleLabel ? (
-                  <p className="text-xs text-muted-foreground">{roleLabel}</p>
-                ) : null}
+                <p className="text-xs text-muted-foreground">{roleLabel}</p>
               </div>
               <Button
                 type="button"
@@ -3781,8 +3840,7 @@ export default function Admin() {
           <div className="min-w-0">
             <p className="truncate font-semibold">{activeLabel}</p>
             <p className="truncate text-xs text-muted-foreground">
-              {session.user.email}
-              {roleLabel ? ` · ${roleLabel}` : ''}
+              {session.user.email} · {roleLabel}
             </p>
           </div>
         </header>
@@ -3791,12 +3849,9 @@ export default function Admin() {
           <div className="mb-6 hidden md:block">
             <h2 className="text-2xl font-bold">{activeLabel}</h2>
             <p className="text-sm text-muted-foreground">
-              Signed in as {session.user.email}
-              {roleLabel ? ` · ${roleLabel}` : ''}
+              Signed in as {session.user.email} · {roleLabel}
             </p>
           </div>
-
-          {error && <p className="mb-4 text-destructive">{error}</p>}
 
           <Tabs value={activeTab} onValueChange={(value) => handleSelectTab(value as AdminTab)}>
             <TabsContent value="dashboard" className="mt-0">
