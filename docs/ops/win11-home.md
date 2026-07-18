@@ -62,7 +62,7 @@ Copy-Item env\win11-home\.env.example env\win11-home\.env
 
 若仍有旧文件 `app/.env.win11-home.local` 或 `app/.env.selfhost.local`：serve/migrate/`build:win11-home` 会回退读取并 warn；建议迁到 `env/win11-home/.env`。
 
-填数据库/MinIO 口令、Supabase、Resend（可选）、Stripe（可选）。多入口公开地址：
+填数据库/MinIO 口令、Supabase、Resend（可选）、Stripe（可选）。公网询盘表单还需 **Cloudflare Turnstile**（见下）。多入口公开地址：
 
 | 变量 | 值 |
 |---|---|
@@ -90,6 +90,13 @@ Copy-Item env\win11-home\.env.example env\win11-home\.env
 **邮箱 OTP（P0）：** Admin / 旅客主路径是 6 位码，不是 magic link。在 **Dev 与 Prod** Supabase → Authentication → Email Templates → **Magic Link** 正文加入 `{{ .Token }}`（建议主文案写 “Your code is …”）。Admin 发码走 `POST /api/admin/auth-otp`（仅双名单邮箱；旧 `auth-magic-link` 路径仍转发）。OAuth（Google）仍需要 Redirect URLs。`VITE_*` 在 **构建时** 打进前端，改完需 `build:win11-home`。
 
 验收清单（本机）：同设备登录后刷新仍在；Admin/旅客 OTP 同页校验；连续点发送有约 60s 倒计时；游客下单不被登录拦住。
+
+**询盘 Turnstile（公网必配）：** 未设 `VITE_TURNSTILE_SITE_KEY` 时表单黄条 *Inquiry protection is not configured*，且无法提交。
+
+1. Cloudflare Dashboard → Turnstile → 新建 widget；Hostnames 填浏览器地址栏实际域名（含 Caddy/Tunnel 对外域名）。
+2. 写入 `env/win11-home/.env`：`VITE_TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY`（**勿**用 always-pass 测试 key；**勿**提交 git）。
+3. **必须** `npm run build:win11-home` 后再重启 `deploy:serve`——site key 是 Vite 编译期注入，只改 `.env` 不重建黄条仍在。
+4. 发信另需齐：`RESEND_API_KEY`、`INQUIRY_FROM_EMAIL`、`INQUIRY_TO_EMAIL`（缺则 Turnstile 通过后仍 502）。
 
 内容从备份迁入生产隔离库：见 [shared/content-backup.md](./shared/content-backup.md)。
 

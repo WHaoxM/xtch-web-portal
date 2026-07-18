@@ -2,6 +2,50 @@
 
 ## Status
 
+**in-progress（正式域名 xuntingtravel.com）** — env PUBLIC_DOMAIN + Caddyfile 已写；等 DNS/证书/Supabase OTP 模板。
+
+### Progress note（正式域名 A+B，2026-07-18）
+
+- 目标：A 正式域名入口 + B Auth/发信体验收口。
+- 域名：`xuntingtravel.com`（www 一并进 Caddy）。
+- 已改：`env/win11-home/.env`（`PUBLIC_DOMAIN=xuntingtravel.com`，恢复 `INQUIRY_TO`）；`deploy/win11-home/Caddyfile`。
+- 家宽公网 IP（用户确认，非 VPN）：`125.69.160.65` → 已写入 `env/win11-home/.env` 的 `PUBLIC_IP`。DNS A `@`/`www` 应对准此 IP。
+- 进行中：Caddy HTTPS（DNS+端口通后）；用户侧 Supabase Redirect+Token 模板 / Turnstile Hostnames。
+- 发信 FROM 仍 `support@neutronm.store`（Resend 已配该域）；站点域与发信域可分离。
+
+**done（S3 相对 URL）** — xtch_prod 封面/媒体改为 `/s3/...`；新上传也写相对路径；ngrok 图 200。
+
+### Progress note（S3 相对 URL，2026-07-18）
+
+- 目标：ngrok/LAN 不裂图（方案 1：入库相对路径）。
+- 已改：`s3.ts`（`publicUrlForKey` 相对 + `toSameOriginS3Path`）、`contentQueries` 校验/规范化、migration `010_relative_s3_public_urls`、gotchas。
+- 已验：`test:s3` 15 pass；`db:migrate:win11-home` 应用 010；routes/destinations/media 绝对 http=0；`GET /api/routes` 返回 `/s3/...`；本机与 ngrok HEAD 图 200；`npm run build` 绿；已重启 `deploy:serve`。
+- 未做：cloud-vps 库若另有数据需同迁移；浏览器硬刷新目视。
+- 下一步：用户硬刷新 ngrok Custom 卡看图。
+
+**done（生产表单 Turnstile 配置）** — env 已写、build:win11-home、deploy:serve :3080 已重启；dist 含 site key、无 secret/bypass。
+
+### Progress note（生产表单 Turnstile，2026-07-18）
+
+- 目标：消黄条 + 真 Turnstile；形态 A（本机全栈 + 后续 ngrok）。
+- 已写：`env/win11-home/.env` — Turnstile site/secret + `RESEND_API_KEY`（自 local）；FROM 仍 `onboarding@resend.dev`。
+- 已验证：`build:win11-home`；dist 有 site key、无 secret、无 bypass；`deploy:serve` Listening `:3080`；`GET /` 200。
+- 未验证：浏览器硬刷新看控件；真提交询盘；ngrok Hostnames。
+- 风险：试用发件域只能发到 Resend 账号本人；`INQUIRY_TO=qq` 可能 502，需 override 或换已验证域。
+- 下一步：用户硬刷新 `http://127.0.0.1:3080` 或 LAN hint；ngrok 时把隧道 host 加进 Turnstile Hostnames。
+
+**in-progress（生产业务数据补全）** — 班期×7 + 分类 + 首页 6 目的地推荐已补；等下一项。
+
+### Progress note（生产业务数据补全，2026-07-18）
+
+- 目标：两套生产业务数据一致；先本机 `xtch_prod`，再同步 cloud-vps。
+- 已写：
+  - `departures` ×7（featured 路线各 1 期 sellable；运维默认价）
+  - `categories`：route×6 + destination×4；themes / travel_styles 已挂
+  - 首页 Popular places：beijing/shanghai/chengdu/yunnan/xinjiang/qinghai（priority 1–6）
+- 仍缺：cloud-vps 未同步、班期价未业务终审。
+- 下一步：用户选 E 同步云 / F 改价 / G 改分类打标。
+
 **done（开发/生产端口拆分）** — Vite `:3000`；`deploy:serve` 默认 `:3080`。
 
 ### Progress note（开发/生产端口拆分，2026-07-18）

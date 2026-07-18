@@ -42,7 +42,7 @@
 | 公网 deploy 禁止 auth/checkout bypass | `env/win11-home/.env` / `env/cloud-vps/.env` 不得设 `DEV_CHECKOUT_BYPASS` / `DEV_AUTH_BYPASS_*`；`npm run deploy:serve` 会拒绝启动 |
 | Admin 双名单 + 角色 | 服务端 `resolveAdminRole`：`ADMIN_TECH_EMAIL_ALLOWLIST` / `ADMIN_OPS_EMAIL_ALLOWLIST`；两边都有 → tech；旧 `ADMIN_EMAIL_ALLOWLIST` 仅在新名单皆空时兼容为全部 tech。bypass 邮箱也必须落在名单内 |
 | 公网 deploy 拒启空/占位 Admin 名单（G1） | `win11-home` / `cloud-vps`：名单全空或仅 `you@example.com` 时 `deploy:serve` `process.exit(1)`；不影响 Vite `local` |
-| 自建 MinIO 签名用本机、浏览器走同域 `/s3` | `S3_ENDPOINT=http://127.0.0.1:9000`；浏览器 URL 优先跟请求 Host（`/s3`），否则 `S3_BROWSER_ENDPOINT` / `PUBLIC_DOMAIN`>`PUBLIC_IP`>LAN；勿把签名 Host 写成公网却让代理改掉 Host |
+| 自建 MinIO 签名用本机、浏览器走同域 `/s3` | `S3_ENDPOINT=http://127.0.0.1:9000`；上传签名 URL 跟请求 Host 改写；**入库的 `public_url`/`hero_image`/`image` 用相对 `/s3/<bucket>/…`**（勿存 `http://127.0.0.1:3000/s3/...`，否则 ngrok/LAN 裂图）。历史绝对路径跑迁移 `010_relative_s3_public_urls` |
 | 生产多入口（域名/公网IP/局域网） | `deploy:serve` 默认 `SELFHOST_HOST=0.0.0.0`；`VITE_AUTH_REDIRECT_URL` 宜留空；Supabase/Google 须白名单每个会用的 origin |
 | Auth 回调必须消费 `#access_token` | URL 含 token 时 `authReady` 必须为 false 并跑 `completeAuthRedirectNavigation`；**勿**因已有 localStorage session 而跳过（曾卡在首页 `#access_token=…`）。回跳：`auth_next` → localStorage → `/api/admin/me` 成功则 `#/admin` → 旅客默认。Supabase Site URL 常丢掉 query；Redirect URLs：开发 `http://127.0.0.1:3000/**`，生产直连/LAN `http://192.168.x.x:3080/**`（及域名）。`type=recovery` 也会带 token，同样走消费逻辑 |
 | 旅客登录成功勿默认 `#/account` | 无 return path 时回 `#/china-trips`（`TRAVELER_DEFAULT_RETURN_PATH`）并 `markPostAuthMeFocus`；会话真相源是 `@supabase/supabase-js`（勿再双写旧 key `syncing_travel_auth_session`）；401 先 `ensureFreshSession` 再试一次，仍失败再清会话；跨标签用 `subscribeAuthSession` + `focus` |
@@ -52,6 +52,7 @@
 | 本地测真 OTP | 临时去掉 `VITE_DEV_AUTH_BYPASS_EMAIL`，用名单邮箱收 6 位码；测完可再开 bypass |
 | 生产勿共用日常库/桶 | Deploy target 用 `xtch_prod` + `xtch-prod` + `APP_ENV=prod`；日常仍是 `xtch` + `xtch-public`；隧道是 `xtch_tunnel` + `xtch-tunnel`。导入备份见 `docs/ops/shared/content-backup.md`，勿对 `xtch` 跑生产导入 |
 | 公网前端 `VITE_*` 要打进构建 | 用 `npm run build:win11-home` 或 `build:cloud-vps`（输出到 `app/dist/<target>/`），再 `npm run deploy:serve`；只改 runtime env 不会更新已构建的 Supabase/redirect |
+| 询盘黄条 / Complete the anti-spam | 生产缺 `VITE_TURNSTILE_SITE_KEY`（编译期）或未 rebuild。填 `env/win11-home/.env` 的 site+secret 后必须 `build:win11-home` 再重启 `deploy:serve`；只改 `.env` 不重建则黄条仍在。公网勿用 Cloudflare always-pass 测试 key；Turnstile 通过后还要齐 `RESEND_API_KEY` / `INQUIRY_FROM_EMAIL` / `INQUIRY_TO_EMAIL` 否则 502 |
 | 勿用本地 `npm run build` 喂 deploy:serve | **已隔离：** `build` → `app/dist/local/`；`build:win11-home` → `app/dist/win11-home/`；`deploy:serve` 只读 `dist/<target>/` 且校验 `.xtch-build-target`。本地 build 再也盖不掉生产包 |
 | 新增 API 后须重启 deploy:serve | `localApiRoutes` 在进程启动时加载；未重启会 JSON `Not found.`（如 `/api/admin/auth-otp`） |
 | Agent/脚本重定向输出别落在 `app/` 根 | 写到仓库根 `tmp/`（gitignore）；勿再生成 `app/out.txt` / `app/err.txt` / `app/build-out.txt` |

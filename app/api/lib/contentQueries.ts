@@ -8,6 +8,7 @@ import {
   type RoutePrimaryType,
   type RoutePriceMode,
 } from './contentSchema';
+import { toSameOriginS3Path } from './s3';
 
 export type Destination = {
   slug: string;
@@ -283,7 +284,7 @@ export function parseDestinationInput(body: Record<string, unknown>): { data: De
       slug,
       name,
       description: String(body.description || '').trim(),
-      image: String(body.image || '').trim(),
+      image: toSameOriginS3Path(String(body.image || '').trim()),
       displayOrder: Math.floor(displayOrder),
       status,
       travelStyles: asStringArray(body.travelStyles ?? body.travel_styles),
@@ -473,7 +474,7 @@ export function parseRouteInput(body: Record<string, unknown>): { data: RouteInp
       themes: asStringArray(body.themes),
       status,
       featured: Boolean(body.featured),
-      heroImage: String(body.heroImage || body.hero_image || '').trim(),
+      heroImage: toSameOriginS3Path(String(body.heroImage || body.hero_image || '').trim()),
       pdfUrl: String(body.pdfUrl || body.pdf_url || '').trim(),
       priceMode,
       priceDisplay: String(body.priceDisplay || body.price_display || 'On request').trim() || 'On request',
@@ -666,8 +667,12 @@ export function parseMediaInput(body: Record<string, unknown>): { data: MediaInp
   const status = String(body.status || 'published').trim() as MediaAssetRow['status'];
   const idRaw = String(body.id || '').trim();
 
-  if (!publicUrl || !/^https?:\/\//i.test(publicUrl)) {
-    return { error: 'A valid http(s) URL is required.' };
+  const normalizedPublicUrl = toSameOriginS3Path(publicUrl);
+  if (
+    !normalizedPublicUrl ||
+    (!/^https?:\/\//i.test(normalizedPublicUrl) && !/^\/s3\//i.test(normalizedPublicUrl))
+  ) {
+    return { error: 'A valid http(s) or /s3/… URL is required.' };
   }
   if (!title) return { error: 'Media title is required.' };
   if (!KNOWN_MEDIA_TYPES.includes(type)) return { error: 'Media type is not valid.' };
@@ -677,7 +682,7 @@ export function parseMediaInput(body: Record<string, unknown>): { data: MediaInp
     data: {
       id: idRaw || null,
       type,
-      publicUrl,
+      publicUrl: normalizedPublicUrl,
       title,
       altText: String(body.altText || body.alt_text || '').trim(),
       destinationSlugs: asStringArray(body.destinationSlugs ?? body.destination_slugs).map((v) => v.toLowerCase()),

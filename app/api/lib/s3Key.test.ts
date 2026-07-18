@@ -3,9 +3,11 @@ import { test } from 'node:test';
 import {
   buildObjectKey,
   mediaTypeFromContentType,
+  publicUrlForKey,
   resolveStorageEnv,
   rewriteSignedUploadUrlForBrowser,
   sanitizeObjectFilename,
+  toSameOriginS3Path,
 } from './s3.ts';
 
 test('resolveStorageEnv prefers APP_ENV', () => {
@@ -65,4 +67,30 @@ test('rewriteSignedUploadUrlForBrowser prefers requestOrigin over S3_BROWSER_END
 test('rewriteSignedUploadUrlForBrowser is a no-op without browser endpoint or public origin', () => {
   const signed = 'http://127.0.0.1:9000/xtch-public/key?sig=1';
   assert.equal(rewriteSignedUploadUrlForBrowser(signed, {}), signed);
+});
+
+test('publicUrlForKey returns same-origin relative /s3 path', () => {
+  assert.equal(
+    publicUrlForKey('prod/image/x.png', {
+      endpoint: 'http://127.0.0.1:9000',
+      accessKeyId: 'x',
+      secretAccessKey: 'y',
+      bucket: 'xtch-prod',
+      region: 'us-east-1',
+      publicBaseUrl: 'http://127.0.0.1:3080/s3/xtch-prod',
+    }),
+    '/s3/xtch-prod/prod/image/x.png',
+  );
+});
+
+test('toSameOriginS3Path strips host from absolute /s3 URLs', () => {
+  assert.equal(
+    toSameOriginS3Path('http://127.0.0.1:3000/s3/xtch-prod/prod/image/a.jpg'),
+    '/s3/xtch-prod/prod/image/a.jpg',
+  );
+  assert.equal(toSameOriginS3Path('/s3/xtch-prod/prod/image/a.jpg'), '/s3/xtch-prod/prod/image/a.jpg');
+  assert.equal(
+    toSameOriginS3Path('https://cdn.example.com/external.jpg'),
+    'https://cdn.example.com/external.jpg',
+  );
 });

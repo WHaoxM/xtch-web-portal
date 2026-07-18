@@ -96,6 +96,10 @@ export function buildObjectKey(
   return `${storageEnv}/${type}/${yyyy}/${mm}/${id}-${safeName}`;
 }
 
+/**
+ * Browser-facing object URL. Prefer same-origin relative `/s3/<bucket>/<key>`
+ * so LAN / ngrok / domain all work without rewriting stored rows.
+ */
 export function publicUrlForKey(key: string, config?: S3Config | null): string {
   const resolved = config ?? getS3Config();
   if (!resolved) {
@@ -105,7 +109,29 @@ export function publicUrlForKey(key: string, config?: S3Config | null): string {
     .split('/')
     .map((segment) => encodeURIComponent(segment))
     .join('/');
-  return `${resolved.publicBaseUrl}/${encodedKey}`;
+
+  if (resolved.bucket) {
+    return `/s3/${resolved.bucket}/${encodedKey}`;
+  }
+
+  const base = resolved.publicBaseUrl.replace(/\/$/, '');
+  if (base.startsWith('/')) {
+    return `${base}/${encodedKey}`;
+  }
+  try {
+    const parsed = new URL(base);
+    const path = parsed.pathname.replace(/\/$/, '') || '';
+    return `${path}/${encodedKey}`;
+  } catch {
+    return `${base}/${encodedKey}`;
+  }
+}
+
+/** Strip host from absolute same-origin /s3 URLs; leave other http(s) URLs alone. */
+export function toSameOriginS3Path(urlOrPath: string): string {
+  const trimmed = urlOrPath.trim();
+  const match = trimmed.match(/^https?:\/\/[^/?#]+(\/s3\/[^?#]*)/i);
+  return match ? match[1] : trimmed;
 }
 
 export async function createPresignedUploadUrl(input: {
@@ -132,14 +158,7 @@ export async function createPresignedUploadUrl(input: {
   });
 
   const requestOrigin = input.requestOrigin?.trim() || null;
-  let publicUrl = publicUrlForKey(input.objectKey, config);
-  if (requestOrigin) {
-    const encodedKey = input.objectKey
-      .split('/')
-      .map((segment) => encodeURIComponent(segment))
-      .join('/');
-    publicUrl = `${requestOrigin.replace(/\/$/, '')}/s3/${config.bucket}/${encodedKey}`;
-  }
+  const publicUrl = publicUrlForKey(input.objectKey, config);
 
   return {
     uploadUrl: rewriteSignedUploadUrlForBrowser(signedUploadUrl, process.env, requestOrigin),
