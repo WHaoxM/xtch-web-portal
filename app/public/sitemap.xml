@@ -2,102 +2,227 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://www.xuntingtravel.com/</loc>
+    <lastmod>2026-07-19</lastmod>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://www.xuntingtravel.com/china-trips</loc>
+    <lastmod>2026-07-19</lastmod>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://www.xuntingtravel.com/destinations</loc>
+    <lastmod>2026-07-19</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://www.xuntingtravel.com/destinations/beijing</loc>
+    <lastmod>2026-07-19</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://www.xuntingtravel.com/destinations/shanghai</loc>
+    <lastmod>2026-07-19</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://www.xuntingtravel.com/destinations/chengdu</loc>
+    <lastmod>2026-07-19</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://www.xuntingtravel.com/destinations/western-sichuan</loc>
+    <lastmod>2026-07-19</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://www.xuntingtravel.com/destinations/chongqing</loc>
+    <lastmod>2026-07-19</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://www.xuntingtravel.com/destinations/yunnan</loc>
+    <lastmod>2026-07-19</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://www.xuntingtravel.com/destinations/guangxi</loc>
+    <lastmod>2026-07-19</lastmod>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://www.xuntingtravel.com/destinations/qinghai</loc>
+    <lastmod>2026-07-19</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://www.xuntingtravel.com/destinations/gansu</loc>
+    <lastmod>2026-07-19</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://www.xuntingtravel.com/destinations/xinjiang</loc>
+    <lastmod>2026-07-19</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://www.xuntingtravel.com/destinations/tibet</loc>
+    <lastmod>2026-07-19</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://www.xuntingtravel.com/destinations/xian</loc>
+    <lastmod>2026-07-19</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://www.xuntingtravel.com/custom-trip</loc>
+    <lastmod>2026-07-19</lastmod>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://www.xuntingtravel.com/travel-guide</loc>
+    <lastmod>2026-07-19</lastmod>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://www.xuntingtravel.com/travel-guide/china-visa-entry-basics</loc>
+    <lastmod>2026-07-19</lastmod>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://www.xuntingtravel.com/travel-guide/mobile-payments-in-china</loc>
+    <lastmod>2026-07-19</lastmod>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://www.xuntingtravel.com/travel-guide/best-time-to-visit-china</loc>
+    <lastmod>2026-07-19</lastmod>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://www.xuntingtravel.com/china-private-tour-cost</loc>
+    <lastmod>2026-07-19</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://www.xuntingtravel.com/featured-services</loc>
+    <lastmod>2026-07-19</lastmod>
     <priority>0.6</priority>
   </url>
   <url>
     <loc>https://www.xuntingtravel.com/about</loc>
+    <lastmod>2026-07-19</lastmod>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://www.xuntingtravel.com/contact</loc>
+    <lastmod>2026-07-19</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://www.xuntingtravel.com/privacy-policy</loc>
+    <lastmod>2026-07-19</lastmod>
     <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://www.xuntingtravel.com/tours/1-one-day-shanghai-city-tour</loc>
+    <lastmod>2026-07-19</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.xuntingtravel.com/tours/2-3-days-and-2-nights-in-shanghai</loc>
+    <lastmod>2026-07-19</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.xuntingtravel.com/tours/3-5-days-and-4-nights-in-beijing</loc>
+    <lastmod>2026-07-19</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.xuntingtravel.com/tours/4-forbidden-city-and-temple-of-heaven-day-tour</loc>
+    <lastmod>2026-07-19</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.xuntingtravel.com/tours/5-chengdu-jiuzhaigou-and-huanglong</loc>
+    <lastmod>2026-07-19</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.xuntingtravel.com/tours/6-where-yading-meets-jiuzhaigou</loc>
+    <lastmod>2026-07-19</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.xuntingtravel.com/tours/7-panoramic-sichuan-and-chongqing</loc>
+    <lastmod>2026-07-19</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.xuntingtravel.com/tours/8-chongqing-custom-city-route</loc>
+    <lastmod>2026-07-19</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.xuntingtravel.com/tours/9-lijiang-dali-and-shangri-la</loc>
+    <lastmod>2026-07-19</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.xuntingtravel.com/tours/10-xishuangbanna-pure-travel-route</loc>
+    <lastmod>2026-07-19</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.xuntingtravel.com/tours/11-colorful-guilin</loc>
+    <lastmod>2026-07-19</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.xuntingtravel.com/tours/12-guangxi-7-day-tour</loc>
+    <lastmod>2026-07-19</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.xuntingtravel.com/tours/13-encounter-qinghai-and-gansu-grand-circuit</loc>
+    <lastmod>2026-07-19</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.xuntingtravel.com/tours/14-qinghai-lake-chaka-and-dunhuang-route</loc>
+    <lastmod>2026-07-19</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.xuntingtravel.com/tours/15-wild-ili-northern-xinjiang</loc>
+    <lastmod>2026-07-19</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.xuntingtravel.com/tours/16-kashgar-and-ili-pure-travel-route</loc>
+    <lastmod>2026-07-19</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.xuntingtravel.com/tours/17-xi-an-and-huashan-boutique-tour</loc>
+    <lastmod>2026-07-19</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.xuntingtravel.com/tours/18-tibet-ali-southern-line</loc>
+    <lastmod>2026-07-19</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.xuntingtravel.com/tours/19-northern-tibet-317-legend</loc>
+    <lastmod>2026-07-19</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.xuntingtravel.com/tours/20-panoramic-gansu-qinghai-8-day-tour</loc>
+    <lastmod>2026-07-19</lastmod>
+    <priority>0.8</priority>
   </url>
 </urlset>
