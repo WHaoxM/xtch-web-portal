@@ -2,6 +2,18 @@
 
 ## Status
 
+**in-progress（sitemap 完整化）** — 共享公开路由表 + generate-sitemap；含 20 条 `/tours/:slug`；robots 补 Disallow account/orders/auth；待 commit → push dev → merge main。
+
+### Progress note（sitemap 完整化，2026-07-19）
+
+- 目标：完整 sitemap 可被生产抓取，并走 git → dev → main。
+- 已读：agent-context、gotchas、SEO 设计稿、App.tsx、既有 public/sitemap+robots、backfill-content tour 列表。
+- 已改：`app/scripts/seo-public-routes.mjs`、`generate-sitemap.mjs`、`prerender.mjs`（共用静态路由）、`package.json`（seo:sitemap + build 钩子）、`public/sitemap.xml`（45 URL）、`public/robots.txt`。
+- 域名：`https://www.xuntingtravel.com`（siteData/gotchas/Caddy）。
+- 已验证：`npm run seo:sitemap`、`npm run build`（dist/local 含 sitemap）。
+- 未验证：公网 curl；生产库若有额外 published routes 需再扩 TOUR_ENTRIES。
+- 下一步：commit → push origin/dev → PR/merge main。
+
 **done（仅技术 SEO）** — 用户要求撤掉内容 GEO 展示；页面 FAQ/Home 新块等已回滚；技术层（Router/meta/prerender）保留。
 
 ### Progress note（撤回内容 GEO 展示，2026-07-19）

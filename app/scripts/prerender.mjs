@@ -8,45 +8,12 @@ import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
+import { getPrerenderRoutes } from './seo-public-routes.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const appRoot = path.resolve(__dirname, '..');
 
-const DESTINATION_SLUGS = [
-  'beijing',
-  'shanghai',
-  'chengdu',
-  'western-sichuan',
-  'chongqing',
-  'yunnan',
-  'guangxi',
-  'qinghai',
-  'gansu',
-  'xinjiang',
-  'tibet',
-  'xian',
-];
-
-const GUIDE_SLUGS = [
-  'china-visa-entry-basics',
-  'mobile-payments-in-china',
-  'best-time-to-visit-china',
-];
-
-const ROUTES = [
-  '/',
-  '/china-trips',
-  '/destinations',
-  ...DESTINATION_SLUGS.map((slug) => `/destinations/${slug}`),
-  '/custom-trip',
-  '/travel-guide',
-  ...GUIDE_SLUGS.map((slug) => `/travel-guide/${slug}`),
-  '/china-private-tour-cost',
-  '/featured-services',
-  '/about',
-  '/contact',
-  '/privacy-policy',
-];
+const ROUTES = getPrerenderRoutes();
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
