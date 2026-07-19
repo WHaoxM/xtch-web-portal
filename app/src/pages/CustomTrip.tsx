@@ -531,6 +531,7 @@ export default function CustomTrip() {
           </form>
         </div>
       </section>
+
     </div>
   );
 }

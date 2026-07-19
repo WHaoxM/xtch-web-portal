@@ -129,7 +129,7 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
 
       res.status(200).json({
         ok: true,
-        checkoutUrl: `${origin}/#/china-trips?checkout=success&order=${encodeURIComponent(order.orderNumber)}&session_id=${encodeURIComponent(sessionId)}`,
+        checkoutUrl: `${origin}/china-trips?checkout=success&order=${encodeURIComponent(order.orderNumber)}&session_id=${encodeURIComponent(sessionId)}`,
         sessionId,
         orderNumber: order.orderNumber,
         expiresAt: holdExpiresAt.toISOString(),
@@ -141,10 +141,10 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
 
     const successUrl =
       process.env.STRIPE_CHECKOUT_SUCCESS_URL ||
-      `${origin}/#/china-trips?checkout=success&order=${encodeURIComponent(order.orderNumber)}&session_id={CHECKOUT_SESSION_ID}`;
+      `${origin}/china-trips?checkout=success&order=${encodeURIComponent(order.orderNumber)}&session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl =
       process.env.STRIPE_CHECKOUT_CANCEL_URL ||
-      `${origin}/#/china-trips?checkout=cancelled&order=${order.orderNumber}`;
+      `${origin}/china-trips?checkout=cancelled&order=${order.orderNumber}`;
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',

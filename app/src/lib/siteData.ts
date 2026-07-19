@@ -10,7 +10,7 @@ export const brand = {
   phone: '+86 193 8082 1961',
   phoneHref: 'tel:+8619380821961',
   whatsappHref: 'https://wa.me/8619380821961',
-  website: 'https://www.syncingtravel.com/',
+  website: 'https://www.xuntingtravel.com/',
   address:
     'Room 201, 2/F, Block C, Yibin Big Data Industrial Park Phase II, Guoxing Avenue, Lingang Economic Zone, Yibin, Sichuan, China',
   logoSrc: '/images/logo.svg',

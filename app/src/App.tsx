@@ -1,4 +1,4 @@
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Navigate, Routes, Route, useLocation } from 'react-router-dom';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -90,14 +90,10 @@ function App() {
         // Strip broken tokens so the next paint is not stuck on `#access_token=…`.
         if (urlHasAuthTokens()) {
           const fallback =
-            window.location.pathname === '/admin' || window.location.hash.includes('admin')
-              ? '#/admin'
-              : '#/';
-          window.history.replaceState(
-            null,
-            '',
-            `${window.location.origin}${window.location.pathname}${fallback}`,
-          );
+            window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin/')
+              ? '/admin'
+              : '/';
+          window.history.replaceState(null, '', `${window.location.origin}${fallback}`);
         }
       }
       if (!cancelled) setAuthReady(true);
@@ -128,6 +124,7 @@ function App() {
           <Route path="/destinations" element={<Destinations />} />
           <Route path="/destinations/:slug" element={<DestinationDetail />} />
           <Route path="/china-trips" element={<ChinaTours />} />
+          <Route path="/china-tours" element={<Navigate to="/china-trips" replace />} />
           <Route path="/tours/:slug" element={<RouteDetail />} />
           <Route path="/custom-trip" element={<CustomTrip />} />
           <Route path="/featured-services" element={<FeaturedServices />} />

@@ -67,9 +67,9 @@ function applyTunnelUrls(tunnelOrigin) {
   upsertEnvKeys(envPath, {
     S3_ENDPOINT: `${origin}/s3`,
     S3_PUBLIC_BASE_URL: `${origin}/s3/xtch-tunnel`,
-    VITE_AUTH_REDIRECT_URL: `${origin}/#/china-trips?auth=callback`,
-    STRIPE_CHECKOUT_SUCCESS_URL: `${origin}/#/china-trips?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-    STRIPE_CHECKOUT_CANCEL_URL: `${origin}/#/china-trips?checkout=cancelled`,
+    VITE_AUTH_REDIRECT_URL: `${origin}/auth/callback`,
+    STRIPE_CHECKOUT_SUCCESS_URL: `${origin}/china-trips?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+    STRIPE_CHECKOUT_CANCEL_URL: `${origin}/china-trips?checkout=cancelled`,
   });
 }
 

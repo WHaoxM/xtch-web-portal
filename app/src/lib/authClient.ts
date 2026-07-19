@@ -32,8 +32,8 @@ export const AUTH_SESSION_STORAGE_KEY = 'syncing_travel_auth_session';
 const authIntentStorageKey = 'syncing_travel_auth_intent';
 const authReturnPathKey = 'syncing_travel_auth_return_path';
 const authFocusMeKey = 'syncing_travel_auth_focus_me';
-/** Traveler default after Auth when no return path (Admin always sets `#/admin` + `auth_next`). */
-export const TRAVELER_DEFAULT_RETURN_PATH = '#/china-trips';
+/** Traveler default after Auth when no return path (Admin always sets `/admin` + `auth_next`). */
+export const TRAVELER_DEFAULT_RETURN_PATH = '/china-trips';
 /** Survives OAuth opens in a new tab (sessionStorage does not). */
 const RETURN_PATH_TTL_MS = 2 * 60 * 60 * 1000;
 const REFRESH_SKEW_MS = 60_000;
@@ -264,13 +264,12 @@ export function consumePendingAuthIntent(): AuthIntent {
   return value === 'checkout' ? 'checkout' : 'account';
 }
 
-/** Store a same-origin HashRouter path (#/...) to return to after Auth. */
-export function setPendingReturnPath(hashPath?: string) {
+/** Store a same-origin app path (`/china-trips`) to return to after Auth. */
+export function setPendingReturnPath(path?: string) {
   if (typeof window === 'undefined') return;
-  let candidate = (hashPath ?? (window.location.hash || '#/')).trim();
-  if (!candidate.startsWith('#')) candidate = `#${candidate}`;
-  if (!isSafeInternalHashPath(candidate)) return;
-  if (candidate.includes('access_token') || candidate.startsWith('#/auth/callback')) return;
+  const fallbackCurrent = `${window.location.pathname}${window.location.search || ''}`;
+  const candidate = normalizeReturnPath(path ?? fallbackCurrent);
+  if (!candidate) return;
 
   const payload: StoredReturnPath = {
     path: candidate,
@@ -281,44 +280,61 @@ export function setPendingReturnPath(hashPath?: string) {
   window.sessionStorage.removeItem(authReturnPathKey);
 }
 
-export function consumePendingReturnPath(fallback = '#/'): string {
+export function consumePendingReturnPath(fallback = '/'): string {
   if (typeof window === 'undefined') return fallback;
 
   const fromUrl = readAuthNextFromUrl();
   const fromStore = readAndClearStoredReturnPath();
   if (fromUrl) return fromUrl;
   if (fromStore) return fromStore;
-  return fallback;
+  return normalizeReturnPath(fallback) || '/';
 }
 
-export function isSafeInternalHashPath(hashPath: string): boolean {
-  if (!hashPath.startsWith('#/')) return false;
-  if (hashPath.includes('://')) return false;
-  if (hashPath.includes('..')) return false;
-  if (hashPath.includes('\\')) return false;
+export function isSafeInternalPath(path: string): boolean {
+  if (!path.startsWith('/')) return false;
+  if (path.includes('://')) return false;
+  if (path.includes('..')) return false;
+  if (path.includes('\\')) return false;
   return true;
 }
 
+/** @deprecated Use isSafeInternalPath — accepts legacy `#/…` or `/…`. */
+export function isSafeInternalHashPath(path: string): boolean {
+  return Boolean(normalizeReturnPath(path));
+}
+
 /**
- * Build Supabase redirect_to. Optional nextHash is also embedded as `?auth_next=`
+ * Build Supabase redirect_to. Optional next path is embedded as `?auth_next=`
  * so it survives when Supabase replaces the hash with tokens (and new-tab opens).
  */
-export function getAuthRedirectTo(options?: { nextHash?: string }) {
-  const base =
-    import.meta.env.VITE_AUTH_REDIRECT_URL || `${window.location.origin}/#/auth/callback`;
-  const nextHash = normalizeReturnHash(options?.nextHash || '');
-  if (!nextHash) return base;
+export function getAuthRedirectTo(options?: { nextHash?: string; nextPath?: string }) {
+  const callbackUrl = resolveAuthCallbackUrl();
+  const nextPath = normalizeReturnPath(options?.nextPath || options?.nextHash || '');
+  if (!nextPath) return callbackUrl.toString();
 
+  callbackUrl.searchParams.set('auth_next', nextPath.replace(/^\//, ''));
+  return callbackUrl.toString();
+}
+
+function resolveAuthCallbackUrl(): URL {
+  const envRedirect = (import.meta.env.VITE_AUTH_REDIRECT_URL as string | undefined)?.trim();
   try {
-    const hashIndex = base.indexOf('#');
-    const beforeHash = hashIndex >= 0 ? base.slice(0, hashIndex) : base;
-    const hashPart = hashIndex >= 0 ? base.slice(hashIndex) : '#/auth/callback';
-    const url = new URL(beforeHash, window.location.origin);
-    url.searchParams.set('auth_next', nextHash.slice(1));
-    return `${url.origin}${url.pathname}${url.search}${hashPart}`;
+    if (envRedirect) {
+      const parsed = new URL(envRedirect, window.location.origin);
+      const looksLegacyHash =
+        parsed.hash.includes('/auth/callback') ||
+        parsed.hash.includes('/china-trips') ||
+        parsed.pathname.includes('china-trips');
+      if (looksLegacyHash || !parsed.pathname.includes('/auth/callback')) {
+        return new URL(`${parsed.origin}/auth/callback`);
+      }
+      parsed.hash = '';
+      return parsed;
+    }
   } catch {
-    return base;
+    // fall through
   }
+  return new URL(`${window.location.origin}/auth/callback`);
 }
 
 export async function signInWithOAuth(
@@ -338,7 +354,7 @@ export async function signInWithOAuth(
   const { error } = await client.auth.signInWithOAuth({
     provider,
     options: {
-      redirectTo: getAuthRedirectTo(returnPath ? { nextHash: returnPath } : undefined),
+      redirectTo: getAuthRedirectTo(returnPath ? { nextPath: returnPath } : undefined),
       skipBrowserRedirect: false,
     },
   });
@@ -356,16 +372,16 @@ export async function sendEmailOtp(email: string, intent: AuthIntent) {
 
   // Mail apps often open the link in a fresh browser with empty localStorage.
   // Embed auth_next so confirmation/magic links never fall through to Admin.
-  let nextHash = peekStoredReturnPath() || TRAVELER_DEFAULT_RETURN_PATH;
-  if (nextHash === '#/admin' || nextHash.startsWith('#/admin?')) {
-    nextHash = TRAVELER_DEFAULT_RETURN_PATH;
+  let nextPath = peekStoredReturnPath() || TRAVELER_DEFAULT_RETURN_PATH;
+  if (nextPath === '/admin' || nextPath.startsWith('/admin?')) {
+    nextPath = TRAVELER_DEFAULT_RETURN_PATH;
   }
 
   const { error } = await client.auth.signInWithOtp({
     email: email.trim().toLowerCase(),
     options: {
       shouldCreateUser: true,
-      emailRedirectTo: getAuthRedirectTo({ nextHash }),
+      emailRedirectTo: getAuthRedirectTo({ nextPath }),
     },
   });
 
@@ -381,7 +397,7 @@ export async function sendEmailMagicLink(email: string, intent: AuthIntent) {
 
 /** Admin-only OTP: server checks allowlist before calling Supabase. */
 export async function sendAdminOtp(email: string) {
-  setPendingReturnPath('#/admin');
+  setPendingReturnPath('/admin');
   setPendingAuthIntent('account');
 
   const response = await fetch('/api/admin/auth-otp', {
@@ -390,7 +406,7 @@ export async function sendAdminOtp(email: string) {
     body: JSON.stringify({
       email: email.trim(),
       // Link fallback when user clicks email instead of entering the 6-digit code.
-      emailRedirectTo: getAuthRedirectTo({ nextHash: '#/admin' }),
+      emailRedirectTo: getAuthRedirectTo({ nextPath: '/admin' }),
     }),
   });
 
@@ -501,29 +517,34 @@ export async function completeAuthRedirectNavigation(): Promise<boolean> {
   const session = await consumeAuthRedirectSession();
   if (!session) return false;
 
-  window.location.hash = await resolvePostAuthReturnPath(session);
+  navigateToAppPath(await resolvePostAuthReturnPath(session));
   return true;
 }
 
 /**
  * Prefer stored/auth_next path; else traveler default.
- * Never infer `#/admin` from allowlist alone — traveler mail-app browsers lose
+ * Never infer `/admin` from allowlist alone — traveler mail-app browsers lose
  * localStorage, and allowlisted test emails must still return to Mini-App.
- * Admin links must carry `?auth_next=admin` (or stored `#/admin`).
+ * Admin links must carry `?auth_next=admin` (or stored `/admin`).
  */
 export async function resolvePostAuthReturnPath(_session: AuthSession): Promise<string> {
   void _session;
   const intent = consumePendingAuthIntent();
   const returnPath = consumePendingReturnPath('');
   if (returnPath) {
-    if (isChinaTripsHash(returnPath) && intent === 'account') markPostAuthMeFocus();
+    if (isChinaTripsPath(returnPath) && intent === 'account') markPostAuthMeFocus();
     return returnPath;
   }
 
-  if (intent === 'checkout') return '#/china-trips';
+  if (intent === 'checkout') return '/china-trips';
 
   if (intent === 'account') markPostAuthMeFocus();
   return TRAVELER_DEFAULT_RETURN_PATH;
+}
+
+export function navigateToAppPath(path: string) {
+  const normalized = normalizeReturnPath(path) || '/';
+  window.location.replace(`${window.location.origin}${normalized}`);
 }
 
 /** After traveler account sign-in, China Trips should open the Me tab once. */
@@ -539,12 +560,13 @@ export function consumePostAuthMeFocus(): boolean {
   return value === '1';
 }
 
-function isChinaTripsHash(hashPath: string): boolean {
+function isChinaTripsPath(path: string): boolean {
+  const normalized = normalizeReturnPath(path);
   return (
-    hashPath === '#/china-trips' ||
-    hashPath.startsWith('#/china-trips?') ||
-    hashPath === '#/china-tours' ||
-    hashPath.startsWith('#/china-tours?')
+    normalized === '/china-trips' ||
+    normalized.startsWith('/china-trips?') ||
+    normalized === '/china-tours' ||
+    normalized.startsWith('/china-tours?')
   );
 }
 
@@ -557,20 +579,29 @@ export function urlHasAuthTokens(): boolean {
   );
 }
 
-function normalizeReturnHash(hashPath: string): string {
-  let candidate = (hashPath || '').trim();
+/** Normalize legacy `#/path` or `path` into a safe `/path`. */
+export function normalizeReturnPath(path: string): string {
+  let candidate = (path || '').trim();
   if (!candidate) return '';
-  if (!candidate.startsWith('#')) candidate = candidate.startsWith('/') ? `#${candidate}` : `#/${candidate}`;
-  if (!isSafeInternalHashPath(candidate)) return '';
-  if (candidate.includes('access_token') || candidate.startsWith('#/auth/callback')) return '';
+  if (candidate.startsWith('#/')) candidate = candidate.slice(1);
+  else if (candidate.startsWith('#')) candidate = candidate.slice(1);
+  if (!candidate.startsWith('/')) candidate = `/${candidate}`;
+  if (!isSafeInternalPath(candidate)) return '';
+  if (
+    candidate.includes('access_token') ||
+    candidate === '/auth/callback' ||
+    candidate.startsWith('/auth/callback?')
+  ) {
+    return '';
+  }
   return candidate;
 }
 
-/** Read `?auth_next=/admin` (survives Supabase replacing the hash with tokens). */
+/** Read `?auth_next=admin` (survives Supabase replacing the hash with tokens). */
 function readAuthNextFromUrl(): string {
   if (typeof window === 'undefined') return '';
   const raw = new URLSearchParams(window.location.search).get('auth_next') || '';
-  return normalizeReturnHash(raw);
+  return normalizeReturnPath(raw);
 }
 
 function peekStoredReturnPath(): string {
@@ -592,17 +623,21 @@ function readStoredReturnPath(clear: boolean): string {
     const raw = storage.getItem(authReturnPathKey);
     if (!raw) continue;
 
-    // Legacy: plain "#/admin" string in sessionStorage
-    if (raw.startsWith('#/') && isSafeInternalHashPath(raw)) {
-      found = raw;
-      break;
+    // Legacy: plain "#/admin" or "/admin" string in sessionStorage
+    if ((raw.startsWith('#/') || raw.startsWith('/')) && !raw.startsWith('{')) {
+      const normalized = normalizeReturnPath(raw);
+      if (normalized) {
+        found = normalized;
+        break;
+      }
     }
 
     try {
       const parsed = JSON.parse(raw) as StoredReturnPath;
-      if (!parsed?.path || !isSafeInternalHashPath(parsed.path)) continue;
+      const normalized = normalizeReturnPath(parsed?.path || '');
+      if (!normalized) continue;
       if (parsed.expiresAt && parsed.expiresAt < Date.now()) continue;
-      found = parsed.path;
+      found = normalized;
       break;
     } catch {
       continue;
@@ -621,7 +656,7 @@ async function assertOAuthProviderEnabled(provider: Exclude<AuthProvider, 'email
   statusUrl.searchParams.set('provider', provider);
   statusUrl.searchParams.set(
     'redirect_to',
-    getAuthRedirectTo({ nextHash: peekStoredReturnPath() || undefined }),
+    getAuthRedirectTo({ nextPath: peekStoredReturnPath() || undefined }),
   );
 
   const response = await fetch(statusUrl.toString(), {
@@ -699,8 +734,8 @@ function findUrlParam(name: string) {
 }
 
 function cleanupAuthUrl() {
-  // Leave a stable HashRouter location; caller sets the real return path next.
-  const cleanUrl = `${window.location.origin}${window.location.pathname}#/auth/callback`;
+  // Leave a stable callback path; caller navigates to the real return path next.
+  const cleanUrl = `${window.location.origin}/auth/callback`;
   window.history.replaceState(null, '', cleanUrl);
 }
 

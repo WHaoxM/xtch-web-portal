@@ -26,7 +26,7 @@
 1. 先读 `app/src/main.tsx` 和 `app/src/App.tsx`。
 2. 导航入口通常在 `app/src/components/Navbar.tsx`。
 3. 页脚入口通常在 `app/src/components/Footer.tsx`。
-4. 当前使用 `HashRouter`，内部链接要兼容 hash 路由。
+4. 当前使用 `BrowserRouter`；旧 `#/…` 链接由开机迁移兼容，新链接写 path。
 5. 验证页面跳转、刷新和返回顶部行为。
 
 ## 改内容、图片或路线数据

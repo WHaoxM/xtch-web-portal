@@ -6,7 +6,7 @@
 
 - 项目是 React + TypeScript + Vite 单页应用。
 - 实际应用目录是 `app/`，npm 命令在 `app/` 下执行。
-- 路由入口是 `app/src/main.tsx`，使用 `HashRouter`。
+- 路由入口是 `app/src/main.tsx`，使用 `BrowserRouter`（旧 `#/…` 开机迁移）。
 - 页面路由集中在 `app/src/App.tsx`。
 - 页面在 `app/src/pages/`，共享组件在 `app/src/components/`。
 - UI 基础组件在 `app/src/components/ui/`。

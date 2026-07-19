@@ -170,7 +170,7 @@ export function LinkOrderToAccount({
                     ? 'w-full min-h-[72px] rounded-xl border border-black/10 bg-white px-3 py-2 text-sm'
                     : 'w-full min-h-[72px] rounded-md border px-3 py-2 text-sm'
                 }
-                placeholder="Paste confirmation link (#/orders/…?token=…)"
+                placeholder="Paste confirmation link (/orders/…?token=…)"
                 value={pasteValue}
                 onChange={(event) => {
                   setPasteValue(event.target.value);

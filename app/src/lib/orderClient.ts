@@ -177,6 +177,7 @@ export function parseOrderClaimInput(input: string): ClaimOrderProof | null {
       orderNumber =
         hashParams.get('order') ||
         asUrl.searchParams.get('order') ||
+        (asUrl.pathname.match(/\/orders\/([^/?#]+)/i)?.[1] ?? '') ||
         (hashPath.match(/orders\/([^/?#]+)/i)?.[1] ?? '') ||
         '';
     } else {

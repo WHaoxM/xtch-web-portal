@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight, BedDouble, Car, Ticket, Users } from 'lucide-react';
 import { CtaBand, FaqBlock, PageHero, SectionIntro } from '@/components/SiteSections';
+import { tourCostFaqs } from '@/lib/seo/faqPacks';
 
 const costDrivers = [
   {
@@ -40,24 +41,6 @@ const sampleBudgets = [
     title: 'Northwest or plateau route',
     range: 'Season and vehicle sensitive',
     text: 'Best for Qinghai, Gansu, Xinjiang, Tibet, and long-distance scenic loops with more logistics.',
-  },
-];
-
-const faqs = [
-  {
-    question: 'Why is there no fixed public price?',
-    answer:
-      'Private China tour cost depends on dates, cities, hotel level, group size, vehicle type, guide needs, flights or trains, and attraction tickets.',
-  },
-  {
-    question: 'Can I control the budget?',
-    answer:
-      'Yes. The quickest levers are hotel level, route length, number of cities, guide days, and whether transfers use flights, trains, or private vehicles.',
-  },
-  {
-    question: 'What should I send for a quote?',
-    answer:
-      'Share travel month, number of travelers, target cities, trip length, hotel level, and any route PDF or destination page you like.',
   },
 ];
 
@@ -148,7 +131,7 @@ export default function TourCost() {
       <section className="section-padding bg-white py-16 md:py-20">
         <SectionIntro eyebrow="FAQ" title="Private China tour cost questions" />
         <div className="mt-10">
-          <FaqBlock items={faqs} />
+          <FaqBlock items={tourCostFaqs} />
         </div>
       </section>
 
@@ -157,7 +140,7 @@ export default function TourCost() {
         title="Pricing works best after the route is shaped"
         text="Send the basics and the Syncing team can help turn the right route into a practical private-trip quote."
         primaryTo="/custom-trip"
-        secondaryTo="/china-tours"
+        secondaryTo="/china-trips"
         secondaryLabel="Browse Routes"
       />
     </div>

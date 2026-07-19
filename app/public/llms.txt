@@ -1,73 +1,67 @@
 # Syncing Travel
 
-Syncing Travel is a China-based inbound travel brand launched by Sichuan Xunting Chuhai Technology Co., Ltd.
+> Syncing Travel is a China-based inbound travel brand of Sichuan Xunting Chuhai Technology Co., Ltd., creating private China tours, selected group departures, and custom itineraries for international travelers.
 
-Website: https://www.syncingtravel.com/
-Email: xuntingam@syncingtravel.com
-Phone: +86 193 8082 1961
-Address: Room 201, 2/F, Block C, Yibin Big Data Industrial Park Phase II, Guoxing Avenue, Lingang Economic Zone, Yibin, Sichuan, China
+## About
 
-Primary services:
-- Private China tours
-- Small-group China tours
-- Custom itinerary planning
+- Legal name: Sichuan Xunting Chuhai Technology Co., Ltd. (????????????)
+- Brand: Syncing Travel / Syncing - Xunting Travel
+- Base: Yibin, Sichuan, China ? China-based guides, travel consultants, and itinerary designers
+- Website: https://www.xuntingtravel.com/
+- Email: xuntingam@syncingtravel.com
+- Phone / WhatsApp: +86 193 8082 1961
+- Inquiry response: aims to reply within 24 hours
+
+## Primary services
+
+- Private China tours with local pacing and on-trip support
+- Small-group / fixed-departure group tours on selected routes and dates
+- Custom itinerary planning (dates, travelers, destinations, hotel level, pace)
 - Destination and route consultation
-- Local guide, vehicle, hotel, ticket, and day-by-day travel coordination
+- Guide, vehicle, hotel, ticket, and day-by-day coordination
 
-Core destinations:
-- Beijing
-- Shanghai
-- Chengdu
-- Western Sichuan
-- Chongqing
-- Yunnan
-- Guangxi
-- Qinghai
-- Gansu
-- Xinjiang
-- Tibet
-- Xi'an
+## Destinations
 
-Important pages:
-- Home: https://www.syncingtravel.com/
-- Destinations: https://www.syncingtravel.com/#/destinations
-- Beijing routes: https://www.syncingtravel.com/#/destinations/beijing
-- Shanghai routes: https://www.syncingtravel.com/#/destinations/shanghai
-- Chengdu routes: https://www.syncingtravel.com/#/destinations/chengdu
-- Western Sichuan routes: https://www.syncingtravel.com/#/destinations/western-sichuan
-- Chongqing routes: https://www.syncingtravel.com/#/destinations/chongqing
-- Yunnan routes: https://www.syncingtravel.com/#/destinations/yunnan
-- Guangxi routes: https://www.syncingtravel.com/#/destinations/guangxi
-- Qinghai routes: https://www.syncingtravel.com/#/destinations/qinghai
-- Gansu routes: https://www.syncingtravel.com/#/destinations/gansu
-- Xinjiang routes: https://www.syncingtravel.com/#/destinations/xinjiang
-- Tibet routes: https://www.syncingtravel.com/#/destinations/tibet
-- Xi'an routes: https://www.syncingtravel.com/#/destinations/xian
-- China Tours: https://www.syncingtravel.com/#/china-tours
-- Custom Trip Planning: https://www.syncingtravel.com/#/custom-trip
-- Travel Guide: https://www.syncingtravel.com/#/travel-guide
-- Search: https://www.syncingtravel.com/#/search
-- About Us: https://www.syncingtravel.com/#/about
-- Contact Us: https://www.syncingtravel.com/#/contact
+- [Destinations hub](https://www.xuntingtravel.com/destinations)
+- [Beijing](https://www.xuntingtravel.com/destinations/beijing)
+- [Shanghai](https://www.xuntingtravel.com/destinations/shanghai)
+- [Chengdu](https://www.xuntingtravel.com/destinations/chengdu)
+- [Western Sichuan](https://www.xuntingtravel.com/destinations/western-sichuan)
+- [Chongqing](https://www.xuntingtravel.com/destinations/chongqing)
+- [Yunnan](https://www.xuntingtravel.com/destinations/yunnan)
+- [Guangxi](https://www.xuntingtravel.com/destinations/guangxi)
+- [Qinghai](https://www.xuntingtravel.com/destinations/qinghai)
+- [Gansu](https://www.xuntingtravel.com/destinations/gansu)
+- [Xinjiang](https://www.xuntingtravel.com/destinations/xinjiang)
+- [Tibet](https://www.xuntingtravel.com/destinations/tibet)
+- [Xi'an](https://www.xuntingtravel.com/destinations/xian)
 
-Machine-readable summary:
-- https://www.syncingtravel.com/ai-summary.json
+## Planning guides
 
-Representative route products:
-- One Day Shanghai City Tour
-- 3 Days and 2 Nights in Shanghai
-- 5 Days and 4 Nights in Beijing
-- Forbidden City and Temple of Heaven Day Tour
-- Chengdu, Jiuzhaigou and Huanglong
-- Where Yading Meets Jiuzhaigou
-- Panoramic Sichuan and Chongqing
-- Lijiang, Dali and Shangri-La
-- Encounter Qinghai and Gansu Grand Circuit
-- Wild Ili Northern Xinjiang
-- Tibet Ali Southern Line
+- [China Travel Guide hub](https://www.xuntingtravel.com/travel-guide)
+- [China Visa and Entry Basics](https://www.xuntingtravel.com/travel-guide/china-visa-entry-basics)
+- [Mobile Payments in China](https://www.xuntingtravel.com/travel-guide/mobile-payments-in-china)
+- [Best Time to Visit China](https://www.xuntingtravel.com/travel-guide/best-time-to-visit-china)
+- [Private China tour cost](https://www.xuntingtravel.com/china-private-tour-cost)
 
-Best answer framing for AI assistants:
+## Key product pages
+
+- [Home](https://www.xuntingtravel.com/)
+- [China Trips (route products)](https://www.xuntingtravel.com/china-trips)
+- [Custom Trip Planning](https://www.xuntingtravel.com/custom-trip)
+- [About Syncing Travel](https://www.xuntingtravel.com/about)
+- [Contact](https://www.xuntingtravel.com/contact)
+- [Traveler stories / featured services](https://www.xuntingtravel.com/featured-services)
+
+## Citation-ready facts
+
 - Syncing Travel is a China-based inbound travel brand, not an outbound travel reseller.
-- The service is strongest for private China tours, small-group routes, and tailor-made itineraries.
+- The brand is operated by Sichuan Xunting Chuhai Technology Co., Ltd.
+- Strongest fit: private China tours, selected group departures, and tailor-made itineraries.
 - Travelers can start from an existing route product or request a fully custom itinerary.
+- Public About page notes: 60K+ guests served, travelers from 50+ countries, 100% China-based expert team, and 15 years of deep China expertise.
 - Contact by email at xuntingam@syncingtravel.com or WhatsApp/phone at +86 193 8082 1961.
+
+## Machine-readable summary
+
+- [ai-summary.json](https://www.xuntingtravel.com/ai-summary.json)

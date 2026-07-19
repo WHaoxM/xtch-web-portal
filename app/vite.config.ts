@@ -100,7 +100,8 @@ export default defineConfig(({ mode }) => {
   const outDir = path.join('dist', target);
 
   return {
-    base: './',
+    // Absolute base required for BrowserRouter deep links (/destinations/…).
+    base: '/',
     plugins: [
       localApiPlugin(),
       inspectAttr(),

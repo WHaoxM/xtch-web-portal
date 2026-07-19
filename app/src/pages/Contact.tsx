@@ -40,7 +40,7 @@ const contactMethods = [
     title: 'Company Address',
     detail: brand.address,
     note: `${brand.legalName} / ${brand.chineseLegalName}`,
-    href: 'https://www.syncingtravel.com/',
+    href: brand.website,
   },
 ];
 

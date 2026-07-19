@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import {
   TRAVELER_DEFAULT_RETURN_PATH,
   completeAuthRedirectNavigation,
+  navigateToAppPath,
   readStoredAuthSession,
   resolvePostAuthReturnPath,
 } from '../lib/authClient';
 
 /**
- * Neutral landing for Supabase redirects: /#/auth/callback
- * Consumes tokens from the URL, then returns to the pending hash path.
+ * Neutral landing for Supabase redirects: /auth/callback
+ * Consumes tokens from the URL, then returns to the pending path.
  */
 export default function AuthCallback() {
   const [error, setError] = useState('');
@@ -23,7 +24,7 @@ export default function AuthCallback() {
         // Tokens already consumed (or link opened twice) but session may exist.
         const session = readStoredAuthSession();
         if (session) {
-          window.location.hash = await resolvePostAuthReturnPath(session);
+          navigateToAppPath(await resolvePostAuthReturnPath(session));
           return;
         }
         setError('No sign-in session was found. Request a new sign-in code or try Google again.');
@@ -49,7 +50,7 @@ export default function AuthCallback() {
             <a className="underline" href={TRAVELER_DEFAULT_RETURN_PATH}>
               Back to sign in
             </a>
-            <a className="underline text-muted-foreground" href="#/admin">
+            <a className="underline text-muted-foreground" href="/admin">
               Admin sign in
             </a>
           </div>

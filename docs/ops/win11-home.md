@@ -15,7 +15,7 @@
 
 ```text
 Visitor → Router :80/:443 → Caddy (HTTPS) → Node deploy:serve :3080 (127.0.0.1)
-                                              ├─ static app/dist/win11-home (HashRouter; per-target outDir)
+                                              ├─ static app/dist/win11-home (BrowserRouter + prerender; per-target outDir)
                                               ├─ /api/* → app/api handlers
                                               └─ /s3/* → MinIO 127.0.0.1:9000
 API → Postgres 127.0.0.1:5432 (xtch_prod)
@@ -77,13 +77,15 @@ Copy-Item env\win11-home\.env.example env\win11-home\.env
 
 `S3_BROWSER_ENDPOINT` / `S3_PUBLIC_BASE_URL` 可留空：浏览器 `/s3` **跟当前访问 Host**；无请求时按 `PUBLIC_DOMAIN` > `PUBLIC_IP` > 局域网侦测。
 
-`VITE_AUTH_REDIRECT_URL` 建议**留空**（前端默认 `{origin}/#/auth/callback`；Admin 登录会变成 `{origin}/?auth_next=/admin#/auth/callback`）。在 Supabase **Redirect URLs** 登记每个入口，建议用通配以免 query 被拒：
+`VITE_AUTH_REDIRECT_URL` 建议**留空**（前端默认 `{origin}/auth/callback`；Admin 登录会变成 `{origin}/auth/callback?auth_next=admin`）。在 Supabase **Redirect URLs** 登记每个入口，建议用通配以免 query 被拒：
 
 - `http://127.0.0.1:3080/**`
 - `http://192.168.x.x:3080/**`（本机局域网 IP；`deploy:serve` 默认端口）
 - `https://你的域名/**`（有域名时）
 
-也可同时保留精确的 `/#/auth/callback`。Site URL 可仍用主入口；**Confirm email** 保持开启（仅首次注册确认）。
+也可同时保留精确的 `/auth/callback`（以及过渡期旧 `/#/auth/callback`）。Site URL 用站点根（不要写成 `/#/admin`）。**Confirm email** 保持开启（仅首次注册确认）。
+
+Stripe Checkout success/cancel 用 path：`/china-trips?checkout=…`（不要 `#/`）。`build:win11-home` 会跑 Playwright prerender；首次需本机 `npx playwright install chromium`。
 
 > 开发 Vite 仍是 `:3000`；生产直连/局域网用 `:3080`。Supabase Redirect 两边入口都要登记。
 

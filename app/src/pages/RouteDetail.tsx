@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { getDestinationBySlug, getRouteTourBySlug } from '@/lib/contentStore';
 import { getRoutePdfDetail, type RoutePdfDetail } from '@/lib/routePdfDetails';
+import { routeGenericFaqs } from '@/lib/seo/faqPacks';
 
 const includedItems = [
   { Icon: BedDouble, label: 'Accommodation' },
@@ -69,29 +70,6 @@ const wayCards = [
     Icon: Users,
     title: 'Local English-Speaking Guides',
     text: 'Professional local guides help make each destination easier to understand.',
-  },
-];
-
-const routeFaqs = [
-  {
-    question: 'Is this route good for first-time visitors to China?',
-    answer:
-      'Yes. It can be shaped into an easy first China journey with private pacing, clear transfers, and local guide support.',
-  },
-  {
-    question: 'Can the itinerary be adjusted?',
-    answer:
-      'Yes. Dates, hotel level, route order, guide needs, and extra cities can be refined after you share your travel details.',
-  },
-  {
-    question: 'Will the trip feel rushed?',
-    answer:
-      'The route is planned around realistic daily timing. If you prefer a slower pace, the same route can be extended or simplified.',
-  },
-  {
-    question: 'How do I get an exact quote?',
-    answer:
-      'Send your travel month, group size, preferred hotel level, and must-see places through the custom trip form.',
   },
 ];
 
@@ -339,7 +317,7 @@ export default function RouteDetail() {
                 {tour.title} FAQs
               </h2>
               <div className="mt-12 divide-y divide-[#e5e5e5]">
-                {routeFaqs.map((item) => (
+                {routeGenericFaqs.map((item) => (
                   <details key={item.question} className="group">
                     <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-6">
                       <h3 className="text-[18px] font-medium leading-7 text-[#111]">{item.question}</h3>

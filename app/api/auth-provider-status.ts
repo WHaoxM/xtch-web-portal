@@ -76,7 +76,7 @@ function queryValue(req: VercelRequestLike, key: string) {
 function getDefaultRedirectUrl(req: VercelRequestLike) {
   const url = req.url ? new URL(req.url, 'http://localhost') : null;
   const origin = url?.origin === 'http://localhost' ? 'http://localhost:3000' : url?.origin || 'http://localhost:3000';
-  return `${origin}/#/china-trips?auth=callback`;
+  return `${origin}/auth/callback`;
 }
 
 async function readAuthError(response: Response) {

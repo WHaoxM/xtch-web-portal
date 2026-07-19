@@ -320,7 +320,7 @@ function SignInView({ onSignedIn }: { onSignedIn: (session: AuthSession) => void
 
   const handleGoogle = async () => {
     try {
-      await signInWithOAuth('google', 'account', { returnPath: '#/admin' });
+      await signInWithOAuth('google', 'account', { returnPath: '/admin' });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign-in failed.');
     }
@@ -348,8 +348,8 @@ function SignInView({ onSignedIn }: { onSignedIn: (session: AuthSession) => void
     try {
       const session = await verifyEmailOtp(email, otpCode);
       const nextPath = await resolvePostAuthReturnPath(session);
-      if (nextPath !== '#/admin' && !nextPath.startsWith('#/admin?')) {
-        window.location.hash = nextPath;
+      if (nextPath !== '/admin' && !nextPath.startsWith('/admin?')) {
+        window.location.replace(nextPath);
         return;
       }
       onSignedIn(session);

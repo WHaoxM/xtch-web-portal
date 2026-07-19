@@ -1,6 +1,29 @@
+# Syncing Travel — crawl policy
 User-agent: *
 Allow: /
+Disallow: /admin
+Disallow: /api/
 
-Sitemap: https://www.syncingtravel.com/sitemap.xml
-AI-Summary: https://www.syncingtravel.com/ai-summary.json
-LLMS: https://www.syncingtravel.com/llms.txt
+# Citation / answer retrieval
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+# Training crawl — allowed for inbound brand visibility
+User-agent: GPTBot
+Allow: /
+
+Sitemap: https://www.xuntingtravel.com/sitemap.xml
+LLMS: https://www.xuntingtravel.com/llms.txt
+AI-Summary: https://www.xuntingtravel.com/ai-summary.json

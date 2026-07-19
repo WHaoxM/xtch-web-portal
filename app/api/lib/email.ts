@@ -132,8 +132,8 @@ export async function sendBookingConfirmationEmail(order: Order): Promise<'sent'
 }
 
 function buildOrderUrl(orderNumber: string, token: string): string {
-  const base = process.env.PUBLIC_APP_URL || 'https://syncingtravel.com';
-  return `${base}/#/orders/${encodeURIComponent(orderNumber)}?token=${encodeURIComponent(token)}`;
+  const base = process.env.PUBLIC_APP_URL || 'https://www.xuntingtravel.com';
+  return `${base}/orders/${encodeURIComponent(orderNumber)}?token=${encodeURIComponent(token)}`;
 }
 
 function formatTripDate(value: string): string {

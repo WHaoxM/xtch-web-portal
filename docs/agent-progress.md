@@ -2,6 +2,30 @@
 
 ## Status
 
+**done（仅技术 SEO）** — 用户要求撤掉内容 GEO 展示；页面 FAQ/Home 新块等已回滚；技术层（Router/meta/prerender）保留。
+
+### Progress note（撤回内容 GEO 展示，2026-07-19）
+
+- 已撤：Home 实体段+按钮、Guide/About/Destination/Custom/Contact 新增 FAQ、指南 lead、站外 playbook。
+- 保留：BrowserRouter、canonical/meta/JSON-LD、robots/sitemap/llms、prerender、TourCost/RouteDetail 原有 FAQ（本来就有）。
+- 下一步：生产 rebuild + Supabase/Stripe path 回调。
+
+### Progress note（SEO/GEO Phase B，2026-07-19）
+
+- 已改：`BrowserRouter`、`hashLegacyRedirect`、`authClient` path 模型、`/auth/callback`、Stripe/email/order 解析、`vite base: '/'`、sitemap/llms path、`prerender.mjs`+playwright、`serve-selfhost` 目录 index、ops/gotchas/context。
+- 已验证：`npm run build`、`npm run prerender -- dist/local`（25 ok）、`npm run lint`；抽查 `/destinations/beijing` prerender canonical。
+- 未验证：生产 Supabase Redirect / 真实 Stripe env 是否仍写旧 hash；真机 Auth/OTP；公网 curl prerender。
+- 运维必做：Supabase 加 `https://www.xuntingtravel.com/auth/callback`；生产 `.env` Stripe URL 去 `#`；`build:win11-home` 后重启 serve。
+- 下一步：Phase C 内容包（Guide/About/Destination FAQ + answer-first）。
+
+### Progress note（SEO/GEO Phase A，2026-07-19）
+
+- 门禁 G1–G4 已确认；域名/seo 模块/机器文件/动态 meta+FAQ schema 已完成。
+
+### Progress note（SEO/GEO 精细设计，2026-07-19）
+
+- 设计稿：`docs/superpowers/specs/2026-07-19-seo-geo-design.md`。
+
 **done（Me 页 Google/Apple 无反馈）** — OAuth 先进入 Sign In 再发起；失败可见错误；build/lint 绿。
 
 ### Progress note（Me 页 Google/Apple，2026-07-19）

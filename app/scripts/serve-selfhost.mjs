@@ -275,6 +275,23 @@ function sendFile(res, filePath) {
   fs.createReadStream(filePath).pipe(res);
 }
 
+function resolveDistFile(urlPathname) {
+  const candidate = safeJoinDist(urlPathname);
+  if (candidate && fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+    return candidate;
+  }
+
+  // Prerendered routes: /destinations/beijing → destinations/beijing/index.html
+  const dirIndexPath =
+    urlPathname.endsWith('/') ? `${urlPathname}index.html` : `${urlPathname}/index.html`;
+  const dirIndex = safeJoinDist(dirIndexPath);
+  if (dirIndex && fs.existsSync(dirIndex) && fs.statSync(dirIndex).isFile()) {
+    return dirIndex;
+  }
+
+  return null;
+}
+
 function serveStatic(req, res, urlPathname) {
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     res.statusCode = 405;
@@ -282,19 +299,19 @@ function serveStatic(req, res, urlPathname) {
     return;
   }
 
-  const candidate = safeJoinDist(urlPathname);
-  if (candidate && fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+  const filePath = resolveDistFile(urlPathname);
+  if (filePath) {
     if (req.method === 'HEAD') {
       res.statusCode = 200;
-      res.setHeader('content-type', MIME[path.extname(candidate).toLowerCase()] || 'application/octet-stream');
+      res.setHeader('content-type', MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream');
       res.end();
       return;
     }
-    sendFile(res, candidate);
+    sendFile(res, filePath);
     return;
   }
 
-  // HashRouter SPA fallback
+  // BrowserRouter SPA fallback
   const indexHtml = path.join(distRoot, 'index.html');
   if (!fs.existsSync(indexHtml)) {
     res.statusCode = 503;

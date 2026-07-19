@@ -9,7 +9,12 @@
 | 根目录也可 `npm run …` | 仓库根 `package.json` 会 `--prefix app` 转发；仍须写 `npm run deploy:serve`（不是裸 `deploy:serve`）。带参数：`npm run deploy:serve -- --target win11-home` |
 | Agent 反复 `npm run dev` 导致端口变成 3001/3002 | 本地 Vite 固定 `3000`（`strictPort: true`）。需要新开时直接 `npm run dev`（会先跑 `scripts/free-dev-port.mjs` 释放占用）；不要手动换端口。已有健康的 3000 服务时优先复用，勿重复启动 |
 | 开发与生产端口分开 | Vite/`npm run dev` → `:3000`；`deploy:serve` → `:3080`（`SELFHOST_PORT` 可覆盖）。Caddy 反代 `127.0.0.1:3080`。勿把两边都写 3000，否则同机并行会抢端口，且 `free-dev-port` 会误杀生产进程 |
-| 当前路由使用 `HashRouter` | 内部链接和刷新行为要兼容 hash 路由 |
+| 当前路由使用 `BrowserRouter` | 路径形如 `/china-trips`；旧 `#/…` 书签由 `hashLegacyRedirect` 开机迁移。Supabase token 仍可能出现在 `#access_token=`，勿清掉 hash 解析 |
+| Vite `base` 必须是 `/` | BrowserRouter 深链依赖绝对 asset 路径；勿改回 `./` |
+| 正式站 canonical 域 | 公网 SEO/GEO 主机为 `https://www.xuntingtravel.com`（Caddy）；品牌名仍 Syncing Travel；勿再把 sitemap/llms/og 写回 `syncingtravel.com` |
+| 产品枢纽路径 | 公开路由是 `/china-trips`；`/china-tours` 仅别名跳转；sitemap/Seo 勿再写死 `china-tours` |
+| Auth / Stripe 回调 URL | Supabase Redirect：`/auth/callback`；Stripe success/cancel：`/china-trips?checkout=…`（无 `#`）。生产 env 若仍写旧 hash 需改 |
+| 生产 build 含 prerender | `build:win11-home` / `build:cloud-vps` 会跑 Playwright prerender；需本机已 `npx playwright install chromium` |
 | 页面路由集中在 `app/src/App.tsx` | 新页面或路由改动先查这里 |
 | `@/*` 指向 `app/src/*` | 应优先使用项目已有别名 |
 | 内容事实不能从目标站猜 | 先查 `docs/content-resource-map.md` |

@@ -1,66 +1,20 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { brand } from '@/lib/siteData';
-import { destinationMeta, routeTours } from '@/lib/contentStore';
-
-const baseUrl = brand.website.replace(/\/$/, '');
-
-const routeMeta = {
-  '/': {
-    title: 'Syncing Travel | Private China Tours & Custom Trips',
-    description:
-      'Plan private China tours and group tour routes with a China-based local travel team. Custom itinerary planning, guides, vehicles, hotels, tickets, and on-trip support.',
-    image: '/images/route-beijing-forbidden.jpg',
-  },
-  '/destinations': {
-    title: 'Top China Destinations | Syncing Travel',
-    description:
-      'Explore top China destinations including Beijing, Shanghai, Chengdu, Yunnan, Guangxi, Qinghai, Gansu, Xinjiang, Tibet, and Xi’an for private China tours.',
-    image: '/images/hero-greatwall.jpg',
-  },
-  '/china-tours': {
-    title: 'China Tours & Real Route Products | Syncing Travel',
-    description:
-      'Browse private and group tour China routes from Syncing Travel, including city breaks, culture routes, nature journeys, Silk Road loops, and custom tours.',
-    image: '/images/hero-forbidden.jpg',
-  },
-  '/custom-trip': {
-    title: 'Custom China Trip Planning | Syncing Travel',
-    description:
-      'Request a tailor-made China itinerary built around your dates, travelers, destinations, interests, hotel level, and pace.',
-    image: '/images/ref-banner-misty-river.jpg',
-  },
-  '/travel-guide': {
-    title: 'China Travel Guide | Syncing Travel',
-    description:
-      'Read practical China travel guidance for visas, payments, high-speed rail, connectivity, food, best travel seasons, safety, and first-time trip planning.',
-    image: '/images/hero-bambooraft.jpg',
-  },
-  '/featured-services': {
-    title: 'Traveler Stories | Real China Experiences | Syncing Travel',
-    description:
-      'See real travel videos from Syncing Travel trips: hands-on culture workshops, remote landscapes, local performances, and everyday moments we arrange for your private China tour.',
-    image: '/images/route-sichuan-yading.jpg',
-  },
-  '/about': {
-    title: 'About Syncing Travel | China-Based Inbound Travel Team',
-    description:
-      'Learn about Syncing Travel, the China-based inbound travel brand of Sichuan Xunting Chuhai Technology Co., Ltd., focused on private China tours.',
-    image: '/images/about-hero.jpg',
-  },
-  '/contact': {
-    title: 'Contact Syncing Travel | China Tour Inquiry',
-    description:
-      'Contact Syncing Travel by WhatsApp, email, phone, or inquiry form for private China tour planning and custom itinerary support.',
-    image: '/images/about-hero.jpg',
-  },
-  '/search': {
-    title: 'Search China Tours, Destinations & Guides | Syncing Travel',
-    description:
-      'Search Syncing Travel routes, China destinations, travel guide topics, and custom trip planning options.',
-    image: '/images/ref-banner-misty-river.jpg',
-  },
-} satisfies Record<string, { title: string; description: string; image: string }>;
+import { faqsForPathname } from '@/lib/seo/faqPacks';
+import {
+  buildBreadcrumbNode,
+  buildFaqPageNode,
+  buildJsonLdGraph,
+  buildOrganizationNode,
+  buildTouristTripNode,
+  buildTourListNode,
+  buildWebPageNode,
+  buildWebSiteNode,
+} from '@/lib/seo/jsonLd';
+import { resolvePageMeta } from '@/lib/seo/routeMeta';
+import { toAbsoluteAssetUrl, toCanonicalUrl } from '@/lib/seo/siteOrigin';
+import { getDestinationBySlug, getRouteTourBySlug } from '@/lib/contentStore';
+import { getGuideArticleBySlug } from '@/lib/siteData';
 
 function upsertMeta(selector: string, create: () => HTMLMetaElement, content: string) {
   const existing = document.head.querySelector<HTMLMetaElement>(selector);
@@ -85,19 +39,58 @@ function upsertJsonLd(id: string, data: unknown) {
   if (!existing) document.head.appendChild(script);
 }
 
+function buildBreadcrumbs(pathname: string) {
+  const crumbs: Array<{ name: string; path: string }> = [{ name: 'Home', path: '/' }];
+
+  const destinationMatch = pathname.match(/^\/destinations\/([^/]+)$/);
+  if (destinationMatch) {
+    crumbs.push({ name: 'Destinations', path: '/destinations' });
+    const destination = getDestinationBySlug(destinationMatch[1]);
+    crumbs.push({
+      name: destination?.name ?? destinationMatch[1],
+      path: pathname,
+    });
+    return crumbs;
+  }
+
+  const tourMatch = pathname.match(/^\/tours\/([^/]+)$/);
+  if (tourMatch) {
+    crumbs.push({ name: 'China Trips', path: '/china-trips' });
+    const tour = getRouteTourBySlug(tourMatch[1]);
+    crumbs.push({
+      name: tour?.title ?? tourMatch[1],
+      path: pathname,
+    });
+    return crumbs;
+  }
+
+  const guideMatch = pathname.match(/^\/travel-guide\/([^/]+)$/);
+  if (guideMatch) {
+    crumbs.push({ name: 'Travel Guide', path: '/travel-guide' });
+    const article = getGuideArticleBySlug(guideMatch[1]);
+    crumbs.push({
+      name: article?.title ?? guideMatch[1],
+      path: pathname,
+    });
+    return crumbs;
+  }
+
+  return null;
+}
+
 export default function Seo() {
   const location = useLocation();
-  const meta = routeMeta[location.pathname as keyof typeof routeMeta] ?? routeMeta['/'];
 
   useEffect(() => {
-    const routeDestinations = destinationMeta.map((destination) => destination.name);
-    const canonicalUrl =
-      location.pathname === '/'
-        ? `${baseUrl}/`
-        : `${baseUrl}/#${location.pathname}${location.search}`;
-    const imageUrl = meta.image.startsWith('http') ? meta.image : `${baseUrl}${meta.image}`;
+    const meta = resolvePageMeta(location.pathname);
+    const canonicalUrl = toCanonicalUrl(location.pathname, location.search);
+    const imageUrl = toAbsoluteAssetUrl(meta.image);
+    const faqs = faqsForPathname(location.pathname);
+    const breadcrumbs = buildBreadcrumbs(location.pathname);
 
     document.title = meta.title;
+    document.documentElement.dataset.seoReady = '1';
+
     upsertMeta('meta[name="description"]', () => {
       const element = document.createElement('meta');
       element.name = 'description';
@@ -107,7 +100,7 @@ export default function Seo() {
       const element = document.createElement('meta');
       element.name = 'robots';
       return element;
-    }, 'index, follow, max-image-preview:large');
+    }, meta.robots);
     upsertLink('link[rel="canonical"]', () => {
       const element = document.createElement('link');
       element.rel = 'canonical';
@@ -135,76 +128,49 @@ export default function Seo() {
       }, content);
     });
 
-    upsertJsonLd('route-json-ld', {
-      '@context': 'https://schema.org',
-      '@graph': [
-        {
-          '@type': 'TravelAgency',
-          '@id': `${baseUrl}/#organization`,
-          name: brand.name,
-          alternateName: brand.fullName,
-          legalName: brand.legalName,
-          url: `${baseUrl}/`,
-          email: brand.email,
-          telephone: brand.phone,
-          description: brand.description,
-          address: {
-            '@type': 'PostalAddress',
-            streetAddress:
-              'Room 201, 2/F, Block C, Yibin Big Data Industrial Park Phase II, Guoxing Avenue, Lingang Economic Zone',
-            addressLocality: 'Yibin',
-            addressRegion: 'Sichuan',
-            addressCountry: 'CN',
-          },
-          areaServed: routeDestinations.map((destination) => ({
-            '@type': 'AdministrativeArea',
-            name: destination,
-          })),
-          knowsAbout: [
-            'Private China tours',
-            'Group tours in China',
-            'Custom China itinerary planning',
-            'China travel guide',
-            ...routeDestinations,
-          ],
-        },
-        {
-          '@type': 'WebSite',
-          '@id': `${baseUrl}/#website`,
-          name: brand.name,
-          url: `${baseUrl}/`,
-          publisher: { '@id': `${baseUrl}/#organization` },
-          potentialAction: {
-            '@type': 'SearchAction',
-            target: `${baseUrl}/#/search?q={search_term_string}`,
-            'query-input': 'required name=search_term_string',
-          },
-        },
-        {
-          '@type': 'ItemList',
-          name: 'Syncing Travel China tour routes',
-          itemListElement: routeTours.slice(0, 12).map((tour, index) => ({
-            '@type': 'ListItem',
-            position: index + 1,
-            item: {
-              '@type': 'TouristTrip',
-              name: tour.title,
-              description: tour.desc,
-              image: `${baseUrl}${tour.image}`,
-              url: `${baseUrl}/#/custom-trip?tour=${encodeURIComponent(tour.title)}`,
-            },
-          })),
-        },
-        {
-          '@type': 'WebPage',
-          name: meta.title,
-          description: meta.description,
-          url: canonicalUrl,
-          isPartOf: { '@id': `${baseUrl}/#website` },
-        },
-      ],
-    });
-  }, [location.pathname, location.search, meta]);
+    const graph: unknown[] = [
+      buildOrganizationNode(),
+      buildWebSiteNode(),
+      buildWebPageNode({
+        title: meta.title,
+        description: meta.description,
+        canonicalUrl,
+      }),
+    ];
+
+    if (
+      location.pathname === '/' ||
+      location.pathname === '/china-trips' ||
+      location.pathname === '/china-tours'
+    ) {
+      graph.push(buildTourListNode());
+    }
+
+    const tourMatch = location.pathname.match(/^\/tours\/([^/]+)$/);
+    if (tourMatch) {
+      const tour = getRouteTourBySlug(tourMatch[1]);
+      if (tour) {
+        graph.push(
+          buildTouristTripNode({
+            title: tour.title,
+            desc: tour.desc,
+            image: tour.image,
+            slug: tour.slug,
+          }),
+        );
+      }
+    }
+
+    if (faqs?.length) {
+      graph.push(buildFaqPageNode(faqs));
+    }
+
+    if (breadcrumbs) {
+      graph.push(buildBreadcrumbNode(breadcrumbs));
+    }
+
+    upsertJsonLd('route-json-ld', buildJsonLdGraph(graph));
+  }, [location.pathname, location.search]);
 
   return null;
 }
