@@ -13,6 +13,13 @@
 - 未验证：真实提交（Turnstile + Resend 邮件）全链路；Admin 侧 `group_tour_inquiry` 类型列表筛选/详情展示的浏览器点击（代码已支持，未逐一点击）。
 - 下一步：如需验证提交全链路，需要本地 Postgres + Turnstile/Resend 配置（见 `docs/agent-gotchas.md` 对应条目）。
 
+### Progress note（推送 dev + 合并 main，2026-07-20）
+
+- 用户确认：把当前工作区内所有已完成但未提交的改动（询盘弹窗修复 + 品牌图标/logo + About 办公室图 + Tibet 封面图 + Home/Navbar 审计修复）一并提交推送。
+- 已做：`git add -A` → 单个 commit `42cc4c1`（提交信息列出各部分）→ `git push origin dev` → `git checkout main` + `git pull --ff-only` → `git merge dev --no-ff` → `git push origin main`（`d60b81f..3c9618b`）→ 切回 `dev`。
+- 合并无冲突；提交前已用 `npm run build` / `npm run lint` 验证过整棵树可编译。
+- **重要：仅代码仓库更新，生产站点未自动更新**——`win11-home` 部署需要运维手动 `npm run build:win11-home` 后重启 `npm run deploy:serve` 才会把这些改动带到公网站点；未做此步。
+
 **done（RouteDetail sticky 段导航重叠）** — 下滚时段导航不再切过卡片；主 Navbar 在 `/tours/` 保持可见。
 
 ### Progress note（RouteDetail sticky 段导航，2026-07-20）
