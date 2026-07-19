@@ -3,10 +3,10 @@ import { ArrowRight } from 'lucide-react';
 import { useScrollAnimation } from '../hooks/useScrollAnimation';
 import { brand } from '@/lib/siteData';
 
-// Interim public URLs until original 本站 office/landscape assets are uploaded via MinIO.
+// Office photos from syncingtravel.com/page-1 (ABOUT US); CTA uses existing route asset.
 const aboutHeroImages = {
-  companyLogoWall: '/images/about-hero.jpg',
-  officeWorkspace: '/images/about-hero.jpg',
+  companyLogoWall: '/images/about-logo-wall.jpg',
+  officeWorkspace: '/images/about-office-workspace.jpg',
   westernSichuanCta: '/images/route-sichuan-yading.jpg',
 };
 

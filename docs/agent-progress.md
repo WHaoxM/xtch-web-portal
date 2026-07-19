@@ -2,17 +2,117 @@
 
 ## Status
 
-**in-progress（sitemap 完整化）** — 共享公开路由表 + generate-sitemap；含 20 条 `/tours/:slug`；robots 补 Disallow account/orders/auth；待 commit → push dev → merge main。
+**done（桌面 RouteDetail 询盘弹窗）** — `Get a Private Quote` / `Group tour inquiry` 已各自是独立弹窗表单（非跳转独立页），字段/文案与用户提供的参考站截图一致；build/lint 绿，浏览器核对两个弹窗均正确打开。
+
+### Progress note（桌面询盘弹窗，2026-07-20）
+
+- 背景：`RouteInquiryModals.tsx`、`RouteDetail.tsx`、`inquiries.ts` 等询盘弹窗代码此前已由任务板 `desktop-route-inquiry-modals` 写好，但未验证是否可编译、未收口。用户本轮用参考站截图确认方向：两个 CTA 点开各自的弹窗表单（不是独立页面），与已实现的 `PrivateQuoteModal` / `GroupTourInquiryModal` 完全一致。
+- 发现并修复真实 bug：`app/src/lib/inquriesAdminClient.ts` 的 `InquiryType` 类型缺 `'group_tour_inquiry'`，导致 `npm run build` 因 `inquiryOpsCopy.ts` 类型不匹配报错（`tsc` 两处 TS2353）。已补上该枚举值，前后端类型现已一致（`app/api/lib/adminInquiries.ts` 的 `INQUIRY_TYPES` 早已包含该值）。
+- 已验证：`npm run build`、`npm run lint` 全绿；本地 dev（`:3000`）打开 `/tours/2-3-days-and-2-nights-in-shanghai`，分别点「Get a Private Quote」「Group tour inquiry」，两个弹窗标题/字段/文案与用户截图一致。
+- 与参考站的已知差异（此前用户已确认，非本轮改动）：Group tour inquiry 弹窗用「Preferred Month/Year + 是否灵活」代替参考站的「选择具体班期」下拉——因为本产品定位是轻量询价、客服邮件回复真实班期，不锁库存/不展示假班期。
+- 未验证：真实提交（Turnstile + Resend 邮件）全链路；Admin 侧 `group_tour_inquiry` 类型列表筛选/详情展示的浏览器点击（代码已支持，未逐一点击）。
+- 下一步：如需验证提交全链路，需要本地 Postgres + Turnstile/Resend 配置（见 `docs/agent-gotchas.md` 对应条目）。
+
+**done（RouteDetail sticky 段导航重叠）** — 下滚时段导航不再切过卡片；主 Navbar 在 `/tours/` 保持可见。
+
+### Progress note（RouteDetail sticky 段导航，2026-07-20）
+
+- 根因：主 Navbar 下滚隐藏后，段导航仍 `sticky top-*`，顶距空隙让正文穿过。
+- 已改：`Navbar.tsx`（`/tours/` 不 slide-hide）；`RouteDetail.tsx`（`top-24` / 侧栏 `top-48` / 锚点 `scroll-mt-48`）。
+- 已验证：Playwright 1440×900 滚动后 siteNav.top=0、subNav.top=96 齐平；`npm run build` + `npm run lint` 绿。
+- 未提交 git。
+
+**in-progress（桌面首页审计跟进）** — 按用户确认，仅处理 1024–1279px 导航可发现性、Real Moments 两组无效箭头、Traveler Story 的错误跳转。
+
+### Progress note（桌面首页审计跟进，2026-07-20）
+
+- 依据：用户确认保留其余审计项，仅修第 2、5、6 项。
+- 拟改：`Navbar.tsx` 将桌面导航从 `xl` 提前至常见笔记本断点；`Home.tsx` 移除无效箭头，并将无对应详情页的故事链接调整为非跳转状态。
+- 验证：修改后运行 `npm run build`、`npm run lint`；再检查桌面断点。
+- 注意：`Navbar.tsx` 正与 route-sticky-nav-fix 共用；勿覆盖 `/tours/` 不隐藏逻辑。
+
+**done（Tibet 目的地封面）** — Tibet 封面已从中文拼图 `route-tibet-ali.jpg` 换成羊湖实景 `route-tibet-yamdrok-01.jpg`。
+
+### Progress note（Tibet 目的地封面，2026-07-19）
+
+- 依据：用户截图内容即 `route-tibet-ali.jpg`（亮点拼图：精品小团等）；目标 `route-tibet-yamdrok-01.jpg`。
+- 已改：`backfill-content.ts`、`CustomTrip.tsx`；本地库 `xtch.destinations` tibet → 已有 MinIO yamdrok URL（与路线 `18-tibet-ali-southern-line` 同源）。
+- 已验证：`GET /api/destinations` 返回 yamdrok MinIO URL。
+- 未改：生产库（本机无 `xtch_prod`）；硬刷新 Mini-App Places/Tibet 可见。
+
+**done（About 办公室两图）** — 已从 syncingtravel.com `/page-1` 取回 logo wall + 办公区照片并接入 About。
+
+### Progress note（About 办公室两图，2026-07-19）
+
+- 官方 About URL：`https://www.syncingtravel.com/page-1`（非 `/about`）。
+- 来源媒体：`2c1368_f8d7048b279e491a99c293c25905b94a~mv2.png`（公司 logo 墙）、`2c1368_b543bb49aa8c4e729739c9db565d8ef5~mv2.png`（办公区）。
+- 已落盘：`app/public/images/about-logo-wall.jpg`、`about-office-workspace.jpg`（原 PNG 转 JPEG q88，约 3000×1550）。
+- 已改：`About.tsx` 的 `companyLogoWall` / `officeWorkspace` 指向上述本地图。
+- 已验证：`npm run build` 绿。
+- 未改：`about-hero.jpg`（Contact/SEO 仍用）；未提交 git。
+
+**done（favicon 改用大 S）** — 站点图标与页脚同源裁剪 S，铺满黑底方图，标签页不再因整图含字而显小。
+
+### Progress note（favicon 放大，2026-07-19）
+
+- 原因：`favicon-source` 含 Syncing 全文，缩成 16/32px 后 S 占比很小。
+- 已改：用 `logo-mark.png` 生成 `favicon-32/192.png`、`apple-touch-icon.png`、`favicon.png`；`index.html` 去掉优先挂 source。
+- 验证：硬刷新标签页。
+
+**done（站点图标用最大 favicon-source）** — tab/apple 图标均由 `favicon-source.png` 居中裁方生成；`index.html` 优先挂原图。
+
+### Progress note（favicon-source 站点图标，2026-07-19）
+
+- 已从 `favicon-source.png` 重生成 `favicon-32/192.png`、`apple-touch-icon.png`、`favicon.png`。
+- `index.html` 增加 `/favicon-source.png`（sizes=any）；`brand.iconSrc` 指向同源。
+- 验证：硬刷新后看浏览器标签页图标。
+
+**done（导航横版 + 页脚仅 S）** — 导航恢复横版 wordmark；页脚裁剪为蓝色 S（无 Syncing 字）。
+
+### Progress note（logo 回退与页脚裁剪，2026-07-19）
+
+- 导航：恢复 `logo.png` / `logo-on-dark.png`（810×449 横版）。
+- 页脚：新增裁剪 `logo-mark.png`（仅 S），`Footer` 用 `brand.logoMarkSrc`。
+- 已验证：裁剪图无 Syncing 字样。
+
+**done（最大竖版标展示）** — 导航/页脚改用 `favicon-source` 全量 lockup（1280×1225）；尺寸已放大。
+
+### Progress note（最大图标展示，2026-07-19）
+
+- 已从 `favicon-source.png` 重生成 `images/logo.png` / `logo-on-dark.png`。
+- Navbar ~56–72px 高；Footer ~80–96px。
+- 已验证：DOM natural 1280×1225；Home 透明导航叠浅色天空时白字版仍可能偏淡（既有透明导航取舍）。
+
+**done（Featured Services 导航可读）** — 根因是 `bg-white/92` 未被 Tailwind 生成（背景实际透明）+ 深色 hero 页未进白字模式；已修。
+
+### Progress note（导航对比度，2026-07-19）
+
+- 问题：`/featured-services` 深色 hero 上导航深色字/深色 logo 看不清。
+- 根因：`bg-white/92` 无对应 CSS（computed 为透明）；且该页不在 `usesTransparentHero`。
+- 已改：`Navbar.tsx` — `bg-white/90`；透明导航覆盖 featured-services / destinations / contact / travel-guide 等深色 hero 路由。
+- 已验证：本地 `/featured-services` 顶部为白字 + logo-on-dark。
+
+**done（Syncing 官方图标替换）** — 已从 syncingtravel.com 取回 favicon + 横版 logo 并接入；build 绿；本地导航/页脚已见官方标。
+
+### Progress note（Syncing 官方图标，2026-07-19）
+
+- 目标：用 https://www.syncingtravel.com/ 的站点图标替换本站 favicon 与 Navbar/Footer logo。
+- 来源：Wix `…4bc28899…~mv2.png`（favicon 32/192/180）与 `…73632240…~mv2.png`（头图横版 logo）。
+- 已改：`app/public/favicon-*.png`、`apple-touch-icon.png`、`images/logo.png`、`images/logo-on-dark.png`；`index.html`；`siteData.ts`；`Navbar.tsx`（透明导航用浅色字版）；`Footer.tsx`；`jsonLd.ts`。
+- 已验证：`npm run build`；本地 `3000` 下 favicon link + navbar/footer 加载官方 PNG。
+- 未验证：生产 rebuild 后公网 tab 图标（需硬刷新清缓存）。
+- 残留：旧 `images/logo.svg` 仍在 public，已无引用。
+
+**done（sitemap 完整化）** — 已推 `origin/dev`（`49851de`），PR #1 已合并 `main`（merge `d60b81f`）。
 
 ### Progress note（sitemap 完整化，2026-07-19）
 
 - 目标：完整 sitemap 可被生产抓取，并走 git → dev → main。
-- 已读：agent-context、gotchas、SEO 设计稿、App.tsx、既有 public/sitemap+robots、backfill-content tour 列表。
-- 已改：`app/scripts/seo-public-routes.mjs`、`generate-sitemap.mjs`、`prerender.mjs`（共用静态路由）、`package.json`（seo:sitemap + build 钩子）、`public/sitemap.xml`（45 URL）、`public/robots.txt`。
-- 域名：`https://www.xuntingtravel.com`（siteData/gotchas/Caddy）。
-- 已验证：`npm run seo:sitemap`、`npm run build`（dist/local 含 sitemap）。
-- 未验证：公网 curl；生产库若有额外 published routes 需再扩 TOUR_ENTRIES。
-- 下一步：commit → push origin/dev → PR/merge main。
+- 已改：`seo-public-routes.mjs`、`generate-sitemap.mjs`、`prerender.mjs`、`package.json`、`public/sitemap.xml`（45 URL）、`public/robots.txt`、gotchas/progress/task-board。
+- 域名：`https://www.xuntingtravel.com`；路径型 URL（BrowserRouter，无 `#`）。
+- Git：commit `49851de` → push `dev`；PR https://github.com/WHaoxM/xtch-web-portal/pull/1 → merge `d60b81f` on `main`。
+- 已验证：`npm run build`（dist 含 45 URL sitemap）；公网 curl / 生产 rebuild 未验。
+- 风险：tour slug 来自 backfill 列表；生产库若另有 published routes 需扩 `TOUR_ENTRIES` 再跑 `seo:sitemap`。
 
 **done（仅技术 SEO）** — 用户要求撤掉内容 GEO 展示；页面 FAQ/Home 新块等已回滚；技术层（Router/meta/prerender）保留。
 

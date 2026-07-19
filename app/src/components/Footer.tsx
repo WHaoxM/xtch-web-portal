@@ -32,9 +32,9 @@ export default function Footer() {
           <div className="grid grid-cols-1 gap-8 border-b border-white/10 py-14 md:grid-cols-[1fr_auto] md:items-center md:py-18">
             <div className="text-center md:text-left">
               <img
-                src={brand.logoSrc}
+                src={brand.logoMarkSrc}
                 alt={brand.fullName}
-                className="mx-auto h-20 w-20 rounded-full object-contain md:mx-0"
+                className="mx-auto h-16 w-auto object-contain md:mx-0 md:h-20"
               />
               <h2 className="mt-3 font-sans text-[26px] font-semibold tracking-tight text-white">
                 {brand.name}

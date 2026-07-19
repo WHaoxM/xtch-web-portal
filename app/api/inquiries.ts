@@ -22,7 +22,7 @@ type VercelResponseLike = {
   json: (body: unknown) => void;
 };
 
-type InquiryType = 'quick_contact' | 'custom_trip' | 'route_private';
+type InquiryType = 'quick_contact' | 'custom_trip' | 'route_private' | 'group_tour_inquiry';
 
 type InquiryPayload = {
   type?: string;
@@ -197,9 +197,9 @@ function validatePayload(payload: InquiryPayload) {
     }
   }
 
-  if (payload.type === 'route_private') {
+  if (payload.type === 'route_private' || payload.type === 'group_tour_inquiry') {
     if (!payload.requestedTour) {
-      return 'Please choose a route for this private request.';
+      return 'Please choose a route for this request.';
     }
     if (!payload.travelMonth) {
       return 'Please share your travel dates.';
@@ -213,7 +213,12 @@ function validatePayload(payload: InquiryPayload) {
 }
 
 function isInquiryType(value: string | undefined): value is InquiryType {
-  return value === 'quick_contact' || value === 'custom_trip' || value === 'route_private';
+  return (
+    value === 'quick_contact' ||
+    value === 'custom_trip' ||
+    value === 'route_private' ||
+    value === 'group_tour_inquiry'
+  );
 }
 
 function inquiryEmailSubject(type: InquiryType | undefined, name: string) {
@@ -222,7 +227,9 @@ function inquiryEmailSubject(type: InquiryType | undefined, name: string) {
       ? 'Custom trip request'
       : type === 'route_private'
         ? 'Route private request'
-        : 'Quick contact';
+        : type === 'group_tour_inquiry'
+          ? 'Group tour inquiry'
+          : 'Quick contact';
   return `[Syncing Travel] ${label} - ${name}`;
 }
 

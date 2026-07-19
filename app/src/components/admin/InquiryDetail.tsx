@@ -144,8 +144,12 @@ export function InquiryDetail({
   }
 
   const highlightRows: { label: string; value: string }[] = [];
-  if (inquiry.type === 'route_private' && requestedTour) {
+  if ((inquiry.type === 'route_private' || inquiry.type === 'group_tour_inquiry') && requestedTour) {
     highlightRows.push({ label: '意向路线', value: requestedTour });
+  }
+  if (inquiry.type === 'group_tour_inquiry') {
+    if (travelMonth) highlightRows.push({ label: '意向出发', value: travelMonth });
+    if (travelers) highlightRows.push({ label: '人数', value: travelers });
   }
   if (inquiry.type === 'custom_trip') {
     if (destinations) highlightRows.push({ label: '目的地', value: destinations });
@@ -164,7 +168,7 @@ export function InquiryDetail({
     { label: '邮箱', value: inquiry.email },
   ];
   if (phone && inquiry.type !== 'quick_contact') secondaryRows.push({ label: '电话', value: phone });
-  if (requestedTour && inquiry.type !== 'route_private') {
+  if (requestedTour && inquiry.type !== 'route_private' && inquiry.type !== 'group_tour_inquiry') {
     secondaryRows.push({ label: '意向路线', value: requestedTour });
   }
   if (requestedDestination && inquiry.type !== 'custom_trip') {
@@ -173,8 +177,12 @@ export function InquiryDetail({
   if (destinations && inquiry.type !== 'custom_trip') {
     secondaryRows.push({ label: '目的地', value: destinations });
   }
-  if (travelMonth) secondaryRows.push({ label: '出行月份', value: travelMonth });
-  if (travelers) secondaryRows.push({ label: '人数', value: travelers });
+  if (travelMonth && inquiry.type !== 'group_tour_inquiry') {
+    secondaryRows.push({ label: '出行月份', value: travelMonth });
+  }
+  if (travelers && inquiry.type !== 'group_tour_inquiry') {
+    secondaryRows.push({ label: '人数', value: travelers });
+  }
   if (tripLength && inquiry.type !== 'custom_trip') {
     secondaryRows.push({ label: '行程天数', value: tripLength });
   }

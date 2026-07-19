@@ -3,7 +3,7 @@ import { sql } from './db';
 export const INQUIRY_STATUSES = ['new', 'in_progress', 'closed'] as const;
 export type InquiryStatus = (typeof INQUIRY_STATUSES)[number];
 
-export const INQUIRY_TYPES = ['quick_contact', 'custom_trip', 'route_private'] as const;
+export const INQUIRY_TYPES = ['quick_contact', 'custom_trip', 'route_private', 'group_tour_inquiry'] as const;
 export type InquiryType = (typeof INQUIRY_TYPES)[number];
 
 export type AdminInquiry = {

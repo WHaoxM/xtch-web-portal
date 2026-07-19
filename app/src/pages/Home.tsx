@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import useEmblaCarousel from 'embla-carousel-react';
 import {
-  ArrowLeft,
   ArrowRight,
   BookOpen,
   CalendarDays,
@@ -472,7 +471,7 @@ function TravelerStoryCarousel({ forcePaused }: { forcePaused: boolean }) {
                   <br />
                   {story.quoteSecondLine}
                 </blockquote>
-                <div className="real-story-tags">
+                  <div className="real-story-tags">
                   {story.tags.map((tag, index) => {
                     const Icon = [MapPin, UsersRound, Leaf, Camera][index] ?? MapPin;
                     return (
@@ -482,11 +481,7 @@ function TravelerStoryCarousel({ forcePaused }: { forcePaused: boolean }) {
                       </span>
                     );
                   })}
-                </div>
-                <Link to="/china-trips" className="real-story-link">
-                  Read full story
-                  <ArrowRight size={18} />
-                </Link>
+                  </div>
               </article>
 
               <div className="real-story-visual">
@@ -589,14 +584,6 @@ function RealMomentsSection() {
               <p>Curated destinations, beyond the guidebooks.</p>
             </div>
           </div>
-          <div className="real-moment-arrows" aria-hidden="true">
-            <button type="button">
-              <ArrowLeft size={24} />
-            </button>
-            <button type="button">
-              <ArrowRight size={24} />
-            </button>
-          </div>
         </div>
 
         <div className="real-moment-marquee">
@@ -634,14 +621,6 @@ function RealMomentsSection() {
               <h3>Real Travelers, Real Moments</h3>
               <p>Genuine smiles. Meaningful connections.</p>
             </div>
-          </div>
-          <div className="real-moment-arrows" aria-hidden="true">
-            <button type="button">
-              <ArrowLeft size={24} />
-            </button>
-            <button type="button">
-              <ArrowRight size={24} />
-            </button>
           </div>
         </div>
 

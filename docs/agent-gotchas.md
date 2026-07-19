@@ -24,6 +24,7 @@
 | Mini-App 顶上出现网站 logo+汉堡 | ≤900px `/china-trips` 不得渲染站点 `Navbar`/`Footer`（见 `App.tsx`）；勿只靠组件内 CSS。断点是 900，不是 `useIsMobile` 的 768 |
 | 订单 Account 看不到、但确认信有 | 登录认领只按 `lead_email`；邮箱不一致时用确认信/成功页链接绑定：`POST /api/claim-orders` + `orderNumber`+`token` 或 `sessionId`（OrderSuccess / My Orders 粘贴） |
 | 首页 Curated「View Itinerary」仍进 `/china-trips` 总览 | 桌面链 `/tours/:slug`；手机链 `/china-trips?route={slug}`（打开详情后清 query） |
+| RouteDetail 段导航（Itinerary/Included/FAQ/Price）切过中间内容 | 子导航 `sticky top-24` 假定主 Navbar 仍占顶；`/tours/` 上勿对主 Navbar 做下滚隐藏（`-translate-y-full`），否则会空出顶距让正文从缝里穿过 |
 | Home traveler story 又改回 CSS `real-story-slide` 自动切 | 已改为 Embla JS 轮播（交互暂停 + 8s 恢复、圆点可点）；不要恢复无限 CSS 动画；图片 marquee 是另一套，勿混改 |
 | Mini-App 无回门户入口 | 顶栏品牌 Syncing Travel + Me「Back to website」链到 `/`；勿把预订主路径改成外跳 |
 | `AGENTS.md` 不是知识库 | 详细内容放入对应 `docs/` 文件 |

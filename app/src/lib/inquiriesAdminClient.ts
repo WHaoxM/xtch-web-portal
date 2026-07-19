@@ -1,5 +1,5 @@
 export type InquiryStatus = 'new' | 'in_progress' | 'closed';
-export type InquiryType = 'quick_contact' | 'custom_trip' | 'route_private';
+export type InquiryType = 'quick_contact' | 'custom_trip' | 'route_private' | 'group_tour_inquiry';
 
 export type AdminInquiryListItem = {
   id: string;

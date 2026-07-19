@@ -45,6 +45,11 @@ export default function Navbar() {
 
   const searchResults = useMemo(() => searchSite(searchQuery, searchQuery.trim() ? 8 : 6), [searchQuery]);
 
+  // Tour detail keeps a sticky section nav under the site header. Hiding this bar
+  // would leave a gap that page content scrolls through, looking like a mid-page cut.
+  const keepNavbarVisible = location.pathname.startsWith('/tours/');
+  const navbarSlideHidden = !keepNavbarVisible && hidden && !mobileOpen;
+
   useEffect(() => {
     const handleScroll = () => {
       const y = window.scrollY;
@@ -199,8 +204,14 @@ export default function Navbar() {
 
   const usesTransparentHero =
     location.pathname === '/' ||
+    location.pathname === '/featured-services' ||
+    location.pathname === '/custom-trip' ||
+    location.pathname === '/contact' ||
+    location.pathname === '/travel-guide' ||
+    location.pathname === '/destinations' ||
+    location.pathname.startsWith('/destinations/') ||
     location.pathname.startsWith('/tours/') ||
-    location.pathname === '/custom-trip';
+    location.pathname.startsWith('/travel-guide/');
   const isTransparent = usesTransparentHero && !scrolled;
   const isActivePath = (path: string) =>
     path === '/' ? location.pathname === '/' : location.pathname === path || location.pathname.startsWith(`${path}/`);
@@ -232,26 +243,26 @@ export default function Navbar() {
             ? 'china-trips-miniapp-nav'
             : ''
         } ${
-          hidden && !mobileOpen ? '-translate-y-full' : 'translate-y-0'
+          navbarSlideHidden ? '-translate-y-full' : 'translate-y-0'
         } ${
           isTransparent
             ? 'bg-transparent'
-            : 'bg-white/92 shadow-[0_1px_0_rgba(0,0,0,0.06)] backdrop-blur-xl'
+            : 'bg-white/90 shadow-[0_1px_0_rgba(0,0,0,0.06)] backdrop-blur-xl'
         }`}
       >
         <div className="mx-auto max-w-[1760px] px-6 md:px-10 xl:px-12">
           <div className="flex items-start justify-between py-4 xl:pt-6 xl:pb-4">
-            <Link to="/" className="shrink-0 pt-0.5">
+            <Link to="/" className="shrink-0 self-center">
               <img
-                src={brand.logoSrc}
+                src={isTransparent ? brand.logoOnDarkSrc : brand.logoSrc}
                 alt={brand.fullName}
-                className={`h-auto rounded-full transition-all duration-300 ${
-                  isTransparent ? 'w-[88px] opacity-100 xl:w-[128px]' : 'w-[82px] opacity-95 xl:w-[104px]'
+                className={`w-auto object-contain transition-all duration-300 ${
+                  isTransparent ? 'h-10 opacity-100 xl:h-12' : 'h-9 opacity-95 xl:h-11'
                 }`}
               />
             </Link>
 
-            <div className="hidden items-center gap-8 pt-4 xl:flex">
+            <div className="hidden items-center gap-8 pt-4 lg:flex">
               <Link
                 to="/"
                 className={`relative whitespace-nowrap text-[16px] font-bold transition-colors duration-300 ${
@@ -361,7 +372,7 @@ export default function Navbar() {
               ))}
             </div>
 
-            <div className="hidden items-center gap-5 pt-3 xl:flex">
+            <div className="hidden items-center gap-5 pt-3 lg:flex">
               <Link
                 to="/custom-trip"
                 className={`text-[16px] font-bold transition-colors ${
@@ -393,7 +404,7 @@ export default function Navbar() {
               type="button"
               aria-label="Open menu"
               onClick={() => setMobileOpen(true)}
-              className={`mt-1 rounded-md p-2 transition-colors xl:hidden ${
+              className={`mt-1 rounded-md p-2 transition-colors lg:hidden ${
                 isTransparent
                   ? 'text-white hover:bg-white/10'
                   : 'text-[#002A3A] hover:bg-[#F6FAFE]'
@@ -426,7 +437,7 @@ export default function Navbar() {
             <img
               src={brand.logoSrc}
               alt={brand.fullName}
-              className="h-auto w-[86px] rounded-full"
+              className="h-9 w-auto object-contain"
             />
             <button
               type="button"
