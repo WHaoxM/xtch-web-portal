@@ -101,7 +101,7 @@ const destinationMeta = [
   {
     name: 'Tibet',
     slug: 'tibet',
-    image: '/images/route-tibet-ali.jpg',
+    image: '/images/route-tibet-yamdrok-01.jpg',
     description:
       'Tibet routes include Ali, Yamdrok Lake, Namtso, Lhasa, monastery culture, plateau scenery, and altitude-aware pacing.',
   },

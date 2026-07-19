@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -18,6 +19,7 @@ import {
   Users,
 } from 'lucide-react';
 import { getDestinationBySlug, getRouteTourBySlug } from '@/lib/contentStore';
+import { GroupTourInquiryModal, PrivateQuoteModal } from '@/components/RouteInquiryModals';
 import { getRoutePdfDetail, type RoutePdfDetail } from '@/lib/routePdfDetails';
 import { routeGenericFaqs } from '@/lib/seo/faqPacks';
 
@@ -83,6 +85,8 @@ const fallbackGallery = [
 export default function RouteDetail() {
   const { slug = '' } = useParams();
   const tour = getRouteTourBySlug(slug);
+  const [groupModalOpen, setGroupModalOpen] = useState(false);
+  const [privateModalOpen, setPrivateModalOpen] = useState(false);
 
   if (!tour) {
     return (
@@ -133,7 +137,7 @@ export default function RouteDetail() {
         </div>
       </section>
 
-      <nav className="sticky top-[76px] z-30 rounded-b-[10px] bg-white shadow-[0_12px_34px_rgba(0,0,0,0.08)]">
+      <nav className="sticky top-24 z-30 rounded-b-[10px] bg-white shadow-[0_12px_34px_rgba(0,0,0,0.08)]">
         <div className="mx-auto grid max-w-[1320px] grid-cols-4 text-center">
           {[
             ['Itinerary', '#itinerary'],
@@ -240,7 +244,7 @@ export default function RouteDetail() {
               </div>
             </section>
 
-            <section id="itinerary" className="mt-28">
+            <section id="itinerary" className="mt-28 scroll-mt-48">
               <h2 className="mx-auto max-w-[880px] text-center font-serif text-[42px] font-medium leading-tight text-[#073846] md:text-[54px]">
                 {tour.title}-Day-by-Day Itinerary:
               </h2>
@@ -267,7 +271,7 @@ export default function RouteDetail() {
               </div>
             </section>
 
-            <section id="included" className="mt-28">
+            <section id="included" className="mt-28 scroll-mt-48">
               <h2 className="font-serif text-[42px] font-medium text-[#111] md:text-[52px]">
                 Tour Price Inclusions &amp; Exclusions
               </h2>
@@ -312,7 +316,7 @@ export default function RouteDetail() {
               </div>
             </section>
 
-            <section id="faq" className="mt-28">
+            <section id="faq" className="mt-28 scroll-mt-48">
               <h2 className="mx-auto max-w-[900px] text-center font-serif text-[42px] font-medium leading-tight text-[#111] md:text-[52px]">
                 {tour.title} FAQs
               </h2>
@@ -330,21 +334,23 @@ export default function RouteDetail() {
             </section>
           </main>
 
-          <aside id="price" className="lg:sticky lg:top-[150px] lg:self-start">
+          <aside id="price" className="scroll-mt-48 lg:sticky lg:top-48 lg:self-start">
             <div className="rounded-[10px] border border-[#c9d8e8] bg-[#eaf4ff] p-8 text-center">
               <p className="font-serif text-[36px] text-[#073846]">Private quote</p>
-              <Link
-                to={`/custom-trip?tour=${encodeURIComponent(tour.title)}`}
+              <button
+                type="button"
+                onClick={() => setGroupModalOpen(true)}
                 className="mt-7 inline-flex min-h-[56px] w-full items-center justify-center rounded-[8px] bg-[#ef4f43] px-5 text-[20px] font-semibold text-white"
               >
                 Group tour inquiry
-              </Link>
-              <Link
-                to={`/custom-trip?tour=${encodeURIComponent(tour.title)}`}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPrivateModalOpen(true)}
                 className="mt-4 inline-flex min-h-[56px] w-full items-center justify-center rounded-[8px] bg-[#00394a] px-5 text-[20px] font-semibold text-white"
               >
                 Get a Private Quote
-              </Link>
+              </button>
               <div className="mt-8 space-y-5 text-left text-[16px] leading-7 text-[#6b7378]">
                 <p className="flex gap-4">
                   <Users className="mt-1 shrink-0" size={24} />
@@ -385,6 +391,17 @@ export default function RouteDetail() {
           </aside>
         </div>
       </section>
+
+      <GroupTourInquiryModal
+        open={groupModalOpen}
+        onOpenChange={setGroupModalOpen}
+        tour={{ slug: tour.slug, title: tour.title, duration: tour.duration }}
+      />
+      <PrivateQuoteModal
+        open={privateModalOpen}
+        onOpenChange={setPrivateModalOpen}
+        tour={{ slug: tour.slug, title: tour.title, duration: tour.duration }}
+      />
     </div>
   );
 }

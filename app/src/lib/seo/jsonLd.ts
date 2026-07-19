@@ -24,6 +24,8 @@ export function buildOrganizationNode() {
     email: brand.email,
     telephone: brand.phone,
     description: brand.description,
+    logo: toAbsoluteAssetUrl(brand.logoSrc),
+    image: toAbsoluteAssetUrl(brand.iconSrc),
     sameAs: [...SOCIAL_PROFILES],
     address: {
       '@type': 'PostalAddress',

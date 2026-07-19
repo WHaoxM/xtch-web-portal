@@ -1,4 +1,4 @@
-export type InquiryType = 'quick_contact' | 'custom_trip' | 'route_private';
+export type InquiryType = 'quick_contact' | 'custom_trip' | 'route_private' | 'group_tour_inquiry';
 
 export type InquirySubmission = {
   type: InquiryType;

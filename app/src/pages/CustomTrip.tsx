@@ -38,7 +38,7 @@ const destinations = [
   { name: 'Huangshan', image: '/images/zhangjiajie-avatar-hallelujah-mountain-destination-card.jpg' },
   { name: 'Jiuzhaigou', image: '/images/route-jiuzhaigou.jpg' },
   { name: 'Yunnan', image: '/images/route-yunnan-lijiang.jpg' },
-  { name: 'Tibet', image: '/images/route-tibet-ali.jpg' },
+  { name: 'Tibet', image: '/images/route-tibet-yamdrok-01.jpg' },
   { name: 'Xinjiang', image: '/images/route-xinjiang-yili.jpg' },
   { name: 'Yangtze River Cruise', image: '/images/ref-banner-misty-river.jpg' },
   { name: 'Other', image: '/images/logo-tocn-reference.png' },

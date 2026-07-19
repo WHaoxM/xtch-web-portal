@@ -10,6 +10,7 @@ export const INQUIRY_TYPE_LABELS: Record<InquiryType, string> = {
   quick_contact: '快捷联系',
   custom_trip: '定制行程',
   route_private: '路线私人定制',
+  group_tour_inquiry: '拼团询价',
 };
 
 export const INQUIRY_STATUS_HINTS: Record<InquiryStatus, string> = {
@@ -50,6 +51,15 @@ export const INQUIRY_TYPE_OPS: Record<InquiryType, InquiryTypeOpsCopy> = {
       '确认意向路线是否正确、是否需微调天数/景点',
       '问清出发月份、人数与预算弹性',
       '说明私人团与拼团的差异及下一步报价',
+    ],
+  },
+  group_tour_inquiry: {
+    label: '拼团询价',
+    summary: '客人基于某条现有路线询问拼团（小团）出发日期、人数与房型，暂不锁库存，需人工核实实际班期后回复价格与可订状态。',
+    replyTips: [
+      '核对该路线近期真实班期是否有客人期望月份附近的团期',
+      '确认人数与房型（是否需拼房/单房差）',
+      '回复可用团期、价格与下一步确认方式',
     ],
   },
 };

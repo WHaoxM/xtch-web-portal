@@ -13,7 +13,14 @@ export const brand = {
   website: 'https://www.xuntingtravel.com/',
   address:
     'Room 201, 2/F, Block C, Yibin Big Data Industrial Park Phase II, Guoxing Avenue, Lingang Economic Zone, Yibin, Sichuan, China',
-  logoSrc: '/images/logo.svg',
+  /** Horizontal Syncing wordmark (transparent bg) for light surfaces. */
+  logoSrc: '/images/logo.png',
+  /** Same horizontal lockup with light wordmark for dark surfaces. */
+  logoOnDarkSrc: '/images/logo-on-dark.png',
+  /** Blue S mark only (no wordmark) — footer / compact uses. */
+  logoMarkSrc: '/images/logo-mark.png',
+  /** Site favicon — large blue S mark (same crop as footer). */
+  iconSrc: '/favicon-192.png',
 };
 
 export const guideArticles = [
