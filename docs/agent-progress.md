@@ -2,6 +2,75 @@
 
 ## Status
 
+**blocked（Subagent-4 SEO/prerender）** — 已审计现状；构建期内容真相源待用户确认后才能实现。未部署、未读真实生产数据、未改真实密钥。
+
+### Progress note（SEO/prerender 开工，2026-07-20）
+
+- 角色：`docs/release/v1-source-audit/04-seo-prerender.md` + README。
+- 已读：`prerender.mjs`、`seo-public-routes.mjs`、`generate-sitemap.mjs`、`Seo.tsx`、`routeMeta.ts`、`contentStore.ts`、`App.tsx` 内容门禁。
+- 现状证据：
+  1. prerender 静态服对 `/api/*` 回退 SPA HTML；`App` 内容加载失败仍 `contentDataLoaded=true`；`Seo` 无条件 `seoReady=1` → 空壳/not found 可进正式 HTML 且构建成功。
+  2. sitemap 含 20 条 `/tours/:slug`，`getPrerenderRoutes()` 不含。
+  3. 无 `*` 路由；未知路径回退首页 meta。
+  4. sitemap `lastmod` 每次 `new Date()`。
+- 门禁：已提交构建期数据方案，等用户确认后再改代码。
+- 下一步：确认真相源 → 实现 adapter + 统一路由 + 404/noindex + lastmod + 产物断言；向角色 2 交公开路由 manifest。
+
+**done（V1 审计角色 3：前端关键流程）** — 四项 P1 已修；typecheck/lint/build + 9 单元测试通过。未部署、未改真实 env。
+
+### Progress note（V1 审计 03 前端关键流程，2026-07-20）
+
+- 角色：`Auto (v1-audit-03-frontend-flows)`；用户确认：方案 A（sessionStorage 含 PII）+ 授权改 `Search.tsx`。
+- 已改：
+  1. Hash 内链 → `Link`：`DestinationDetail`、`Navbar` 搜索、`Search.tsx`；全仓无 `#${internalPath}`。
+  2. Stripe cancel：`sessionStorage` 草稿 TTL 30min；`checkout=cancelled` 恢复确认步+提示并清 query；success/失败开单/返回表单时清理。
+  3. `Account` 订单卡改为真实 `Link`。
+  4. Navbar 关菜单 `inert` + 焦点回触发钮。
+- 测试：`scripts/hashLegacyRedirect.test.ts` + `scripts/checkoutCancelDraft.test.ts`（9 pass）。
+- 验证：`npm run typecheck` / `lint` / `build` 全绿。
+- May Touch：`checkoutClient.ts`、`hashLegacyRedirect.ts`、`chinaTripsMobile.css`、`Search.tsx`（经批准）。
+- 未验证：真实 Stripe Cancel 端到端、320/375/390 手工键盘走查。
+- 下一步：交给协调代理收口；浏览器回归可选。
+
+**done（V1 预订/支付一致性 · Subagent-1）** — A/B/C 已实现；真实 `xtch` PG 集成 6/6 + 本地签名 webhook E2E 4/4 + 单元 12/12；typecheck/lint/build 全绿。
+
+### Progress note（预订与支付一致性 · PG/Webhook 验证，2026-07-20）
+
+- PG 集成（`localhost/xtch`，非生产）：并发 hold 拒绝、fail 释放、A1 过期、邮箱限流 5、取消门禁、全额退款释放 consumed。
+- Webhook E2E：本地 `whsec` 签名；expired 释放；unpaid completed 不确认；charge.refunded 部分→累计全额 + 幂等；Charge.amount 陷阱。
+- E2E 中发现并修复：`canAutoReleaseSeats` 的 `EXTRACT(DAY FROM date-date)` 在 PG 报 42883 → 改为 `(start_date - CURRENT_DATE)::int`。
+- 环境限制：各 env 均无 `sk_test`；未走 Stripe 网络 API（PI retrieve / refund.updated charge.retrieve）。有 test key 后可补付费确认与 refund.updated 真网测。
+- 声明：未部署、未访问生产库、未改真实密钥、未启用 Stripe live。
+
+### Progress note（预订与支付一致性收口，2026-07-20）
+
+- 确认：A=推荐限流+A1+同主体拒绝+建议频率+TRUST_PROXY 仅 Caddy；B=B1 仅卡；C=仅 confirmed+paid，幂等，部分退款不可申请。
+- 已改 Owns：checkout-session / stripe-webhook / orders / lib/{orders,orderQueries,availability,bookingSchema}；新建 bookingIntegrity + checkoutRateLimit + 测试。
+- May Touch：`vite.config.ts`、`serve-selfhost.mjs` 传入 `socket.remoteAddress`。
+- 交接角色 6：Caddy 后环境设 `TRUST_PROXY=1`（未改 env examples）。
+- 交接角色 5：建议 `test:booking-integrity` 脚本（未改 package.json）。
+- 已验证：见上方 PG/Webhook note + 单元 + typecheck/lint/build。
+
+**done（About 数据统计区编辑感动效）** — Playfair 数字、Manrope 标签、稳定单行数值、响应式分隔线与遮罩错峰揭示已完成。
+
+### Progress note（About 数据统计区，2026-07-20）
+
+- 依据：用户选中统计 section；当前大号粗黑 sans + mono 标签偏仪表盘感，`60K +` / `100 %` / `15 Years` 在桌面列内发生不美观换行。
+- 已改：`60K+ / 50+ / 100% / 15 Years` 单行；Playfair Display 500 数值 + Manrope 500 标签；两列移动/四列桌面；移动行列分隔线与桌面列分隔线。
+- 动效：30% 入视口触发、90ms 错峰；分隔线中心绘制、数值遮罩上揭、标签随后淡入；`viewport.once` 确认不重播。
+- 范围：仅 `About.tsx` 数据统计区；不改四项业务事实、不改全局字体/动画、不新增依赖。
+- 已验证：`npm run build`、`npm run lint`、IDE lints 全绿；390/1024/1280 数值均单行且无横向溢出；正常动效初始隐藏→完成态，离开再进入不重播；reduced-motion 在区块未入视口时已直接显示完成态。
+
+**done（About Mission & Vision 精致化）** — 缩小区块与字体，平衡标题换行，并局部明确 Playfair Display / Archivo / Manrope 字体角色。
+
+### Progress note（About Mission & Vision 比例，2026-07-20）
+
+- 依据：用户截图和浏览器选中节点；原 1024px 档使用 128px 上下留白、24px 标签、58px 标题、30px 正文，且标题自然换行不均衡、正文行长偏宽。
+- 已改：390px 为 56px 留白 / 30px 标题 / 16px 正文；1024px 为 72px / 42px / 17px；1280px+ 为 88px / 46px。桌面标题受控为两行，正文宽度收至 780px。
+- 字体：标题 Playfair Display 400、标签 Archivo 600、正文 Manrope 400；均复用已有字体变量，无新依赖、无全局字体改动。
+- 范围：仅 `About.tsx` 的 Mission & Vision section；不改其他 About 板块、图片、产品文案、全局字体或依赖。
+- 已验证：`npm run build`、`npm run lint`、IDE lints 全绿；浏览器实测 390/1024/1280，无水平溢出，字体与断点值符合设计。
+
 **blocked（公网内容同步）** — sitemap MIME + 导入脚本已修；本机 `xtch_prod` 已有 20 路线/12 目的地/627 素材；公网 `api/routes` 仍 `[]`（DNS→cloud-vps）。等 VPS SSH。
 
 ### Progress note（SEO MIME + 内容导入，2026-07-20）

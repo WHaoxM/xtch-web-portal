@@ -305,6 +305,23 @@ export async function ensureBookingTables() {
   await sql`CREATE INDEX IF NOT EXISTS inventory_holds_status_idx ON inventory_holds (status)`;
   await sql`CREATE INDEX IF NOT EXISTS inventory_holds_session_idx ON inventory_holds (stripe_checkout_session_id)`;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS checkout_rate_buckets (
+      bucket_key TEXT PRIMARY KEY,
+      dimension TEXT NOT NULL,
+      subject_key TEXT NOT NULL,
+      hit_count INTEGER NOT NULL DEFAULT 0,
+      window_start TIMESTAMPTZ NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      CONSTRAINT checkout_rate_buckets_hit_positive CHECK (hit_count >= 0)
+    )
+  `;
+  await sql`
+    CREATE INDEX IF NOT EXISTS checkout_rate_buckets_expires_at_idx
+    ON checkout_rate_buckets (expires_at)
+  `;
+
   await sql`CREATE INDEX IF NOT EXISTS stripe_webhook_events_event_id_idx ON stripe_webhook_events (stripe_event_id)`;
   await sql`CREATE INDEX IF NOT EXISTS audit_logs_target_idx ON audit_logs (target_type, target_id)`;
 

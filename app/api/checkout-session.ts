@@ -1,4 +1,6 @@
 import { ensureBookingTables } from './lib/bookingSchema';
+import { resolveClientIp } from './lib/bookingIntegrity';
+import { assertCheckoutRateLimits } from './lib/checkoutRateLimit';
 import { getStripe, isDevCheckoutBypassEnabled, isStripeConfigured } from './lib/stripe';
 import {
   attachStripeSessionToOrder,
@@ -7,6 +9,8 @@ import {
 } from './lib/orders';
 import {
   confirmOrderAndConsumeHold,
+  expireExpiredHolds,
+  failOrderAndReleaseHold,
   findOrderByOrderNumber,
   updateConfirmationEmailStatus,
 } from './lib/orderQueries';
@@ -17,6 +21,7 @@ type VercelRequestLike = {
   method?: string;
   headers: Record<string, string | string[] | undefined>;
   body?: unknown;
+  socket?: { remoteAddress?: string | null };
 };
 
 type VercelResponseLike = {
@@ -51,6 +56,8 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
     return;
   }
 
+  let createdOrderId: string | undefined;
+
   try {
     const stripeConfigured = isStripeConfigured();
     const checkoutBypass = !stripeConfigured && isDevCheckoutBypassEnabled();
@@ -68,6 +75,21 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
     }
 
     await ensureBookingTables();
+
+    const clientIp = resolveClientIp({
+      headers: req.headers,
+      socketRemoteAddress: req.socket?.remoteAddress,
+    });
+
+    const rateLimit = await assertCheckoutRateLimits({
+      ip: clientIp,
+      email: payload.email!,
+      departurePublicId: payload.departureId!,
+    });
+    if (!rateLimit.ok) {
+      res.status(429).json({ ok: false, error: rateLimit.error });
+      return;
+    }
 
     let userId: string | undefined;
     if (payload.accessToken) {
@@ -90,6 +112,8 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
       return;
     }
 
+    await expireExpiredHolds(departure.id);
+
     const holdExpiresAt = new Date(Date.now() + CHECKOUT_SESSION_TTL_MINUTES * 60 * 1000);
 
     const travelers = payload.travelers!;
@@ -106,6 +130,7 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
       holdExpiresAt,
       userId,
     });
+    createdOrderId = order.id;
 
     const origin = getOrigin(req);
 
@@ -146,40 +171,57 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
       process.env.STRIPE_CHECKOUT_CANCEL_URL ||
       `${origin}/china-trips?checkout=cancelled&order=${order.orderNumber}`;
 
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      line_items: [
-        {
-          quantity: order.adultQuantity,
-          price_data: {
-            currency: 'usd',
-            unit_amount: departure.adult_unit_price_cents,
-            product_data: {
-              name: `Syncing Travel · ${departure.route_title}`,
-              description: `${departure.departure_city} · ${departure.start_date} to ${departure.end_date}`,
+    let session;
+    try {
+      session = await stripe.checkout.sessions.create({
+        mode: 'payment',
+        // V1 B1: instant card only — no async payment methods.
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            quantity: order.adultQuantity,
+            price_data: {
+              currency: 'usd',
+              unit_amount: departure.adult_unit_price_cents,
+              product_data: {
+                name: `Syncing Travel · ${departure.route_title}`,
+                description: `${departure.departure_city} · ${departure.start_date} to ${departure.end_date}`,
+              },
             },
           },
+        ],
+        customer_email: payload.email!,
+        client_reference_id: order.orderNumber,
+        metadata: {
+          type: 'fixed_departure_booking',
+          order_number: order.orderNumber,
+          departure_id: departure.id,
+          departure_public_id: departure.public_id,
         },
-      ],
-      customer_email: payload.email!,
-      client_reference_id: order.orderNumber,
-      metadata: {
-        type: 'fixed_departure_booking',
-        order_number: order.orderNumber,
-        departure_id: departure.id,
-        departure_public_id: departure.public_id,
-      },
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      expires_at: Math.floor(holdExpiresAt.getTime() / 1000),
-      locale: 'en',
-    });
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        expires_at: Math.floor(holdExpiresAt.getTime() / 1000),
+        locale: 'en',
+      });
+    } catch (stripeError) {
+      await failOrderAndReleaseHold(order.id);
+      createdOrderId = undefined;
+      throw stripeError;
+    }
 
     if (!session.id || !session.url) {
+      await failOrderAndReleaseHold(order.id);
+      createdOrderId = undefined;
       throw new Error('Stripe did not return a checkout session.');
     }
 
-    await attachStripeSessionToOrder(order.id, hold.id, session.id);
+    try {
+      await attachStripeSessionToOrder(order.id, hold.id, session.id);
+    } catch (attachError) {
+      await failOrderAndReleaseHold(order.id);
+      createdOrderId = undefined;
+      throw attachError;
+    }
 
     res.status(200).json({
       ok: true,
@@ -191,10 +233,19 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
   } catch (error) {
     console.error('Checkout session creation failed:', error);
 
+    if (createdOrderId) {
+      try {
+        await failOrderAndReleaseHold(createdOrderId);
+      } catch (cleanupError) {
+        console.error('Failed to release hold after checkout error:', cleanupError);
+      }
+    }
+
     if (error instanceof Error) {
       if (
         error.message.includes('no longer available') ||
-        error.message.includes('Not enough seats')
+        error.message.includes('Not enough seats') ||
+        error.message.includes('already have an open checkout')
       ) {
         res.status(409).json({ ok: false, error: error.message });
         return;

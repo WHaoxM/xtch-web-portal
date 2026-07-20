@@ -1,4 +1,4 @@
-import { type FormEvent, type KeyboardEvent, useEffect, useMemo, useState } from 'react';
+import { type FormEvent, type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowRight, ChevronDown, MapPin, Menu, Search, Sparkles, X } from 'lucide-react';
 import { searchSite, type SearchResult } from '@/lib/searchIndex';
@@ -42,6 +42,9 @@ export default function Navbar() {
   const [searchQuery, setSearchQuery] = useState('');
   const location = useLocation();
   const navigate = useNavigate();
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const closeMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const wasMobileOpenRef = useRef(false);
 
   const searchResults = useMemo(() => searchSite(searchQuery, searchQuery.trim() ? 8 : 6), [searchQuery]);
 
@@ -105,6 +108,15 @@ export default function Navbar() {
     return () => document.removeEventListener('pointerdown', closeOnPointerDown);
   }, [chinaTripsOpen]);
 
+  useEffect(() => {
+    if (mobileOpen && !wasMobileOpenRef.current) {
+      closeMenuButtonRef.current?.focus();
+    } else if (!mobileOpen && wasMobileOpenRef.current) {
+      menuButtonRef.current?.focus();
+    }
+    wasMobileOpenRef.current = mobileOpen;
+  }, [mobileOpen]);
+
   const openSearch = () => {
     setSearchOpen(true);
   };
@@ -146,7 +158,8 @@ export default function Navbar() {
 
   const isAssetHref = (href: string) => href.startsWith('/assets/') || href.endsWith('.pdf');
 
-  const linkHref = (href: string) => (isAssetHref(href) ? href : `#${href}`);
+  const searchResultClassName =
+    'block rounded-lg px-3 py-3 transition-colors hover:bg-[#F6FAFE]';
 
   const renderSearchPanel = (inputId: string, className: string) => (
     <form
@@ -171,21 +184,35 @@ export default function Navbar() {
       </div>
       <div className="mt-3 max-h-[330px] overflow-y-auto">
         {searchResults.length > 0 ? (
-          searchResults.map((item) => (
-            <a
-              key={item.id}
-              href={linkHref(item.href)}
-              target={isAssetHref(item.href) ? '_blank' : undefined}
-              rel={isAssetHref(item.href) ? 'noopener noreferrer' : undefined}
-              className="block rounded-lg px-3 py-3 transition-colors hover:bg-[#F6FAFE]"
-              onClick={() => setSearchOpen(false)}
-            >
-              <span className="block text-[13px] font-semibold text-[#002A3A]">{item.title}</span>
-              <span className="mt-1 block text-[12px] text-[#88929C]">
-                {item.type} / {resultDetail(item)}
-              </span>
-            </a>
-          ))
+          searchResults.map((item) =>
+            isAssetHref(item.href) ? (
+              <a
+                key={item.id}
+                href={item.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={searchResultClassName}
+                onClick={() => setSearchOpen(false)}
+              >
+                <span className="block text-[13px] font-semibold text-[#002A3A]">{item.title}</span>
+                <span className="mt-1 block text-[12px] text-[#88929C]">
+                  {item.type} / {resultDetail(item)}
+                </span>
+              </a>
+            ) : (
+              <Link
+                key={item.id}
+                to={item.href}
+                className={searchResultClassName}
+                onClick={() => setSearchOpen(false)}
+              >
+                <span className="block text-[13px] font-semibold text-[#002A3A]">{item.title}</span>
+                <span className="mt-1 block text-[12px] text-[#88929C]">
+                  {item.type} / {resultDetail(item)}
+                </span>
+              </Link>
+            ),
+          )
         ) : (
           <p className="px-3 py-5 text-[13px] leading-6 text-[#5D5D5D]">
             No matching destinations or routes. Try Beijing, Chengdu, Silk Road, or Jiuzhaigou.
@@ -401,8 +428,11 @@ export default function Navbar() {
             </div>
 
             <button
+              ref={menuButtonRef}
               type="button"
               aria-label="Open menu"
+              aria-expanded={mobileOpen}
+              aria-controls="site-mobile-menu"
               onClick={() => setMobileOpen(true)}
               className={`mt-1 rounded-md p-2 transition-colors lg:hidden ${
                 isTransparent
@@ -424,7 +454,12 @@ export default function Navbar() {
       )}
 
       <div
+        id="site-mobile-menu"
+        role="dialog"
+        aria-modal={mobileOpen}
+        aria-label="Site menu"
         aria-hidden={!mobileOpen}
+        inert={!mobileOpen ? true : undefined}
         className={`fixed top-0 right-0 bottom-0 z-[70] w-[320px] transform bg-white transition-transform duration-500 ${
           mobileOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
@@ -440,6 +475,7 @@ export default function Navbar() {
               className="h-9 w-auto object-contain"
             />
             <button
+              ref={closeMenuButtonRef}
               type="button"
               aria-label="Close menu"
               onClick={() => setMobileOpen(false)}

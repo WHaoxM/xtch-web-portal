@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
+import { motion, useReducedMotion, type Variants } from 'motion/react';
 import { useScrollAnimation } from '../hooks/useScrollAnimation';
 import { brand } from '@/lib/siteData';
 
@@ -48,15 +49,15 @@ const chooseItems = [
 
 const aboutStats = [
   {
-    value: '60K +',
+    value: '60K+',
     label: 'Guests Served Worldwide',
   },
   {
-    value: '50 +',
+    value: '50+',
     label: 'Countries Served Worldwide',
   },
   {
-    value: '100 %',
+    value: '100%',
     label: 'China-Based Expert Team',
   },
   {
@@ -64,6 +65,101 @@ const aboutStats = [
     label: 'Deep China Expertise',
   },
 ];
+
+const editorialEase = [0.22, 1, 0.36, 1] as const;
+
+const statsGridVariants: Variants = {
+  hidden: {},
+  visible: { transition: { delayChildren: 0.05, staggerChildren: 0.09 } },
+};
+
+const statItemVariants: Variants = {
+  hidden: { opacity: 0, y: 16 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.65, ease: editorialEase } },
+};
+
+const statValueVariants: Variants = {
+  hidden: { y: '115%' },
+  visible: { y: 0, transition: { duration: 0.65, ease: editorialEase } },
+};
+
+const statLabelVariants: Variants = {
+  hidden: { opacity: 0, y: 8 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { delay: 0.12, duration: 0.5, ease: editorialEase },
+  },
+};
+
+const verticalDividerVariants: Variants = {
+  hidden: { scaleY: 0 },
+  visible: { scaleY: 1, transition: { duration: 0.7, ease: editorialEase } },
+};
+
+const horizontalDividerVariants: Variants = {
+  hidden: { scaleX: 0 },
+  visible: { scaleX: 1, transition: { duration: 0.7, ease: editorialEase } },
+};
+
+function AboutStatsSection() {
+  const reduceMotion = useReducedMotion();
+
+  return (
+    <section className="bg-[#f5fafc] px-6 py-14 md:px-10 md:py-16 xl:px-20 xl:py-[72px]">
+      <motion.div
+        className="mx-auto grid max-w-[1280px] grid-cols-2 text-center lg:grid-cols-4"
+        variants={statsGridVariants}
+        initial={reduceMotion ? false : 'hidden'}
+        whileInView="visible"
+        viewport={{ once: true, amount: 0.3 }}
+      >
+        {aboutStats.map((stat, index) => (
+          <motion.article
+            key={stat.label}
+            className="relative flex min-h-[145px] flex-col items-center justify-center px-2 py-7 md:min-h-[165px] md:px-6 md:py-8"
+            variants={statItemVariants}
+          >
+            {index > 0 && (
+              <motion.span
+                aria-hidden="true"
+                className={`pointer-events-none absolute inset-y-3 left-0 w-px bg-[#cbd8de] ${
+                  index === 2 ? 'hidden lg:block' : 'block'
+                }`}
+                variants={verticalDividerVariants}
+                style={{ transformOrigin: 'center' }}
+              />
+            )}
+            {index >= 2 && (
+              <motion.span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-x-3 top-0 h-px bg-[#cbd8de] lg:hidden"
+                variants={horizontalDividerVariants}
+                style={{ transformOrigin: 'center' }}
+              />
+            )}
+            <div className="overflow-hidden py-1">
+              <motion.p
+                className="whitespace-nowrap text-[40px] font-medium leading-none tracking-[-0.03em] text-[#142f3a] md:text-[50px] xl:text-[60px]"
+                variants={statValueVariants}
+                style={{ fontFamily: 'var(--font-serif)' }}
+              >
+                {stat.value}
+              </motion.p>
+            </div>
+            <motion.p
+              className="mt-4 max-w-[160px] text-[13px] font-medium leading-[1.45] tracking-[0.015em] text-[#35515d] md:text-[14px]"
+              variants={statLabelVariants}
+              style={{ fontFamily: 'var(--font-sans)' }}
+            >
+              {stat.label}
+            </motion.p>
+          </motion.article>
+        ))}
+      </motion.div>
+    </section>
+  );
+}
 
 export default function About() {
   useScrollAnimation('.about-replica-anim');
@@ -100,15 +196,25 @@ export default function About() {
         </div>
       </section>
 
-      <section className="bg-[#fbfbfb] px-6 py-20 text-center md:px-10 md:py-32 xl:py-40">
-        <div className="about-replica-anim animate-fade-up mx-auto max-w-[1500px]">
-          <p className="text-[15px] font-semibold uppercase tracking-[0.34em] text-[#786076] md:text-[24px]">
+      <section className="bg-[#fbfbfb] px-6 py-14 text-center md:px-10 md:py-[72px] xl:py-[88px]">
+        <div className="about-replica-anim animate-fade-up mx-auto max-w-[1040px]">
+          <p
+            className="text-[12px] font-semibold uppercase tracking-[0.32em] text-[#786076]"
+            style={{ fontFamily: 'var(--font-display)' }}
+          >
             Our Mission &amp; Vision
           </p>
-          <h2 className="mt-5 font-serif text-[36px] font-normal leading-snug text-[#55585b] md:text-[58px] xl:text-[68px]">
-            In the Name of Nature, Embark on a Grand Journey of the Soul
+          <h2
+            className="mx-auto mt-[18px] max-w-[900px] text-[30px] font-normal leading-[1.14] tracking-[-0.012em] text-[#55585b] md:text-[42px] xl:text-[46px]"
+            style={{ fontFamily: 'var(--font-serif)' }}
+          >
+            <span className="md:block">In the Name of Nature, Embark</span>{' '}
+            <span className="md:block">on a Grand Journey of the Soul</span>
           </h2>
-          <p className="mx-auto mt-12 max-w-[1360px] text-[18px] leading-8 text-[#888a98] md:text-[30px] md:leading-[1.45]">
+          <p
+            className="mx-auto mt-6 max-w-[780px] text-[16px] leading-[1.7] text-[#888a98] md:text-[17px]"
+            style={{ fontFamily: 'var(--font-sans)' }}
+          >
             We strive to make private travel feel calm, personal, and deeply connected to place.
             Through careful planning and local insight, we create China itineraries that balance
             iconic sights, hidden moments, comfort, and meaningful discovery.
@@ -116,24 +222,7 @@ export default function About() {
         </div>
       </section>
 
-      <section className="bg-[#f5fafc] px-6 py-14 md:px-10 md:py-20 xl:px-20">
-        <div className="about-replica-anim animate-fade-up mx-auto grid max-w-[1500px] grid-cols-1 gap-y-8 text-center sm:grid-cols-2 md:gap-y-10 lg:grid-cols-4">
-          {aboutStats.map((stat, index) => (
-            <div
-              key={stat.label}
-              className="px-4 sm:px-8 lg:border-l lg:border-[#d4dde3] first:lg:border-l-0 xl:px-12"
-              style={{ transitionDelay: `${index * 0.04}s` }}
-            >
-              <p className="font-sans text-[46px] font-semibold leading-none tracking-normal text-black md:text-[58px] xl:text-[68px]">
-                {stat.value}
-              </p>
-              <p className="mt-5 font-mono text-[17px] font-medium leading-snug tracking-normal text-[#183b4a] md:text-[20px] xl:text-[22px]">
-                {stat.label}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
+      <AboutStatsSection />
 
       <section className="bg-white px-6 pb-14 md:px-10 md:pb-24 xl:px-20 xl:pb-28">
         <div className="mx-auto max-w-[1740px]">

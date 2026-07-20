@@ -90,7 +90,7 @@ export default function RouteDetail() {
 
   if (!tour) {
     return (
-      <div className="section-padding bg-white py-32">
+      <div className="section-padding bg-white py-32" data-seo-content="missing">
         <div className="content-max-width max-w-3xl">
           <Link
             to="/china-trips"

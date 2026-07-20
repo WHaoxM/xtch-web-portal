@@ -5,21 +5,6 @@ import {
 } from '@/lib/contentStore';
 import { destinationContent } from '@/lib/destinationGuides';
 
-const DESTINATION_DISPLAY_NAMES: Record<string, string> = {
-  beijing: 'Beijing',
-  shanghai: 'Shanghai',
-  chengdu: 'Chengdu',
-  'western-sichuan': 'Western Sichuan',
-  chongqing: 'Chongqing',
-  yunnan: 'Yunnan',
-  guangxi: 'Guangxi',
-  qinghai: 'Qinghai',
-  gansu: 'Gansu',
-  xinjiang: 'Xinjiang',
-  tibet: 'Tibet',
-  xian: 'Xi’an',
-};
-
 export type PageMeta = {
   title: string;
   description: string;
@@ -29,6 +14,13 @@ export type PageMeta = {
 
 const INDEX_FOLLOW = 'index, follow, max-image-preview:large';
 const NOINDEX = 'noindex, nofollow';
+
+export const NOT_FOUND_META: PageMeta = {
+  title: 'Page Not Found | Syncing Travel',
+  description: 'This page is not available on Syncing Travel. Return home to browse China destinations and routes.',
+  image: '/images/hero-greatwall.jpg',
+  robots: NOINDEX,
+};
 
 const staticMeta: Record<string, PageMeta> = {
   '/': {
@@ -141,10 +133,15 @@ export function resolvePageMeta(pathname: string): PageMeta {
   if (destinationMatch) {
     const slug = destinationMatch[1];
     const destination = getDestinationBySlug(slug);
+    if (!destination) {
+      return {
+        ...NOT_FOUND_META,
+        title: 'Destination Not Found | Syncing Travel',
+      };
+    }
     const content = destinationContent[slug];
-    const name =
-      destination?.name ?? DESTINATION_DISPLAY_NAMES[slug] ?? slug.replace(/-/g, ' ');
-    const description = destination?.description
+    const name = destination.name;
+    const description = destination.description
       ? clipDescription(destination.description)
       : content
         ? clipDescription(content.overview)
@@ -152,7 +149,7 @@ export function resolvePageMeta(pathname: string): PageMeta {
     return {
       title: `${name} Travel Guide & Tours | Syncing Travel`,
       description,
-      image: destination?.image || '/images/hero-greatwall.jpg',
+      image: destination.image || '/images/hero-greatwall.jpg',
       robots: INDEX_FOLLOW,
     };
   }
@@ -170,11 +167,8 @@ export function resolvePageMeta(pathname: string): PageMeta {
       };
     }
     return {
-      title: 'China Tour Route | Syncing Travel',
-      description:
-        'Explore a Syncing Travel China route product with itinerary pacing, private quote options, and local trip support.',
-      image: '/images/hero-forbidden.jpg',
-      robots: INDEX_FOLLOW,
+      ...NOT_FOUND_META,
+      title: 'Route Not Found | Syncing Travel',
     };
   }
 
@@ -189,7 +183,11 @@ export function resolvePageMeta(pathname: string): PageMeta {
         robots: INDEX_FOLLOW,
       };
     }
+    return {
+      ...NOT_FOUND_META,
+      title: 'Guide Not Found | Syncing Travel',
+    };
   }
 
-  return staticMeta[pathname] ?? staticMeta['/'];
+  return staticMeta[pathname] ?? NOT_FOUND_META;
 }

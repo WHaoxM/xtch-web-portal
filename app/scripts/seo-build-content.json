@@ -1,0 +1,752 @@
+{
+  "version": 1,
+  "exportedAt": "2026-07-20T00:00:00.000Z",
+  "sourceEnv": "bootstrap-catalog",
+  "contentHash": "33e68b722b046073cd6ff851cfb63694edc83c76e84bb925602b6ee6375cdb70",
+  "destinationCount": 12,
+  "routeCount": 20,
+  "destinations": [
+    {
+      "slug": "beijing",
+      "name": "Beijing",
+      "description": "Beijing routes focus on the Forbidden City, Temple of Heaven, Great Wall, imperial history, and first-time China travel pacing.",
+      "image": "/images/dest-beijing.jpg",
+      "displayOrder": 1,
+      "status": "published",
+      "travelStyles": [],
+      "featuredOnHome": true,
+      "featuredPriority": 1
+    },
+    {
+      "slug": "shanghai",
+      "name": "Shanghai",
+      "description": "Shanghai routes are built around The Bund, city landmarks, water towns, modern skyline views, and short city-break planning.",
+      "image": "/images/dest-shanghai.jpg",
+      "displayOrder": 2,
+      "status": "published",
+      "travelStyles": [],
+      "featuredOnHome": true,
+      "featuredPriority": 2
+    },
+    {
+      "slug": "chengdu",
+      "name": "Chengdu",
+      "description": "Chengdu routes connect pandas, Sichuan food, city life, Jiuzhaigou, Huanglong, and broader Sichuan combinations.",
+      "image": "/images/dest-chengdu.jpg",
+      "displayOrder": 3,
+      "status": "published",
+      "travelStyles": [],
+      "featuredOnHome": true,
+      "featuredPriority": 3
+    },
+    {
+      "slug": "western-sichuan",
+      "name": "Western Sichuan",
+      "description": "Western Sichuan routes focus on snow mountains, Tibetan villages, Daocheng Yading, Jiuzhaigou, Huanglong, and photo-friendly highland travel.",
+      "image": "/images/route-sichuan-yading.jpg",
+      "displayOrder": 4,
+      "status": "published",
+      "travelStyles": [],
+      "featuredOnHome": true,
+      "featuredPriority": 4
+    },
+    {
+      "slug": "chongqing",
+      "name": "Chongqing",
+      "description": "Chongqing routes include layered mountain-city views, hotpot, Wulong karst scenery, night views, and Sichuan-Chongqing regional loops.",
+      "image": "/images/dest-chongqing.jpg",
+      "displayOrder": 5,
+      "status": "published",
+      "travelStyles": [],
+      "featuredOnHome": true,
+      "featuredPriority": 5
+    },
+    {
+      "slug": "yunnan",
+      "name": "Yunnan",
+      "description": "Yunnan routes cover Lijiang, Dali, Shangri-La, Xishuangbanna, old towns, highland scenery, and tropical southern China.",
+      "image": "/images/dest-lijiang.jpg",
+      "displayOrder": 6,
+      "status": "published",
+      "travelStyles": [],
+      "featuredOnHome": true,
+      "featuredPriority": 6
+    },
+    {
+      "slug": "guangxi",
+      "name": "Guangxi",
+      "description": "Guangxi routes focus on Guilin, Yangshuo, Li River scenery, karst landscapes, caves, bamboo rafting, and southern China scenery.",
+      "image": "/images/route-guilin.jpg",
+      "displayOrder": 7,
+      "status": "published",
+      "travelStyles": [],
+      "featuredOnHome": false,
+      "featuredPriority": 7
+    },
+    {
+      "slug": "qinghai",
+      "name": "Qinghai",
+      "description": "Qinghai routes feature Qinghai Lake, Chaka Salt Lake, Chakaerhan Salt Lake, highland scenery, and northwest China grand circuits.",
+      "image": "/images/route-qinghai-chaka.jpg",
+      "displayOrder": 8,
+      "status": "published",
+      "travelStyles": [],
+      "featuredOnHome": false,
+      "featuredPriority": 8
+    },
+    {
+      "slug": "gansu",
+      "name": "Gansu",
+      "description": "Gansu routes cover Dunhuang, Mogao Caves, Mingsha Mountain, Crescent Spring, Jiayuguan, Zhangye Danxia, and Silk Road landscapes.",
+      "image": "/images/route-qinggan-danxia.jpg",
+      "displayOrder": 9,
+      "status": "published",
+      "travelStyles": [],
+      "featuredOnHome": false,
+      "featuredPriority": 9
+    },
+    {
+      "slug": "xinjiang",
+      "name": "Xinjiang",
+      "description": "Xinjiang routes include Ili grasslands, Sayram Lake, Kashgar, forest roads, lakes, and seasonal northern Xinjiang scenery.",
+      "image": "/images/route-xinjiang-yili.jpg",
+      "displayOrder": 10,
+      "status": "published",
+      "travelStyles": [],
+      "featuredOnHome": false,
+      "featuredPriority": 10
+    },
+    {
+      "slug": "tibet",
+      "name": "Tibet",
+      "description": "Tibet routes include Ali, Yamdrok Lake, Namtso, Lhasa, monastery culture, plateau scenery, and altitude-aware pacing.",
+      "image": "/images/route-tibet-yamdrok-01.jpg",
+      "displayOrder": 11,
+      "status": "published",
+      "travelStyles": [],
+      "featuredOnHome": false,
+      "featuredPriority": 11
+    },
+    {
+      "slug": "xian",
+      "name": "Xi'an",
+      "description": "Xi'an routes focus on Terracotta Warriors, Qin and Tang heritage, ancient Chang'an culture, city walls, and Mount Huashan.",
+      "image": "/images/route-xian-huashan.jpg",
+      "displayOrder": 12,
+      "status": "published",
+      "travelStyles": [],
+      "featuredOnHome": false,
+      "featuredPriority": 12
+    }
+  ],
+  "routes": [
+    {
+      "slug": "1-one-day-shanghai-city-tour",
+      "legacyNumericId": 1,
+      "title": "One Day Shanghai City Tour",
+      "subtitle": "",
+      "summary": "A focused cultural day route covering Zhujiajiao Ancient Town, City God Temple Market, the Bund, Nanjing Road, Jin Mao Tower, and a Huangpu River cruise.",
+      "durationDays": 1,
+      "groupSizeDisplay": "Private / Small Group",
+      "category": "City Break",
+      "themes": [],
+      "status": "published",
+      "featured": false,
+      "heroImage": "/images/route-shanghai-night-01.jpg",
+      "pdfUrl": "",
+      "priceMode": "on-request",
+      "priceDisplay": "On request",
+      "primaryType": "customizable",
+      "availableTypes": [
+        "private",
+        "group-tour",
+        "customizable"
+      ],
+      "destinationSlugs": [
+        "shanghai"
+      ],
+      "experience": [],
+      "moments": [],
+      "includedSupport": [],
+      "itineraryDays": []
+    },
+    {
+      "slug": "2-3-days-and-2-nights-in-shanghai",
+      "legacyNumericId": 2,
+      "title": "3 Days and 2 Nights in Shanghai",
+      "subtitle": "",
+      "summary": "A short Shanghai cultural route with Zhujiajiao, the Bund, Nanjing Road, City God Temple Market, the Oriental Pearl Tower, Yu Garden, and flexible city time.",
+      "durationDays": 3,
+      "groupSizeDisplay": "Private / Small Group",
+      "category": "City Break",
+      "themes": [],
+      "status": "published",
+      "featured": true,
+      "heroImage": "/images/route-shanghai-bund-01.jpg",
+      "pdfUrl": "",
+      "priceMode": "on-request",
+      "priceDisplay": "On request",
+      "primaryType": "customizable",
+      "availableTypes": [
+        "private",
+        "group-tour",
+        "customizable"
+      ],
+      "destinationSlugs": [
+        "shanghai"
+      ],
+      "experience": [],
+      "moments": [],
+      "includedSupport": [],
+      "itineraryDays": []
+    },
+    {
+      "slug": "3-5-days-and-4-nights-in-beijing",
+      "legacyNumericId": 3,
+      "title": "5 Days and 4 Nights in Beijing",
+      "subtitle": "",
+      "summary": "A first-time Beijing itinerary covering Tiananmen Square, the Forbidden City, Mutianyu Great Wall, Ming Tombs, the Summer Palace, and Olympic Park.",
+      "durationDays": 5,
+      "groupSizeDisplay": "Private / Small Group",
+      "category": "Classic",
+      "themes": [],
+      "status": "published",
+      "featured": true,
+      "heroImage": "/images/route-beijing-greatwall-01.png",
+      "pdfUrl": "",
+      "priceMode": "on-request",
+      "priceDisplay": "On request",
+      "primaryType": "customizable",
+      "availableTypes": [
+        "private",
+        "group-tour",
+        "customizable"
+      ],
+      "destinationSlugs": [
+        "beijing"
+      ],
+      "experience": [],
+      "moments": [],
+      "includedSupport": [],
+      "itineraryDays": []
+    },
+    {
+      "slug": "4-forbidden-city-and-temple-of-heaven-day-tour",
+      "legacyNumericId": 4,
+      "title": "Forbidden City and Temple of Heaven Day Tour",
+      "subtitle": "",
+      "summary": "A compact Beijing culture route for travelers with limited time, focused on the Palace Museum and the Temple of Heaven.",
+      "durationDays": 1,
+      "groupSizeDisplay": "Private / Small Group",
+      "category": "Culture",
+      "themes": [],
+      "status": "published",
+      "featured": false,
+      "heroImage": "/images/route-beijing-forbidden-01.png",
+      "pdfUrl": "",
+      "priceMode": "on-request",
+      "priceDisplay": "On request",
+      "primaryType": "customizable",
+      "availableTypes": [
+        "private",
+        "group-tour",
+        "customizable"
+      ],
+      "destinationSlugs": [
+        "beijing"
+      ],
+      "experience": [],
+      "moments": [],
+      "includedSupport": [],
+      "itineraryDays": []
+    },
+    {
+      "slug": "5-chengdu-jiuzhaigou-and-huanglong",
+      "legacyNumericId": 5,
+      "title": "Chengdu, Jiuzhaigou and Huanglong",
+      "subtitle": "",
+      "summary": "A Sichuan route from Chengdu into Jiuzhaigou and Huanglong, with panda time, Minjiang valley views, colorful lakes, and a relaxed arrival day in Chengdu.",
+      "durationDays": 5,
+      "groupSizeDisplay": "2-8 People",
+      "category": "Nature",
+      "themes": [],
+      "status": "published",
+      "featured": true,
+      "heroImage": "/images/route-jiuzhaigou-lake-01.png",
+      "pdfUrl": "",
+      "priceMode": "on-request",
+      "priceDisplay": "On request",
+      "primaryType": "customizable",
+      "availableTypes": [
+        "private",
+        "group-tour",
+        "customizable"
+      ],
+      "destinationSlugs": [
+        "chengdu",
+        "western-sichuan"
+      ],
+      "experience": [],
+      "moments": [],
+      "includedSupport": [],
+      "itineraryDays": []
+    },
+    {
+      "slug": "6-where-yading-meets-jiuzhaigou",
+      "legacyNumericId": 6,
+      "title": "Where Yading Meets Jiuzhaigou",
+      "subtitle": "",
+      "summary": "An 8-day VIP small-group route through western Sichuan, linking Xinduqiao, Litang, Daocheng Yading, Jiuzhaigou, Huanglong, photo stops, and local meals.",
+      "durationDays": 8,
+      "groupSizeDisplay": "2-8 People",
+      "category": "Nature",
+      "themes": [],
+      "status": "published",
+      "featured": true,
+      "heroImage": "/images/route-yading-mountain-01.png",
+      "pdfUrl": "",
+      "priceMode": "on-request",
+      "priceDisplay": "On request",
+      "primaryType": "customizable",
+      "availableTypes": [
+        "private",
+        "group-tour",
+        "customizable"
+      ],
+      "destinationSlugs": [
+        "western-sichuan",
+        "chengdu"
+      ],
+      "experience": [],
+      "moments": [],
+      "includedSupport": [],
+      "itineraryDays": []
+    },
+    {
+      "slug": "7-panoramic-sichuan-and-chongqing",
+      "legacyNumericId": 7,
+      "title": "Panoramic Sichuan and Chongqing",
+      "subtitle": "",
+      "summary": "A Chongqing-to-Chengdu route combining Wulong, Chongqing city views, panda time, Jiuzhaigou, Huanglong, Emei Mountain, Leshan Giant Buddha, and Sichuan food culture.",
+      "durationDays": 11,
+      "groupSizeDisplay": "Private / Small Group",
+      "category": "Regional",
+      "themes": [],
+      "status": "published",
+      "featured": false,
+      "heroImage": "/images/route-chongqing-wulong-01.jpg",
+      "pdfUrl": "",
+      "priceMode": "on-request",
+      "priceDisplay": "On request",
+      "primaryType": "customizable",
+      "availableTypes": [
+        "private",
+        "group-tour",
+        "customizable"
+      ],
+      "destinationSlugs": [
+        "chongqing",
+        "chengdu",
+        "western-sichuan"
+      ],
+      "experience": [],
+      "moments": [],
+      "includedSupport": [],
+      "itineraryDays": []
+    },
+    {
+      "slug": "8-chongqing-custom-city-route",
+      "legacyNumericId": 8,
+      "title": "Chongqing Custom City Route",
+      "subtitle": "",
+      "summary": "A Chongqing route built around layered city views, night scenes, hotpot culture, Wulong karst scenery, and flexible airport or railway pickup.",
+      "durationDays": 5,
+      "groupSizeDisplay": "Private / Small Group",
+      "category": "City Break",
+      "themes": [],
+      "status": "published",
+      "featured": false,
+      "heroImage": "/images/route-chongqing-hongyadong-01.jpg",
+      "pdfUrl": "",
+      "priceMode": "on-request",
+      "priceDisplay": "On request",
+      "primaryType": "customizable",
+      "availableTypes": [
+        "private",
+        "group-tour",
+        "customizable"
+      ],
+      "destinationSlugs": [
+        "chongqing"
+      ],
+      "experience": [],
+      "moments": [],
+      "includedSupport": [],
+      "itineraryDays": []
+    },
+    {
+      "slug": "9-lijiang-dali-and-shangri-la",
+      "legacyNumericId": 9,
+      "title": "Lijiang, Dali and Shangri-La",
+      "subtitle": "",
+      "summary": "An 8-day Yunnan journey through Lijiang, Dali, Shangri-La, old towns, snow mountain scenery, highland culture, and driver-guide pickup service.",
+      "durationDays": 8,
+      "groupSizeDisplay": "Private / Small Group",
+      "category": "Nature",
+      "themes": [],
+      "status": "published",
+      "featured": true,
+      "heroImage": "/images/route-yunnan-shangri-la-01.png",
+      "pdfUrl": "",
+      "priceMode": "on-request",
+      "priceDisplay": "On request",
+      "primaryType": "customizable",
+      "availableTypes": [
+        "private",
+        "group-tour",
+        "customizable"
+      ],
+      "destinationSlugs": [
+        "yunnan"
+      ],
+      "experience": [],
+      "moments": [],
+      "includedSupport": [],
+      "itineraryDays": []
+    },
+    {
+      "slug": "10-xishuangbanna-pure-travel-route",
+      "legacyNumericId": 10,
+      "title": "Xishuangbanna Pure Travel Route",
+      "subtitle": "",
+      "summary": "A 5-day tropical Yunnan product from the real route library, focused on Dai culture, warm weather, forest scenery, and pure-travel pacing.",
+      "durationDays": 5,
+      "groupSizeDisplay": "Private / Small Group",
+      "category": "Nature",
+      "themes": [],
+      "status": "published",
+      "featured": false,
+      "heroImage": "/images/route-yunnan-xishuangbanna-01.jpg",
+      "pdfUrl": "",
+      "priceMode": "on-request",
+      "priceDisplay": "On request",
+      "primaryType": "customizable",
+      "availableTypes": [
+        "private",
+        "group-tour",
+        "customizable"
+      ],
+      "destinationSlugs": [
+        "yunnan"
+      ],
+      "experience": [],
+      "moments": [],
+      "includedSupport": [],
+      "itineraryDays": []
+    },
+    {
+      "slug": "11-colorful-guilin",
+      "legacyNumericId": 11,
+      "title": "Colorful Guilin",
+      "subtitle": "",
+      "summary": "A 4-day Guilin route with Elephant Trunk Hill, Sun and Moon Twin Pagodas, Yangshuo, Yulong River scenery, bamboo rafting, Li River views, Gudong Waterfall, and Guanyan Cave.",
+      "durationDays": 4,
+      "groupSizeDisplay": "Private / Small Group",
+      "category": "Nature",
+      "themes": [],
+      "status": "published",
+      "featured": false,
+      "heroImage": "/images/route-guilin-bamboo-raft-01.jpg",
+      "pdfUrl": "",
+      "priceMode": "on-request",
+      "priceDisplay": "On request",
+      "primaryType": "customizable",
+      "availableTypes": [
+        "private",
+        "group-tour",
+        "customizable"
+      ],
+      "destinationSlugs": [
+        "guangxi"
+      ],
+      "experience": [],
+      "moments": [],
+      "includedSupport": [],
+      "itineraryDays": []
+    },
+    {
+      "slug": "12-guangxi-7-day-tour",
+      "legacyNumericId": 12,
+      "title": "Guangxi 7-Day Tour",
+      "subtitle": "",
+      "summary": "A deeper Guangxi route for 2-8 travelers, built around southern karst landscapes, local culture, river scenery, selected hotels, and no-shopping sightseeing.",
+      "durationDays": 7,
+      "groupSizeDisplay": "2-8 People",
+      "category": "Nature",
+      "themes": [],
+      "status": "published",
+      "featured": false,
+      "heroImage": "/images/route-guilin-li-river-01.jpg",
+      "pdfUrl": "",
+      "priceMode": "on-request",
+      "priceDisplay": "On request",
+      "primaryType": "customizable",
+      "availableTypes": [
+        "private",
+        "group-tour",
+        "customizable"
+      ],
+      "destinationSlugs": [
+        "guangxi"
+      ],
+      "experience": [],
+      "moments": [],
+      "includedSupport": [],
+      "itineraryDays": []
+    },
+    {
+      "slug": "13-encounter-qinghai-and-gansu-grand-circuit",
+      "legacyNumericId": 13,
+      "title": "Encounter Qinghai and Gansu Grand Circuit",
+      "subtitle": "",
+      "summary": "An 8-day Lanzhou grand circuit through Qinghai Lake, Chaka Salt Lake, Chakaerhan Salt Lake, Xitai Jinair Lake, Yardang, Mogao Caves, Mingsha Mountain, Jiayuguan, and Rainbow Danxia.",
+      "durationDays": 8,
+      "groupSizeDisplay": "2-8 People",
+      "category": "Silk Road",
+      "themes": [],
+      "status": "published",
+      "featured": true,
+      "heroImage": "/images/route-qinghai-mingsha-01.jpg",
+      "pdfUrl": "",
+      "priceMode": "on-request",
+      "priceDisplay": "On request",
+      "primaryType": "customizable",
+      "availableTypes": [
+        "private",
+        "group-tour",
+        "customizable"
+      ],
+      "destinationSlugs": [
+        "qinghai",
+        "gansu"
+      ],
+      "experience": [],
+      "moments": [],
+      "includedSupport": [],
+      "itineraryDays": []
+    },
+    {
+      "slug": "14-qinghai-lake-chaka-and-dunhuang-route",
+      "legacyNumericId": 14,
+      "title": "Qinghai Lake, Chaka and Dunhuang Route",
+      "subtitle": "",
+      "summary": "A 7-day spring and summer Qinghai-Gansu route featuring Qinghai Lake, Chaka Salt Lake, Chakaerhan Salt Lake, Emerald Lake, Mogao Caves, Mingsha Mountain, Crescent Spring, and Rainbow Danxia.",
+      "durationDays": 7,
+      "groupSizeDisplay": "2-8 People",
+      "category": "Silk Road",
+      "themes": [],
+      "status": "published",
+      "featured": false,
+      "heroImage": "/images/route-qinghai-chaka-01.jpg",
+      "pdfUrl": "",
+      "priceMode": "on-request",
+      "priceDisplay": "On request",
+      "primaryType": "customizable",
+      "availableTypes": [
+        "private",
+        "group-tour",
+        "customizable"
+      ],
+      "destinationSlugs": [
+        "qinghai",
+        "gansu"
+      ],
+      "experience": [],
+      "moments": [],
+      "includedSupport": [],
+      "itineraryDays": []
+    },
+    {
+      "slug": "15-wild-ili-northern-xinjiang",
+      "legacyNumericId": 15,
+      "title": "Wild Ili Northern Xinjiang",
+      "subtitle": "",
+      "summary": "A 7-day Ili route designed for younger travelers, with private scenic-area driving, grassland views, lakes, forest roads, and a light-luxury small-group pace.",
+      "durationDays": 7,
+      "groupSizeDisplay": "Up to 6 People",
+      "category": "Silk Road",
+      "themes": [],
+      "status": "published",
+      "featured": true,
+      "heroImage": "/images/route-xinjiang-ili-valley-01.jpg",
+      "pdfUrl": "",
+      "priceMode": "on-request",
+      "priceDisplay": "On request",
+      "primaryType": "customizable",
+      "availableTypes": [
+        "private",
+        "group-tour",
+        "customizable"
+      ],
+      "destinationSlugs": [
+        "xinjiang"
+      ],
+      "experience": [],
+      "moments": [],
+      "includedSupport": [],
+      "itineraryDays": []
+    },
+    {
+      "slug": "16-kashgar-and-ili-pure-travel-route",
+      "legacyNumericId": 16,
+      "title": "Kashgar and Ili Pure Travel Route",
+      "subtitle": "",
+      "summary": "A 10-day northern Xinjiang route with 4-diamond hotels, Sayram Lake, Tangbula Hundred-Mile Gallery, Mengkete Ancient Road, Kurdening, campfire experiences, and comfortable 1+1 business seats.",
+      "durationDays": 10,
+      "groupSizeDisplay": "2-6 People",
+      "category": "Silk Road",
+      "themes": [],
+      "status": "published",
+      "featured": false,
+      "heroImage": "/images/route-xinjiang-mountain-lake-01.jpg",
+      "pdfUrl": "",
+      "priceMode": "on-request",
+      "priceDisplay": "On request",
+      "primaryType": "customizable",
+      "availableTypes": [
+        "private",
+        "group-tour",
+        "customizable"
+      ],
+      "destinationSlugs": [
+        "xinjiang"
+      ],
+      "experience": [],
+      "moments": [],
+      "includedSupport": [],
+      "itineraryDays": []
+    },
+    {
+      "slug": "17-xi-an-and-huashan-boutique-tour",
+      "legacyNumericId": 17,
+      "title": "Xi'an and Huashan Boutique Tour",
+      "subtitle": "",
+      "summary": "A 7-day Shaanxi route through the millennial Chang'an atmosphere, Qin and Tang heritage, Terracotta Warriors, city culture, and Mount Huashan scenery.",
+      "durationDays": 7,
+      "groupSizeDisplay": "Private / Small Group",
+      "category": "Culture",
+      "themes": [],
+      "status": "published",
+      "featured": false,
+      "heroImage": "/images/route-xian-warriors-01.jpg",
+      "pdfUrl": "",
+      "priceMode": "on-request",
+      "priceDisplay": "On request",
+      "primaryType": "customizable",
+      "availableTypes": [
+        "private",
+        "group-tour",
+        "customizable"
+      ],
+      "destinationSlugs": [
+        "xian"
+      ],
+      "experience": [],
+      "moments": [],
+      "includedSupport": [],
+      "itineraryDays": []
+    },
+    {
+      "slug": "18-tibet-ali-southern-line",
+      "legacyNumericId": 18,
+      "title": "Tibet Ali Southern Line",
+      "subtitle": "",
+      "summary": "A 7-day Tibet route through Yamdrok Lake, Karola Glacier, Tashilhunpo Monastery, Guge Kingdom, Mapam Yumco, and optional Mount Kailash pilgrimage pacing.",
+      "durationDays": 7,
+      "groupSizeDisplay": "2-6 People",
+      "category": "Nature",
+      "themes": [],
+      "status": "published",
+      "featured": false,
+      "heroImage": "/images/route-tibet-yamdrok-01.jpg",
+      "pdfUrl": "",
+      "priceMode": "on-request",
+      "priceDisplay": "On request",
+      "primaryType": "customizable",
+      "availableTypes": [
+        "private",
+        "group-tour",
+        "customizable"
+      ],
+      "destinationSlugs": [
+        "tibet"
+      ],
+      "experience": [],
+      "moments": [],
+      "includedSupport": [],
+      "itineraryDays": []
+    },
+    {
+      "slug": "19-northern-tibet-317-legend",
+      "legacyNumericId": 19,
+      "title": "Northern Tibet 317 Legend",
+      "subtitle": "",
+      "summary": "A 10-day Sichuan-Tibet north route through Dege Printing House, Zizhu Temple, Sapu Snow Mountain, Namtso, Lhasa, selected hotels, and daily departures for small groups.",
+      "durationDays": 10,
+      "groupSizeDisplay": "Up to 4 People",
+      "category": "Nature",
+      "themes": [],
+      "status": "published",
+      "featured": false,
+      "heroImage": "/images/route-tibet-potala-01.jpg",
+      "pdfUrl": "",
+      "priceMode": "on-request",
+      "priceDisplay": "On request",
+      "primaryType": "customizable",
+      "availableTypes": [
+        "private",
+        "group-tour",
+        "customizable"
+      ],
+      "destinationSlugs": [
+        "tibet"
+      ],
+      "experience": [],
+      "moments": [],
+      "includedSupport": [],
+      "itineraryDays": []
+    },
+    {
+      "slug": "20-panoramic-gansu-qinghai-8-day-tour",
+      "legacyNumericId": 20,
+      "title": "Panoramic Gansu-Qinghai 8-Day Tour",
+      "subtitle": "",
+      "summary": "A northwest grand loop with Qinghai Lake, Chaka Salt Lake, Hoh Xil, Chakaerhan, Xitai Jinair Lake, Yardang landforms, Mogao Caves, Mingsha Mountain, Crescent Spring, Zhangye Danxia, and Qilian Grassland.",
+      "durationDays": 8,
+      "groupSizeDisplay": "2-6 People",
+      "category": "Silk Road",
+      "themes": [],
+      "status": "published",
+      "featured": false,
+      "heroImage": "/images/route-qinghai-qilian-grassland-01.jpg",
+      "pdfUrl": "",
+      "priceMode": "on-request",
+      "priceDisplay": "On request",
+      "primaryType": "customizable",
+      "availableTypes": [
+        "private",
+        "group-tour",
+        "customizable"
+      ],
+      "destinationSlugs": [
+        "gansu",
+        "qinghai"
+      ],
+      "experience": [],
+      "moments": [],
+      "includedSupport": [],
+      "itineraryDays": []
+    }
+  ],
+  "updatedAtByPath": {}
+}

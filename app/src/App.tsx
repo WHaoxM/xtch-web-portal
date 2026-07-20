@@ -22,6 +22,7 @@ import OrderSuccess from './pages/OrderSuccess';
 import Admin from './pages/Admin';
 import Account from './pages/Account';
 import AuthCallback from './pages/AuthCallback';
+import NotFound from './pages/NotFound';
 import { completeAuthRedirectNavigation, urlHasAuthTokens } from './lib/authClient';
 import { ensureContentDataLoaded } from './lib/contentStore';
 
@@ -56,16 +57,24 @@ function App() {
     return !urlHasAuthTokens();
   });
   const [contentDataLoaded, setContentDataLoaded] = useState(false);
+  const [contentDataFailed, setContentDataFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
     ensureContentDataLoaded()
+      .then(() => {
+        if (!cancelled) {
+          setContentDataFailed(false);
+          setContentDataLoaded(true);
+        }
+      })
       .catch((error) => {
         console.error('Failed to load destinations/routes content:', error);
-      })
-      .finally(() => {
-        if (!cancelled) setContentDataLoaded(true);
+        if (!cancelled) {
+          setContentDataLoaded(false);
+          setContentDataFailed(true);
+        }
       });
 
     return () => {
@@ -111,6 +120,18 @@ function App() {
     isAdminRoute || isAuthCallbackRoute || (isChinaTripsRoute && isMiniAppViewport);
 
   if (!authReady) return null;
+
+  if (contentDataFailed && !isAdminRoute && !isAuthCallbackRoute) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-white px-6 text-center">
+        <h1 className="font-serif text-[32px] text-[#002A3A]">Content temporarily unavailable</h1>
+        <p className="mt-4 max-w-md text-[15px] leading-7 text-[#5D5D5D]">
+          We could not load destinations and routes. Please refresh the page in a moment.
+        </p>
+      </div>
+    );
+  }
+
   if (!contentReady) return null;
 
   return (
@@ -139,6 +160,7 @@ function App() {
           <Route path="/account" element={<Account />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
       {!hideSiteChrome && <Footer />}

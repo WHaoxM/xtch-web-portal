@@ -74,8 +74,21 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
       }
 
       if (action === 'cancellation-request') {
-        await recordCancellationRequest(order.id);
-        res.status(200).json({ ok: true, message: 'Cancellation request recorded.' });
+        const result = await recordCancellationRequest(order.id);
+        if (result.status === 'not_allowed') {
+          res.status(409).json({
+            ok: false,
+            error: 'This order cannot request cancellation from its current state.',
+          });
+          return;
+        }
+        res.status(200).json({
+          ok: true,
+          message:
+            result.status === 'already_requested'
+              ? 'Cancellation request already recorded.'
+              : 'Cancellation request recorded.',
+        });
         return;
       }
 

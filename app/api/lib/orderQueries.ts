@@ -82,6 +82,7 @@ export async function consumeHoldByOrderId(orderId: string): Promise<void> {
   `;
 }
 
+/** Release an unpaid checkout hold (active only). */
 export async function releaseHoldByOrderId(orderId: string): Promise<void> {
   await sql`
     UPDATE inventory_holds
@@ -93,15 +94,148 @@ export async function releaseHoldByOrderId(orderId: string): Promise<void> {
   `;
 }
 
+/**
+ * Release seats after a full refund: active (rare) or consumed (normal paid path).
+ * Idempotent when already released/expired.
+ */
+export async function releaseInventoryHoldByOrderId(orderId: string): Promise<void> {
+  await sql`
+    UPDATE inventory_holds
+    SET status = 'released',
+        released_at = COALESCE(released_at, NOW()),
+        updated_at = NOW()
+    WHERE order_id = ${orderId}
+      AND status IN ('active', 'consumed')
+  `;
+}
+
+/** Mark pending_payment order failed and release its active hold (Stripe create/attach failure). */
+export async function failOrderAndReleaseHold(orderId: string): Promise<void> {
+  await sql.begin(async (tx) => {
+    await tx`
+      UPDATE orders
+      SET status = 'failed',
+          payment_status = 'failed',
+          updated_at = NOW()
+      WHERE id = ${orderId}
+        AND status = 'pending_payment'
+    `;
+
+    await tx`
+      UPDATE inventory_holds
+      SET status = 'released',
+          released_at = NOW(),
+          updated_at = NOW()
+      WHERE order_id = ${orderId}
+        AND status = 'active'
+    `;
+  });
+}
+
+/**
+ * A1 lazy cleanup: expire overdue active holds and matching pending_payment orders.
+ * Call from checkout and availability paths — no external cron.
+ */
+export async function expireExpiredHolds(departureId?: string): Promise<number> {
+  return sql.begin(async (tx) => {
+    if (departureId) {
+      await tx`
+        UPDATE orders o
+        SET status = 'expired',
+            expired_at = NOW(),
+            updated_at = NOW()
+        FROM inventory_holds h
+        WHERE o.id = h.order_id
+          AND o.status = 'pending_payment'
+          AND h.status = 'active'
+          AND h.expires_at <= NOW()
+          AND h.departure_id = ${departureId}
+      `;
+
+      const holds = await tx<{ id: string }>`
+        UPDATE inventory_holds
+        SET status = 'expired',
+            updated_at = NOW()
+        WHERE status = 'active'
+          AND expires_at <= NOW()
+          AND departure_id = ${departureId}
+        RETURNING id
+      `;
+      return holds.rows.length;
+    }
+
+    await tx`
+      UPDATE orders o
+      SET status = 'expired',
+          expired_at = NOW(),
+          updated_at = NOW()
+      FROM inventory_holds h
+      WHERE o.id = h.order_id
+        AND o.status = 'pending_payment'
+        AND h.status = 'active'
+        AND h.expires_at <= NOW()
+    `;
+
+    const holds = await tx<{ id: string }>`
+      UPDATE inventory_holds
+      SET status = 'expired',
+          updated_at = NOW()
+      WHERE status = 'active'
+        AND expires_at <= NOW()
+      RETURNING id
+    `;
+    return holds.rows.length;
+  });
+}
+
+/**
+ * Full refund terminal state + inventory release in one transaction.
+ * Idempotent when order is already refunded (still repairs lingering occupies).
+ */
+export async function applyFullRefundAndReleaseSeats(
+  orderId: string,
+  stripeRefundId?: string,
+): Promise<'applied' | 'already'> {
+  return sql.begin(async (tx) => {
+    const updated = await tx<{ id: string }>`
+      UPDATE orders
+      SET status = 'refunded',
+          payment_status = 'refunded',
+          refund_status = 'refunded',
+          stripe_refund_id = COALESCE(${stripeRefundId ?? null}, stripe_refund_id),
+          refunded_at = COALESCE(refunded_at, NOW()),
+          updated_at = NOW()
+      WHERE id = ${orderId}
+        AND status <> 'refunded'
+      RETURNING id
+    `;
+
+    await tx`
+      UPDATE inventory_holds
+      SET status = 'released',
+          released_at = COALESCE(released_at, NOW()),
+          updated_at = NOW()
+      WHERE order_id = ${orderId}
+        AND status IN ('active', 'consumed')
+    `;
+
+    return updated.rows[0] ? 'applied' : 'already';
+  });
+}
+
+/**
+ * Confirm paid order and consume active hold.
+ * Returns false when order is no longer pending_payment (concurrent/idempotent).
+ */
 export async function confirmOrderAndConsumeHold(
   orderId: string,
   stripePaymentIntentId: string,
   stripeChargeId: string,
-): Promise<void> {
+): Promise<boolean> {
   const travelerDetailsDueAt = await computeTravelerDetailsDueAt(orderId);
 
-  await sql.begin(async (tx) => {
-    await tx`
+  return sql.begin(async (tx) => {
+    const updated = await tx<{ id: string }>`
       UPDATE orders
       SET status = 'confirmed',
           payment_status = 'paid',
@@ -113,7 +247,13 @@ export async function confirmOrderAndConsumeHold(
           confirmation_email_status = 'confirmation_email_pending',
           updated_at = NOW()
       WHERE id = ${orderId}
+        AND status = 'pending_payment'
+      RETURNING id
     `;
+
+    if (!updated.rows[0]) {
+      return false;
+    }
 
     await tx`
       UPDATE inventory_holds
@@ -123,6 +263,8 @@ export async function confirmOrderAndConsumeHold(
       WHERE order_id = ${orderId}
         AND status = 'active'
     `;
+
+    return true;
   });
 }
 
@@ -177,14 +319,46 @@ export async function updateConfirmationEmailStatus(
   `;
 }
 
-export async function recordCancellationRequest(orderId: string): Promise<void> {
-  await sql`
+export type CancellationRequestResult =
+  | { status: 'recorded' }
+  | { status: 'already_requested' }
+  | { status: 'not_allowed' };
+
+/**
+ * Traveler cancellation request (user-confirmed gate):
+ * - confirmed + payment_status paid → allow
+ * - already cancellation_requested → idempotent success
+ * - partially_refunded / terminal / pending_payment → deny
+ */
+export async function recordCancellationRequest(
+  orderId: string,
+): Promise<CancellationRequestResult> {
+  const already = await sql<{ id: string }>`
+    SELECT id
+    FROM orders
+    WHERE id = ${orderId}
+      AND status = 'cancellation_requested'
+  `;
+  if (already.rows[0]) {
+    return { status: 'already_requested' };
+  }
+
+  const updated = await sql<{ id: string }>`
     UPDATE orders
     SET cancellation_requested_at = NOW(),
         status = 'cancellation_requested',
         updated_at = NOW()
     WHERE id = ${orderId}
+      AND status = 'confirmed'
+      AND payment_status = 'paid'
+    RETURNING id
   `;
+
+  if (updated.rows[0]) {
+    return { status: 'recorded' };
+  }
+
+  return { status: 'not_allowed' };
 }
 
 export async function recordDateChangeRequest(orderId: string): Promise<void> {
@@ -201,7 +375,7 @@ export async function canAutoReleaseSeats(orderId: string): Promise<boolean> {
     SELECT
       d.start_date,
       d.status,
-      EXTRACT(DAY FROM (d.start_date - CURRENT_DATE))::int AS days_until_departure
+      (d.start_date - CURRENT_DATE)::int AS days_until_departure
     FROM orders o
     JOIN departures d ON d.id = o.departure_id
     WHERE o.id = ${orderId}
