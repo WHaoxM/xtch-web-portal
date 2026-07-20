@@ -2,19 +2,19 @@
 
 ## Status
 
-**blocked（Subagent-4 SEO/prerender）** — 已审计现状；构建期内容真相源待用户确认后才能实现。未部署、未读真实生产数据、未改真实密钥。
+**done（Subagent-4 SEO/prerender）** — 方案 A 已落地；local 预渲染 45/45 + assert 通过。未部署、未读真实生产数据、未改真实密钥。
 
-### Progress note（SEO/prerender 开工，2026-07-20）
+### Progress note（SEO/prerender 实现，2026-07-20）
 
-- 角色：`docs/release/v1-source-audit/04-seo-prerender.md` + README。
-- 已读：`prerender.mjs`、`seo-public-routes.mjs`、`generate-sitemap.mjs`、`Seo.tsx`、`routeMeta.ts`、`contentStore.ts`、`App.tsx` 内容门禁。
-- 现状证据：
-  1. prerender 静态服对 `/api/*` 回退 SPA HTML；`App` 内容加载失败仍 `contentDataLoaded=true`；`Seo` 无条件 `seoReady=1` → 空壳/not found 可进正式 HTML 且构建成功。
-  2. sitemap 含 20 条 `/tours/:slug`，`getPrerenderRoutes()` 不含。
-  3. 无 `*` 路由；未知路径回退首页 meta。
-  4. sitemap `lastmod` 每次 `new Date()`。
-- 门禁：已提交构建期数据方案，等用户确认后再改代码。
-- 下一步：确认真相源 → 实现 adapter + 统一路由 + 404/noindex + lastmod + 产物断言；向角色 2 交公开路由 manifest。
+- 用户确认：构建期真相源 = 仓库快照 `app/scripts/seo-build-content.json`（方案 A）。
+- 已改：
+  1. 快照 + `seo-export-build-content.mjs` / `seo-bootstrap-build-content.mjs`；prerender 对 `/api/destinations|routes` 返回快照 JSON，其它 `/api/*` 404 JSON（不再回 SPA）。
+  2. `seo-public-routes.mjs`：sitemap 与 prerender 同一路径集（含全部 published `/tours/:slug`）；`lastmod` 仅来自快照 `updatedAtByPath`，无则省略。
+  3. `App.tsx`：内容加载失败不设 ready、不挂 Seo；`*` → `NotFound`（`noindex`）；`RouteDetail` 缺内容标记 `data-seo-content="missing"`。
+  4. 交付 `app/scripts/seo-public-route-manifest.json` 给角色 2；Blocking Request 给角色 5 登记 npm scripts。
+- 验证：`typecheck`/`lint`/`build` 绿；`node --test scripts/seo-build-content.test.mjs` 6 pass；`prerender dist/local` 45 ok 0 fail；`seo-assert-prerender dist/local` OK。
+- 未验证：完整 `build:cloud-vps` 末尾 prerender（vite 产物曾生成，prerender 因缺 playwright 中断后改在 `dist/local` 验）；有 DB 时的 `seo-export`。
+- 给角色 2：读 `app/scripts/seo-public-route-manifest.json` 的 `paths` 作 HTTP 404 白名单。
 
 **done（V1 审计角色 3：前端关键流程）** — 四项 P1 已修；typecheck/lint/build + 9 单元测试通过；**真实 E2E（含 Stripe Cancel）已通过**。未部署、未改真实密钥文件内容（仅本机 `xtch` 班期 capacity 8→20 供测）。
 
