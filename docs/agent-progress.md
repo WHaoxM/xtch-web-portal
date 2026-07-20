@@ -2,6 +2,17 @@
 
 ## Status
 
+**done（透明导航 logo 脱色）** — `logo-on-dark.png` 已重生：S 标蓝渐变完整保留，仅右侧 Syncing 字变白。
+
+### Progress note（logo-on-dark 脱色，2026-07-20）
+
+- 依据：用户截图透明导航下 S 标中间发白/脱色；像素统计确认旧图左侧 half 有 ~9k 近白像素（S 标暗部折叠被全局「深色→白」误伤）。
+- 根因：生成 on-dark 时把整图深蓝像素洗白，未区分左侧 S 与右侧字标。
+- 已改：从 `logo.png` 重生成 `logo-on-dark.png`——`x < 250` 原样保留，`x >= 250` 仅把字标 RGB 置白并保留 alpha。
+- 已验证：icon 区与 `logo.png` 像素差 0；icon 近白像素 0；Playwright 首页透明导航截图 S 为青→宝蓝渐变 + 白字。
+- 未改：Navbar 切换逻辑、`logo.png` / `logo-mark.png`。
+- 注意：硬刷新后再看（浏览器可能缓存旧 PNG）。
+
 **done（桌面 RouteDetail 询盘弹窗）** — `Get a Private Quote` / `Group tour inquiry` 已各自是独立弹窗表单（非跳转独立页），字段/文案与用户提供的参考站截图一致；build/lint 绿，浏览器核对两个弹窗均正确打开。
 
 ### Progress note（桌面询盘弹窗，2026-07-20）
