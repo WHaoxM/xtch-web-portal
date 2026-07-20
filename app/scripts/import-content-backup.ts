@@ -496,7 +496,7 @@ async function main() {
     throw new Error('Missing target public base URL (--public-base-url or S3_PUBLIC_BASE_URL).');
   }
   if (!process.env.POSTGRES_URL) {
-    throw new Error(`POSTGRES_URL missing after loading ${envFile}`);
+    throw new Error(`POSTGRES_URL missing after loading ${loaded.path}`);
   }
 
   const rewrite = (url: string) =>
@@ -509,7 +509,7 @@ async function main() {
 
   console.log('Import content backup');
   console.log(`  backup: ${backupDir}`);
-  console.log(`  env file: ${envFile}`);
+  console.log(`  env file: ${loaded.path}`);
   console.log(`  POSTGRES_URL target: ${process.env.POSTGRES_URL}`);
   console.log(`  S3_BUCKET: ${process.env.S3_BUCKET || '(unset)'}`);
   console.log(`  public base: ${toPublicBaseUrl}`);

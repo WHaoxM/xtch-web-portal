@@ -2,6 +2,15 @@
 
 ## Status
 
+**blocked（公网内容同步）** — sitemap MIME + 导入脚本已修；本机 `xtch_prod` 已有 20 路线/12 目的地/627 素材；公网 `api/routes` 仍 `[]`（DNS→cloud-vps）。等 VPS SSH。
+
+### Progress note（SEO MIME + 内容导入，2026-07-20）
+
+- 已改：`serve-selfhost.mjs` 补 `.xml`→`application/xml`；`import-content-backup.ts` 修未定义 `envFile`；本机建 `xtch_prod`+桶 `xtch-prod`；包 `data/content-backups/prod-ready-2026-07-20` 已导入本机库。
+- 公网：`www.xuntingtravel.com` → `103.201.130.12`，`/api/routes` 仍空——本机导入不影响公网。
+- Admin：素材仅「归档」软删；「筛选分类」管 Places/Routes，素材用 tags+关联 slug。
+- 阻塞/下一步：用户提供 cloud-vps SSH 与 `env/cloud-vps/.env` 后，在 VPS 跑 import + `build:cloud-vps` 重启。
+
 **done（透明导航 logo 脱色）** — `logo-on-dark.png` 已重生：S 标蓝渐变完整保留，仅右侧 Syncing 字变白。
 
 ### Progress note（logo-on-dark 脱色，2026-07-20）
