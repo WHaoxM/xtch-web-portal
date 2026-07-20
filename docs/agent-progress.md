@@ -32,24 +32,34 @@
 - 未验证：真实 Stripe Cancel 端到端、320/375/390 手工键盘走查。
 - 下一步：交给协调代理收口；浏览器回归可选。
 
-**done（V1 预订/支付一致性 · Subagent-1）** — A/B/C 已实现；真实 `xtch` PG 集成 6/6 + 本地签名 webhook E2E 4/4 + 单元 12/12；typecheck/lint/build 全绿。
+**done（V1 预订/支付一致性 · Subagent-1）** — 交付报告已填：`docs/release/v1-source-audit/deliveries/01-booking-payment-integrity.md`（`ready-for-validation`）。PG 6/6 + 本地 webhook 4/4 + 网络 E2E 2/2 + 单元 12/12；typecheck/lint/build 全绿。
+
+### Progress note（交付报告更新，2026-07-20）
+
+- 按 README 统一交付格式写入 `deliveries/01-booking-payment-integrity.md`。
+- 含用户确认 A/B/C、四项修复、May Touch、全部命令退出码、网络 E2E（rk_test 进程态）与剩余风险。
+- 状态：`ready-for-validation`（待主协调代理独立复跑）。
+
+### Progress note（Stripe 网络 E2E，2026-07-20）
+
+- 用户提供 `rk_test_` 受限密钥（仅本次进程环境，**未写入**仓库跟踪文件）。
+- 权限探测：balance/charges/PI/checkout/refunds 均可。
+- `api/stripe-webhook.network.e2e.integration.test.ts`：**2/2 pass**（paid completed PI retrieve；refund.updated + charges.retrieve）。
+- 确认邮件：Resend key 无效仅打日志，不影响订单状态。
+- 安全：密钥曾出现在对话中，建议用户轮换。
 
 ### Progress note（预订与支付一致性 · PG/Webhook 验证，2026-07-20）
 
-- PG 集成（`localhost/xtch`，非生产）：并发 hold 拒绝、fail 释放、A1 过期、邮箱限流 5、取消门禁、全额退款释放 consumed。
-- Webhook E2E：本地 `whsec` 签名；expired 释放；unpaid completed 不确认；charge.refunded 部分→累计全额 + 幂等；Charge.amount 陷阱。
-- E2E 中发现并修复：`canAutoReleaseSeats` 的 `EXTRACT(DAY FROM date-date)` 在 PG 报 42883 → 改为 `(start_date - CURRENT_DATE)::int`。
-- 环境限制：各 env 均无 `sk_test`；未走 Stripe 网络 API（PI retrieve / refund.updated charge.retrieve）。有 test key 后可补付费确认与 refund.updated 真网测。
-- 声明：未部署、未访问生产库、未改真实密钥、未启用 Stripe live。
+- PG 集成（`localhost/xtch`）：并发 hold、fail 释放、A1 过期、邮箱限流、取消门禁、全额退款释放 consumed。
+- 本地签名 webhook：expired、unpaid completed、charge.refunded 部分→全额+幂等、amount 陷阱。
+- 修复：`canAutoReleaseSeats` → `(start_date - CURRENT_DATE)::int`。
+- 声明：未部署、未访问生产库、未启用 Stripe live。
 
 ### Progress note（预订与支付一致性收口，2026-07-20）
 
 - 确认：A=推荐限流+A1+同主体拒绝+建议频率+TRUST_PROXY 仅 Caddy；B=B1 仅卡；C=仅 confirmed+paid，幂等，部分退款不可申请。
-- 已改 Owns：checkout-session / stripe-webhook / orders / lib/{orders,orderQueries,availability,bookingSchema}；新建 bookingIntegrity + checkoutRateLimit + 测试。
-- May Touch：`vite.config.ts`、`serve-selfhost.mjs` 传入 `socket.remoteAddress`。
-- 交接角色 6：Caddy 后环境设 `TRUST_PROXY=1`（未改 env examples）。
-- 交接角色 5：建议 `test:booking-integrity` 脚本（未改 package.json）。
-- 已验证：见上方 PG/Webhook note + 单元 + typecheck/lint/build。
+- Owns 与 May Touch 见交付报告。
+- 交接角色 6：`TRUST_PROXY=1`；角色 5：测试脚本登记。
 
 **done（About 数据统计区编辑感动效）** — Playfair 数字、Manrope 标签、稳定单行数值、响应式分隔线与遮罩错峰揭示已完成。
 
