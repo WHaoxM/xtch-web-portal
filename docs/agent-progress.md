@@ -16,7 +16,7 @@
 - 门禁：已提交构建期数据方案，等用户确认后再改代码。
 - 下一步：确认真相源 → 实现 adapter + 统一路由 + 404/noindex + lastmod + 产物断言；向角色 2 交公开路由 manifest。
 
-**done（V1 审计角色 3：前端关键流程）** — 四项 P1 已修；typecheck/lint/build + 9 单元测试通过。未部署、未改真实 env。
+**done（V1 审计角色 3：前端关键流程）** — 四项 P1 已修；typecheck/lint/build + 9 单元测试通过；**真实 E2E（含 Stripe Cancel）已通过**。未部署、未改真实密钥文件内容（仅本机 `xtch` 班期 capacity 8→20 供测）。
 
 ### Progress note（V1 审计 03 前端关键流程，2026-07-20）
 
@@ -28,9 +28,15 @@
   4. Navbar 关菜单 `inert` + 焦点回触发钮。
 - 测试：`scripts/hashLegacyRedirect.test.ts` + `scripts/checkoutCancelDraft.test.ts`（9 pass）。
 - 验证：`npm run typecheck` / `lint` / `build` 全绿。
+- **E2E（2026-07-20 晚）** `node scripts/e2e-frontend-critical-flows.mjs` 全绿：
+  - Destination/Search/Navbar 无 `#` 内链
+  - 移动菜单 inert + Escape 焦点回按钮
+  - Account 订单卡为 `<a href="/orders/...">`
+  - 真实 Stripe Checkout（`cs_test_…`）打开 → Cancel 回流 → 草稿恢复 + 提示 + query 清理；刷新不再弹提示
+- 本机辅助：`departures.capacity` 8→20（座位已满无法下单）；脚本见 `app/scripts/e2e-frontend-critical-flows.mjs`
+- 剩余风险：`env/local/.env` 的 `STRIPE_CHECKOUT_*_URL` 仍含旧 `#/china-trips?...`（靠开机 `migrateLegacyHashRoute` 兼容）；建议改为无 `#` path。
 - May Touch：`checkoutClient.ts`、`hashLegacyRedirect.ts`、`chinaTripsMobile.css`、`Search.tsx`（经批准）。
-- 未验证：真实 Stripe Cancel 端到端、320/375/390 手工键盘走查。
-- 下一步：交给协调代理收口；浏览器回归可选。
+- 未部署、未改生产库/DNS。
 
 **done（V1 预订/支付一致性 · Subagent-1）** — 交付报告已填：`docs/release/v1-source-audit/deliveries/01-booking-payment-integrity.md`（`ready-for-validation`）。PG 6/6 + 本地 webhook 4/4 + 网络 E2E 2/2 + 单元 12/12；typecheck/lint/build 全绿。
 

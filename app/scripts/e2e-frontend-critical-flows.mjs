@@ -21,7 +21,16 @@ function record(name, ok, detail) {
 }
 
 async function shot(page, name) {
-  await page.screenshot({ path: path.join(OUT, `${name}.png`), fullPage: true });
+  try {
+    await page.screenshot({
+      path: path.join(OUT, `${name}.png`),
+      fullPage: true,
+      timeout: 10000,
+      animations: 'disabled',
+    });
+  } catch (error) {
+    console.warn(`screenshot ${name} skipped:`, error instanceof Error ? error.message : error);
+  }
 }
 
 async function gotoReady(page, url, readySelector) {
@@ -132,7 +141,7 @@ async function testAccountOrderLink(page) {
 
 async function fillCheckoutAndCancel(page) {
   await page.setViewportSize({ width: 390, height: 844 });
-  await gotoReady(page, `${BASE}/china-trips`, '.china-trips-mobile-page, .iosapp-page, text=Book');
+  await gotoReady(page, `${BASE}/china-trips`, '.china-trips-mobile-page');
   await page.waitForTimeout(1500);
 
   const bookBtn = page.getByText(/Book a group tour|Find another departure/).first();
