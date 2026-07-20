@@ -61,6 +61,7 @@ const MIME = {
   '.ttf': 'font/ttf',
   '.map': 'application/json; charset=utf-8',
   '.txt': 'text/plain; charset=utf-8',
+  '.xml': 'application/xml; charset=utf-8',
   '.pdf': 'application/pdf',
 };
 
