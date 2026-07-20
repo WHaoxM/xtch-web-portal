@@ -51,6 +51,7 @@ function localApiPlugin(): Plugin {
               headers: req.headers,
               url: req.url,
               body,
+              socket: { remoteAddress: req.socket?.remoteAddress },
             },
             response,
           );

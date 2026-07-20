@@ -102,11 +102,10 @@ export default function DestinationDetail() {
           {tours.length > 0 ? (
             <div className="grid grid-cols-1 gap-8 md:grid-cols-2 xl:grid-cols-3">
               {tours.map((tour) => {
-                const href = `#${getRouteTourHref(tour)}`;
                 return (
-                  <a
+                  <Link
                     key={tour.slug}
-                    href={href}
+                    to={getRouteTourHref(tour)}
                     className="tocn-image-card group block"
                   >
                     <div className="overflow-hidden rounded-[30px] bg-[#d7d7d7]">
@@ -139,7 +138,7 @@ export default function DestinationDetail() {
                         <ArrowRight size={14} />
                       </span>
                     </div>
-                  </a>
+                  </Link>
                 );
               })}
             </div>

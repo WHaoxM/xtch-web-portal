@@ -5,6 +5,7 @@
 #
 # Caddy obtains and renews HTTPS certificates automatically (needs public 80/443).
 
+# Apex (@) intentionally unused — only www (+ optional admin).
 www.xuntingtravel.com, admin.xuntingtravel.com {
 	encode gzip
 	reverse_proxy 127.0.0.1:3080

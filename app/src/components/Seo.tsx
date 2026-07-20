@@ -89,6 +89,8 @@ export default function Seo() {
     const breadcrumbs = buildBreadcrumbs(location.pathname);
 
     document.title = meta.title;
+    // Only mark SEO ready after meta is applied. Content-load failures never mount Seo
+    // (see App content gate). Missing detail pages still set ready with noindex meta.
     document.documentElement.dataset.seoReady = '1';
 
     upsertMeta('meta[name="description"]', () => {

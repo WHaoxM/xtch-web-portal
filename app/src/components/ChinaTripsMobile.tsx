@@ -41,7 +41,12 @@ import {
   type AuthProvider,
   type AuthUser,
 } from '@/lib/authClient';
-import { createFixedDepartureCheckoutSession } from '@/lib/checkoutClient';
+import {
+  clearCheckoutCancelDraft,
+  consumeCheckoutCancelDraft,
+  createFixedDepartureCheckoutSession,
+  saveCheckoutCancelDraft,
+} from '@/lib/checkoutClient';
 import { endDateFromDuration, normalizeDateOnly } from '@/lib/dateOnly';
 import { LinkOrderToAccount } from '@/components/LinkOrderToAccount';
 import {
@@ -2683,6 +2688,8 @@ function GroupRequestView({
   draft,
   selectedDeparture,
   departures,
+  cancelNotice,
+  onDismissCancelNotice,
   onBack,
   onDraftChange,
   onTravelerNameChange,
@@ -2694,6 +2701,8 @@ function GroupRequestView({
   draft: GroupRequestDraft;
   selectedDeparture?: GroupTourDeparture;
   departures: GroupTourDeparture[];
+  cancelNotice?: string;
+  onDismissCancelNotice?: () => void;
   onBack: () => void;
   onDraftChange: (field: keyof GroupRequestDraft, value: string | number) => void;
   onTravelerNameChange: (index: number, name: string) => void;
@@ -2755,6 +2764,18 @@ function GroupRequestView({
     <div className="china-trips-mobile-page iosapp-page">
       <BackBar title="Group tour" onBack={onBack} />
       <main className="iosapp-screen">
+        {cancelNotice && (
+          <div className="iosapp-checkout-cancel-notice" role="status">
+            <p>{cancelNotice}</p>
+            <button
+              type="button"
+              aria-label="Dismiss notice"
+              onClick={onDismissCancelNotice}
+            >
+              <X size={16} aria-hidden="true" />
+            </button>
+          </div>
+        )}
         <header className="iosapp-flow-intro">
           <span className="iosapp-kicker">Group tour</span>
           <h1>{scopedRoute ? scopedRoute.title : 'Group tour departures'}</h1>
@@ -3173,6 +3194,8 @@ function ReserveReviewView({
   draft,
   checkoutStatus,
   checkoutError,
+  cancelNotice,
+  onDismissCancelNotice,
   onBack,
   onSubmitCheckout,
 }: {
@@ -3182,6 +3205,8 @@ function ReserveReviewView({
   draft: GroupRequestDraft;
   checkoutStatus: CheckoutStatus;
   checkoutError: string;
+  cancelNotice: string;
+  onDismissCancelNotice: () => void;
   onBack: () => void;
   onSubmitCheckout: () => void;
 }) {
@@ -3207,6 +3232,15 @@ function ReserveReviewView({
     <div className="china-trips-mobile-page iosapp-page">
       <BackBar title="Book" onBack={onBack} />
       <main className="iosapp-screen">
+        {cancelNotice && (
+          <div className="iosapp-checkout-cancel-notice" role="status">
+            <p>{cancelNotice}</p>
+            <button type="button" aria-label="Dismiss notice" onClick={onDismissCancelNotice}>
+              <X size={16} aria-hidden="true" />
+            </button>
+          </div>
+        )}
+
         <section className="iosapp-form-section iosapp-checkout-review">
           <header className="iosapp-checkout-hero">
             <span className="iosapp-kicker">{selectedDestinationName || 'Group tour'}</span>
@@ -3630,6 +3664,7 @@ export default function ChinaTripsMobile() {
   const [selectedRouteSlug, setSelectedRouteSlug] = useState('');
   const [checkoutStatus, setCheckoutStatus] = useState<CheckoutStatus>('idle');
   const [checkoutError, setCheckoutError] = useState('');
+  const [checkoutCancelNotice, setCheckoutCancelNotice] = useState('');
   const [bookingOrder, setBookingOrder] = useState<SafeOrderSummary | null>(null);
   const [bookingStatus, setBookingStatus] = useState<BookingConfirmedStatus>('loading');
   const [bookingError, setBookingError] = useState('');
@@ -3653,6 +3688,7 @@ export default function ChinaTripsMobile() {
   const [postSignInCheckoutDraft, setPostSignInCheckoutDraft] = useState<GroupRequestDraft | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const bookingHandledRef = useRef(false);
+  const checkoutCancelledHandledRef = useRef(false);
   const routeDeepLinkHandledRef = useRef(false);
   const bookingIdentifiersRef = useRef<{ orderNumber: string; sessionId?: string } | null>(null);
   const [bookingClaimProof, setBookingClaimProof] = useState<{
@@ -3745,10 +3781,7 @@ export default function ChinaTripsMobile() {
   }, [bookingOrder]);
 
   useEffect(() => {
-    if (bookingHandledRef.current) return;
     if (searchParams.get('checkout') !== 'success') return;
-
-    bookingHandledRef.current = true;
 
     const orderNumber = searchParams.get('order') || '';
     const sessionId = searchParams.get('session_id') || undefined;
@@ -3758,6 +3791,10 @@ export default function ChinaTripsMobile() {
     next.delete('order');
     next.delete('session_id');
     setSearchParams(next, { replace: true });
+
+    if (bookingHandledRef.current) return;
+    bookingHandledRef.current = true;
+    clearCheckoutCancelDraft();
 
     if (!orderNumber && !sessionId) return;
 
@@ -3786,6 +3823,35 @@ export default function ChinaTripsMobile() {
         setBookingError('We could not load your booking.');
         setBookingStatus('error');
       });
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (searchParams.get('checkout') !== 'cancelled') return;
+
+    const next = new URLSearchParams(searchParams);
+    next.delete('checkout');
+    next.delete('order');
+    setSearchParams(next, { replace: true });
+
+    if (checkoutCancelledHandledRef.current) return;
+    checkoutCancelledHandledRef.current = true;
+
+    const restored = consumeCheckoutCancelDraft();
+    if (restored) {
+      setDraft(normalizeGroupDraft(restored));
+      setCheckoutCancelNotice(
+        'Payment was cancelled. Your booking details were restored — you can try again when ready.',
+      );
+      setCheckoutStatus('idle');
+      setCheckoutError('');
+      setActiveView('reserveReview');
+      return;
+    }
+
+    setCheckoutCancelNotice(
+      'Payment was cancelled. Please review your trip details and try again.',
+    );
+    setActiveView('groupRequest');
   }, [searchParams, setSearchParams]);
 
   useEffect(() => {
@@ -4677,11 +4743,27 @@ export default function ChinaTripsMobile() {
 
     setCheckoutStatus('loading');
     setCheckoutError('');
+    setCheckoutCancelNotice('');
 
     const authSession = readStoredAuthSession();
     const travelers = draft.travelers.map((traveler) => ({ name: traveler.name.trim() }));
 
     try {
+      saveCheckoutCancelDraft({
+        destinationSlug: draft.destinationSlug,
+        routeSlug: draft.routeSlug,
+        departureId: draft.departureId,
+        dateRange: draft.dateRange,
+        adultQuantity: draft.adultQuantity,
+        travelers,
+        name: travelers[0]?.name || draft.name.trim(),
+        email: checkoutEmail,
+        phoneCountry: draft.phoneCountry,
+        phoneNational: draft.phoneNational,
+        phone: draft.phone.trim(),
+        notes: draft.notes.trim(),
+      });
+
       const result = await createFixedDepartureCheckoutSession({
         departureId: selectedDeparture.id,
         adultQuantity: draft.adultQuantity,
@@ -4695,6 +4777,7 @@ export default function ChinaTripsMobile() {
 
       window.location.assign(result.checkoutUrl!);
     } catch (error) {
+      clearCheckoutCancelDraft();
       setCheckoutStatus('error');
       setCheckoutError(error instanceof Error ? error.message : 'We could not open Stripe Checkout. Please try again.');
     }
@@ -4747,13 +4830,21 @@ export default function ChinaTripsMobile() {
             draft={draft}
             selectedDeparture={selectedDeparture}
             departures={departures}
-            onBack={() => setActiveView('tabs')}
+            cancelNotice={checkoutCancelNotice}
+            onDismissCancelNotice={() => setCheckoutCancelNotice('')}
+            onBack={() => {
+              setCheckoutCancelNotice('');
+              setActiveView('tabs');
+            }}
             onDraftChange={updateDraft}
             onTravelerNameChange={updateTravelerName}
             onPhoneChange={updateGroupPhone}
             onSelectDeparture={selectDeparture}
             onViewItinerary={(routeSlug) => openRouteDetail(routeSlug, 'groupRequest')}
-            onContinue={() => setActiveView('reserveReview')}
+            onContinue={() => {
+              setCheckoutCancelNotice('');
+              setActiveView('reserveReview');
+            }}
           />
         </motion.div>
       );
@@ -4809,7 +4900,13 @@ export default function ChinaTripsMobile() {
           draft={draft}
           checkoutStatus={checkoutStatus}
           checkoutError={checkoutError}
-          onBack={() => setActiveView('groupRequest')}
+          cancelNotice={checkoutCancelNotice}
+          onDismissCancelNotice={() => setCheckoutCancelNotice('')}
+          onBack={() => {
+            clearCheckoutCancelDraft();
+            setCheckoutCancelNotice('');
+            setActiveView('groupRequest');
+          }}
           onSubmitCheckout={submitCheckout}
         />
       </motion.div>

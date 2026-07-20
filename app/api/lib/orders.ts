@@ -115,6 +115,22 @@ export async function createPendingOrderAndHold(
             AND expires_at > NOW()
         `;
 
+        const concurrentHold = await tx<{ id: string }>`
+          SELECT h.id
+          FROM inventory_holds h
+          JOIN orders o ON o.id = h.order_id
+          WHERE h.departure_id = ${params.departure.id}
+            AND h.status = 'active'
+            AND h.expires_at > NOW()
+            AND LOWER(o.lead_email) = ${params.leadEmail.toLowerCase()}
+          LIMIT 1
+        `;
+        if (concurrentHold.rows[0]) {
+          throw new Error(
+            'You already have an open checkout for this departure. Finish payment or wait for it to expire.',
+          );
+        }
+
         const confirmed = Number(confirmedResult.rows[0]?.adults ?? 0);
         const held = Number(heldResult.rows[0]?.adults ?? 0);
         const availableSeats = departure.capacity - confirmed - held;

@@ -4258,6 +4258,44 @@ span.iosapp-provider-mark {
   text-wrap: pretty;
 }
 
+.iosapp-checkout-cancel-notice {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: start;
+  margin: 12px 16px 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fff6e8;
+  color: #5c3d12;
+}
+
+.iosapp-checkout-cancel-notice p {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+
+.iosapp-checkout-cancel-notice button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: -4px -4px 0 0;
+  padding: 4px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.iosapp-checkout-cancel-notice button:focus-visible {
+  outline: 2px solid #5c3d12;
+  outline-offset: 2px;
+}
+
 .iosapp-stripe-trust {
   display: grid;
   grid-template-columns: 18px 1fr;

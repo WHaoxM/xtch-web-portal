@@ -1,14 +1,16 @@
 /**
- * Writes app/public/sitemap.xml from seo-public-routes.mjs.
+ * Writes app/public/sitemap.xml and app/scripts/seo-public-route-manifest.json
+ * from seo-public-routes.mjs + seo-build-content.json.
  * Usage: node scripts/generate-sitemap.mjs
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SITE_ORIGIN, getSitemapEntries } from './seo-public-routes.mjs';
+import { SITE_ORIGIN, buildPublicRouteManifest, getSitemapEntries } from './seo-public-routes.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const outPath = path.resolve(__dirname, '../public/sitemap.xml');
+const sitemapPath = path.resolve(__dirname, '../public/sitemap.xml');
+const manifestPath = path.resolve(__dirname, 'seo-public-route-manifest.json');
 
 function locForPath(routePath) {
   if (!routePath || routePath === '/') return `${SITE_ORIGIN}/`;
@@ -24,17 +26,16 @@ function escapeXml(value) {
     .replace(/'/g, '&apos;');
 }
 
-const lastmod = new Date().toISOString().slice(0, 10);
 const entries = getSitemapEntries();
 
 const body = entries
-  .map(
-    ({ path: routePath, priority }) => `  <url>
-    <loc>${escapeXml(locForPath(routePath))}</loc>
-    <lastmod>${lastmod}</lastmod>
+  .map(({ path: routePath, priority, lastmod }) => {
+    const lastmodLine = lastmod ? `\n    <lastmod>${escapeXml(lastmod)}</lastmod>` : '';
+    return `  <url>
+    <loc>${escapeXml(locForPath(routePath))}</loc>${lastmodLine}
     <priority>${priority}</priority>
-  </url>`,
-  )
+  </url>`;
+  })
   .join('\n');
 
 const xml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -43,6 +44,11 @@ ${body}
 </urlset>
 `;
 
-fs.writeFileSync(outPath, xml, 'utf8');
-console.log(`[sitemap] wrote ${entries.length} URLs → ${outPath}`);
-console.log(`[sitemap] origin ${SITE_ORIGIN}`);
+fs.writeFileSync(sitemapPath, xml, 'utf8');
+const manifest = buildPublicRouteManifest();
+fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
+
+const withLastmod = entries.filter((entry) => entry.lastmod).length;
+console.log(`[sitemap] wrote ${entries.length} URLs → ${sitemapPath}`);
+console.log(`[sitemap] origin ${SITE_ORIGIN}; lastmod on ${withLastmod}/${entries.length}`);
+console.log(`[sitemap] public route manifest → ${manifestPath} (${manifest.pathCount} paths)`);

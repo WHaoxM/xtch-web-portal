@@ -1,5 +1,5 @@
 import { type FormEvent, useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowRight, Search as SearchIcon, SlidersHorizontal } from 'lucide-react';
 import { buildSearchIndex, searchSite, type SearchResultType } from '@/lib/searchIndex';
 
@@ -26,7 +26,8 @@ export default function Search() {
   };
 
   const isAssetLink = (href: string) => href.startsWith('/assets/') || href.endsWith('.pdf');
-  const linkHref = (href: string) => (isAssetLink(href) ? href : `#${href}`);
+  const resultClassName =
+    'group overflow-hidden rounded-[10px] border border-[#D6D6D6] bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_46px_rgba(0,42,58,0.12)]';
 
   return (
     <div className="bg-white">
@@ -128,40 +129,52 @@ export default function Search() {
 
             {results.length > 0 ? (
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                {results.map((item) => (
-                  <a
-                    key={item.id}
-                    href={linkHref(item.href)}
-                    target={isAssetLink(item.href) ? '_blank' : undefined}
-                    rel={isAssetLink(item.href) ? 'noopener noreferrer' : undefined}
-                    className="group overflow-hidden rounded-[10px] border border-[#D6D6D6] bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_46px_rgba(0,42,58,0.12)]"
-                  >
-                    {item.image && (
-                      <div className="aspect-[16/9] overflow-hidden bg-[#D6D6D6]">
-                        <img
-                          src={item.image}
-                          alt={item.title}
-                          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-                        />
+                {results.map((item) => {
+                  const body = (
+                    <>
+                      {item.image && (
+                        <div className="aspect-[16/9] overflow-hidden bg-[#D6D6D6]">
+                          <img
+                            src={item.image}
+                            alt={item.title}
+                            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                          />
+                        </div>
+                      )}
+                      <div className="p-5">
+                        <span className="rounded-full bg-[#F0FAF7] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#1D6F62]">
+                          {item.type}
+                        </span>
+                        <h3 className="mt-4 font-sans text-[18px] font-semibold leading-snug text-[#002A3A]">
+                          {item.title}
+                        </h3>
+                        <p className="mt-3 line-clamp-3 text-[14px] leading-7 text-[#5D5D5D]">
+                          {item.description}
+                        </p>
+                        <span className="mt-5 inline-flex items-center gap-2 text-[13px] font-semibold text-[#002A3A]">
+                          {isAssetLink(item.href) ? 'Open PDF' : 'Open result'}
+                          <ArrowRight size={14} />
+                        </span>
                       </div>
-                    )}
-                    <div className="p-5">
-                      <span className="rounded-full bg-[#F0FAF7] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#1D6F62]">
-                        {item.type}
-                      </span>
-                      <h3 className="mt-4 font-sans text-[18px] font-semibold leading-snug text-[#002A3A]">
-                        {item.title}
-                      </h3>
-                      <p className="mt-3 line-clamp-3 text-[14px] leading-7 text-[#5D5D5D]">
-                        {item.description}
-                      </p>
-                      <span className="mt-5 inline-flex items-center gap-2 text-[13px] font-semibold text-[#002A3A]">
-                        {isAssetLink(item.href) ? 'Open PDF' : 'Open result'}
-                        <ArrowRight size={14} />
-                      </span>
-                    </div>
-                  </a>
-                ))}
+                    </>
+                  );
+
+                  return isAssetLink(item.href) ? (
+                    <a
+                      key={item.id}
+                      href={item.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={resultClassName}
+                    >
+                      {body}
+                    </a>
+                  ) : (
+                    <Link key={item.id} to={item.href} className={resultClassName}>
+                      {body}
+                    </Link>
+                  );
+                })}
               </div>
             ) : (
               <div className="rounded-[10px] border border-[#D6D6D6] bg-[#F9F9FB] p-8 text-center">

@@ -15,7 +15,7 @@
 | 公网当前在 cloud-vps | `www.xuntingtravel.com` DNS → 云主机（非本机 Win11）。本机 `xtch_prod` 导入**不会**自动出现在公网；需 SSH 到 VPS 跑 migrate/import + `build:cloud-vps` 重启服务 |
 | sitemap Content-Type | `serve-selfhost.mjs` MIME 须含 `.xml` → `application/xml`；缺了会变成 `application/octet-stream`，不利于引擎认 sitemap |
 | 内容导入 JSON 勿带 BOM | PowerShell `Set-Content` 默认 UTF-8 BOM 会让 `import-content-backup.ts` 解析失败；用无 BOM UTF-8，或从已有干净备份包复制 `tables/*.json` |
-| sitemap 维护 | 改公开路由或 published tour 列表后跑 `npm run seo:sitemap`（`app/`）；`build`/`build:win11-home` 也会自动生成。真相源是 `app/scripts/seo-public-routes.mjs`，勿手改 `public/sitemap.xml` 后不同步脚本 |
+| sitemap 维护 | 改公开路由或 published 内容后：优先 `npx tsx scripts/seo-export-build-content.mjs --env=<target>` 更新 `seo-build-content.json`（无 DB 时用 `node scripts/seo-bootstrap-build-content.mjs`）；再跑 `npm run seo:sitemap`。sitemap 与 prerender 共用该快照；勿手改 `public/sitemap.xml`。无可靠 `updated_at` 时不要写假 `lastmod` |
 | 产品枢纽路径 | 公开路由是 `/china-trips`；`/china-tours` 仅别名跳转；sitemap/Seo 勿再写死 `china-tours` |
 | Auth / Stripe 回调 URL | Supabase Redirect：`/auth/callback`；Stripe success/cancel：`/china-trips?checkout=…`（无 `#`）。生产 env 若仍写旧 hash 需改 |
 | 生产 build 含 prerender | `build:win11-home` / `build:cloud-vps` 会跑 Playwright prerender；需本机已 `npx playwright install chromium` |

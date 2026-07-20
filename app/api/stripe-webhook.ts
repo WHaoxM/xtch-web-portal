@@ -1,8 +1,10 @@
 import Stripe from 'stripe';
 import { sql } from './lib/db';
 import { ensureBookingTables } from './lib/bookingSchema';
+import { classifyRefundAmount, shouldConfirmPaidCheckout } from './lib/bookingIntegrity';
 import { getStripe } from './lib/stripe';
 import {
+  applyFullRefundAndReleaseSeats,
   canAutoReleaseSeats,
   confirmOrderAndConsumeHold,
   expireOrderAndReleaseHold,
@@ -87,11 +89,15 @@ async function processStripeEvent(event: Stripe.Event): Promise<void> {
       await handleCheckoutSessionExpired(session);
       break;
     }
-    case 'charge.refunded':
+    case 'charge.refunded': {
+      const charge = event.data.object as Stripe.Charge;
+      await handleChargeRefunded(charge);
+      break;
+    }
     case 'charge.refund.updated':
     case 'refund.updated': {
       const refund = event.data.object as Stripe.Refund;
-      await handleRefundEvent(refund);
+      await handleRefundObjectEvent(refund);
       break;
     }
     default:
@@ -118,21 +124,51 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session):
     return;
   }
 
-  const paymentIntentId = session.payment_intent as string | undefined;
-  if (!paymentIntentId) {
-    console.warn(`No payment_intent on completed session ${session.id}`);
+  const paymentIntentId =
+    typeof session.payment_intent === 'string'
+      ? session.payment_intent
+      : session.payment_intent?.id;
+
+  let paymentIntentStatus: string | null = null;
+  let chargeId = '';
+
+  if (paymentIntentId) {
+    const stripe = getStripe();
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    paymentIntentStatus = paymentIntent.status;
+    chargeId =
+      typeof paymentIntent.latest_charge === 'string'
+        ? paymentIntent.latest_charge
+        : paymentIntent.latest_charge?.id || '';
+  }
+
+  // V1 B1: only confirm when Stripe reports paid / PI succeeded.
+  if (
+    !shouldConfirmPaidCheckout({
+      sessionPaymentStatus: session.payment_status,
+      paymentIntentStatus,
+    })
+  ) {
+    console.warn(
+      `Session ${session.id} completed but not paid (payment_status=${session.payment_status}, pi=${paymentIntentStatus}); skipping confirmation.`,
+    );
     return;
   }
 
-  const stripe = getStripe();
-  const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-  const chargeId = paymentIntent.latest_charge as string | undefined;
+  if (!paymentIntentId) {
+    console.warn(`No payment_intent on paid session ${session.id}`);
+    return;
+  }
 
-  await confirmOrderAndConsumeHold(order.id, paymentIntentId, chargeId || '');
-  await sendConfirmationEmail(order);
+  const confirmed = await confirmOrderAndConsumeHold(order.id, paymentIntentId, chargeId);
+  if (confirmed) {
+    await sendConfirmationEmail(order);
+  }
 }
 
-async function sendConfirmationEmail(order: Awaited<ReturnType<typeof findOrderByStripeSessionId>>): Promise<void> {
+async function sendConfirmationEmail(
+  order: Awaited<ReturnType<typeof findOrderByStripeSessionId>>,
+): Promise<void> {
   if (!order) return;
 
   const emailStatus = await sendBookingConfirmationEmail(order);
@@ -156,43 +192,107 @@ async function handleCheckoutSessionExpired(session: Stripe.Checkout.Session): P
   await expireOrderAndReleaseHold(order.id);
 }
 
-async function handleRefundEvent(refund: Stripe.Refund): Promise<void> {
-  const chargeId = typeof refund.charge === 'string' ? refund.charge : refund.charge?.id;
-  const paymentIntentId = typeof refund.payment_intent === 'string' ? refund.payment_intent : null;
+async function handleChargeRefunded(charge: Stripe.Charge): Promise<void> {
+  const chargeId = charge.id;
+  const paymentIntentId =
+    typeof charge.payment_intent === 'string'
+      ? charge.payment_intent
+      : charge.payment_intent?.id ?? null;
+  const amountRefundedCents = charge.amount_refunded;
+  const refundId = charge.refunds?.data?.[0]?.id;
 
-  let order = chargeId ? await findOrderByStripeChargeId(chargeId) : null;
-  if (!order && paymentIntentId) {
-    order = await findOrderByStripePaymentIntentId(paymentIntentId);
-  }
+  await applyRefundByCharge({
+    chargeId,
+    paymentIntentId,
+    amountRefundedCents,
+    refundId,
+    refundStatusHint: charge.refunded ? 'succeeded' : undefined,
+  });
+}
 
-  if (!order) {
-    console.warn(`No order found for refund ${refund.id}`);
-    return;
-  }
-
-  const totalPriceCents = order.total_price_cents;
-  const refundedCents = refund.amount;
-
+async function handleRefundObjectEvent(refund: Stripe.Refund): Promise<void> {
   if (refund.status !== 'succeeded' && refund.status !== 'pending') {
     return;
   }
 
-  if (refundedCents >= totalPriceCents) {
+  const chargeId = typeof refund.charge === 'string' ? refund.charge : refund.charge?.id ?? null;
+  const paymentIntentId =
+    typeof refund.payment_intent === 'string'
+      ? refund.payment_intent
+      : refund.payment_intent?.id ?? null;
+
+  let amountRefundedCents = refund.amount;
+  if (chargeId) {
+    const charge = await getStripe().charges.retrieve(chargeId);
+    amountRefundedCents = charge.amount_refunded;
+  }
+
+  await applyRefundByCharge({
+    chargeId,
+    paymentIntentId,
+    amountRefundedCents,
+    refundId: refund.id,
+    refundStatusHint: refund.status,
+  });
+}
+
+async function applyRefundByCharge(params: {
+  chargeId: string | null;
+  paymentIntentId: string | null;
+  amountRefundedCents: number;
+  refundId?: string;
+  refundStatusHint?: string;
+}): Promise<void> {
+  let order = params.chargeId ? await findOrderByStripeChargeId(params.chargeId) : null;
+  if (!order && params.paymentIntentId) {
+    order = await findOrderByStripePaymentIntentId(params.paymentIntentId);
+  }
+
+  if (!order) {
+    console.warn(
+      `No order found for refund charge=${params.chargeId} pi=${params.paymentIntentId}`,
+    );
+    return;
+  }
+
+  if (params.refundStatusHint && params.refundStatusHint !== 'succeeded' && params.refundStatusHint !== 'pending') {
+    return;
+  }
+
+  const refundClass = classifyRefundAmount(params.amountRefundedCents, order.total_price_cents);
+
+  if (refundClass === 'none') {
+    return;
+  }
+
+  if (refundClass === 'full') {
     const autoRelease = await canAutoReleaseSeats(order.id);
     if (autoRelease) {
-      await updateOrderRefundState(order.id, 'refunded', 'refunded', refund.id);
-      await releaseHoldByOrderId(order.id);
+      await applyFullRefundAndReleaseSeats(order.id, params.refundId);
     } else {
-      await updateOrderRefundState(order.id, 'pending', 'paid', refund.id);
-      await sql`
-        UPDATE orders
-        SET internal_notes = COALESCE(internal_notes, '') || E'\nRefund received but seats held for manual review due to departure window or status.',
-            updated_at = NOW()
-        WHERE id = ${order.id}
-      `;
+      // Near-departure / non-sellable: keep seats occupied for manual review.
+      if (order.refund_status !== 'refunded' && order.status !== 'refunded') {
+        await updateOrderRefundState(order.id, 'pending', 'paid', params.refundId);
+        await sql`
+          UPDATE orders
+          SET internal_notes = COALESCE(internal_notes, '') || E'\nRefund received but seats held for manual review due to departure window or status.',
+              updated_at = NOW()
+          WHERE id = ${order.id}
+            AND status <> 'refunded'
+        `;
+      }
     }
-  } else if (refundedCents > 0) {
-    await updateOrderRefundState(order.id, 'partially_refunded', 'partially_refunded', refund.id);
+    return;
+  }
+
+  // Partial: never treat single refund.amount as full; use cumulative amount_refunded.
+  if (order.payment_status !== 'refunded' && order.status !== 'refunded') {
+    await updateOrderRefundState(
+      order.id,
+      'partially_refunded',
+      'partially_refunded',
+      params.refundId,
+    );
   }
 }
 

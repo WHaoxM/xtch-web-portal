@@ -1,4 +1,5 @@
 import { sql } from './db';
+import { expireExpiredHolds } from './orderQueries';
 
 /**
  * Normalize DB Date / ISO / date strings to calendar `YYYY-MM-DD`.
@@ -74,6 +75,8 @@ function mapDepartureInventoryRow(row: Record<string, unknown>): DepartureInvent
 }
 
 export async function getAvailableSeats(departureId: string): Promise<number> {
+  await expireExpiredHolds(departureId);
+
   const result = await sql<{ available_seats: string }>`
     SELECT
       d.capacity
@@ -99,6 +102,8 @@ export async function getAvailableSeats(departureId: string): Promise<number> {
 }
 
 export async function listAvailableDepartures(): Promise<DepartureInventoryRow[]> {
+  await expireExpiredHolds();
+
   const result = await sql`
     SELECT
       d.id,
@@ -147,6 +152,8 @@ export async function listAvailableDepartures(): Promise<DepartureInventoryRow[]
 /** Public home rail: sellable, has seats, featured, top N by priority then start date. */
 export async function listFeaturedHomeDepartures(limit = 3): Promise<DepartureInventoryRow[]> {
   const safeLimit = Math.min(Math.max(Number(limit) || 3, 1), 12);
+  await expireExpiredHolds();
+
   const result = await sql`
     SELECT
       d.id,
