@@ -68,7 +68,10 @@ export function formatConfirmationEmailNote(email: string, status?: string | nul
   if (status === 'confirmation_email_failed') {
     return `We could not send a confirmation email to ${email}. Please contact us if you need a copy of your booking.`;
   }
-  if (status === 'confirmation_email_sent') {
+  if (
+    status === 'confirmation_email_sent' ||
+    status === 'confirmation_email_traveler_sent'
+  ) {
     return `A confirmation email has been sent to ${email}. If you do not see it, please check your spam folder.`;
   }
   return `A confirmation email is on its way to ${email}. If you do not see it, please check your spam folder.`;

@@ -146,7 +146,7 @@ test('webhook E2E: checkout.session.expired releases pending hold', async () => 
     leadName: 'Expire WH',
     leadEmail: `exp-wh-${RUN}@example.com`,
     leadPhone: '',
-    travelers: [{ name: 'Expire WH' }],
+    travelers: [{ name: 'Expire WH', gender: 'female' }],
     holdExpiresAt: new Date(Date.now() + 30 * 60 * 1000),
   });
   createdOrderIds.push(created.order.id);
@@ -196,7 +196,7 @@ test('webhook E2E: unpaid checkout.session.completed without PI does not confirm
     leadName: 'Unpaid WH',
     leadEmail: `unpaid-wh-${RUN}@example.com`,
     leadPhone: '',
-    travelers: [{ name: 'Unpaid WH' }],
+    travelers: [{ name: 'Unpaid WH', gender: 'male' }],
     holdExpiresAt: new Date(Date.now() + 30 * 60 * 1000),
   });
   createdOrderIds.push(created.order.id);
@@ -252,7 +252,7 @@ test('webhook E2E: charge.refunded partial then cumulative full; duplicate event
     leadName: 'Refund WH',
     leadEmail: `refund-wh-${RUN}@example.com`,
     leadPhone: '',
-    travelers: [{ name: 'Refund WH' }],
+    travelers: [{ name: 'Refund WH', gender: 'female' }],
     holdExpiresAt: new Date(Date.now() + 30 * 60 * 1000),
   });
   createdOrderIds.push(created.order.id);
@@ -359,7 +359,7 @@ test('webhook E2E: charge.refunded must not treat Charge.amount as refund amount
     leadName: 'Bug WH',
     leadEmail: `bug-wh-${RUN}@example.com`,
     leadPhone: '',
-    travelers: [{ name: 'Bug WH' }],
+    travelers: [{ name: 'Bug WH', gender: 'male' }],
     holdExpiresAt: new Date(Date.now() + 30 * 60 * 1000),
   });
   createdOrderIds.push(created.order.id);

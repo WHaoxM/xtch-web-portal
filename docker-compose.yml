@@ -1,7 +1,12 @@
 # Bind Postgres/MinIO to loopback only. Public traffic must go through Caddy →
 # Node deploy:serve (80/443). Shared by deploy targets (win11-home / cloud-vps).
-# Before exposing the host to the internet, change the default postgres/minioadmin
-# passwords. See docs/ops/deploy/README.md.
+#
+# Credentials are REQUIRED — no production defaults.
+# Copy `.env.example` → `.env` at the repo root (gitignored) and set secrets before
+# `docker compose up`. See docs/ops/shared/compose-credentials.md.
+#
+# Changing compose env does NOT change passwords already stored in volumes.
+# First init vs existing-volume rotation steps are documented separately.
 services:
   postgres:
     image: postgres:16-alpine
@@ -10,14 +15,14 @@ services:
     ports:
       - "127.0.0.1:5432:5432"
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: xtch
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set in repo-root .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in repo-root .env}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set in repo-root .env}
     volumes:
       - xtch_pg_data:/var/lib/postgresql/data
       - ./docker/postgres/init-extra-db.sql:/docker-entrypoint-initdb.d/02-init-extra-db.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d xtch"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -31,8 +36,8 @@ services:
       - "127.0.0.1:9000:9000"
       - "127.0.0.1:9001:9001"
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER must be set in repo-root .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD must be set in repo-root .env}
     volumes:
       - xtch_minio_data:/data
     command: server /data --console-address ":9001"
@@ -44,15 +49,19 @@ services:
       start_period: 10s
 
   # One-shot bucket bootstrap: public-read bucket for browser-loaded media URLs.
+  # Uses the same MINIO_ROOT_* vars as the minio service (no duplicated literals).
   minio-init:
     image: minio/mc:RELEASE.2025-04-16T18-13-26Z
     container_name: xtch-minio-init
     depends_on:
       minio:
         condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER must be set in repo-root .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD must be set in repo-root .env}
     entrypoint: >
       /bin/sh -c "
-      mc alias set local http://minio:9000 minioadmin minioadmin &&
+      mc alias set local http://minio:9000 \"$$MINIO_ROOT_USER\" \"$$MINIO_ROOT_PASSWORD\" &&
       mc mb local/xtch-public --ignore-existing &&
       mc anonymous set download local/xtch-public &&
       mc mb local/xtch-tunnel --ignore-existing &&

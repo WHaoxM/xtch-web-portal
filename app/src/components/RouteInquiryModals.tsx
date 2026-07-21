@@ -129,6 +129,7 @@ function ModalContactFields({
           onChange={(event) => onNameChange(event.target.value)}
           placeholder="Enter your name"
           aria-invalid={Boolean(fieldErrors.name)}
+          aria-describedby={fieldErrors.name ? fieldErrorId('name') : undefined}
           className={fieldInputClass(Boolean(fieldErrors.name))}
         />
       </ModalField>
@@ -139,6 +140,7 @@ function ModalContactFields({
           onChange={(event) => onEmailChange(event.target.value)}
           placeholder="you@example.com"
           aria-invalid={Boolean(fieldErrors.email)}
+          aria-describedby={fieldErrors.email ? fieldErrorId('email') : undefined}
           className={fieldInputClass(Boolean(fieldErrors.email))}
         />
       </ModalField>
@@ -322,12 +324,16 @@ export function PrivateQuoteModal({
 
           <div
             data-field-error="timing"
+            aria-invalid={Boolean(fieldErrors.timing)}
+            aria-describedby={fieldErrors.timing ? fieldErrorId('timing') : undefined}
             className={cn('grid grid-cols-1 gap-4 sm:grid-cols-2', fieldErrors.timing && 'rounded-[6px] border border-red-400 bg-red-50/40 p-4')}
           >
             <ModalField label="Estimated Travel Month">
               <select
                 value={travelMonth}
                 onChange={(event) => setTravelMonth(event.target.value)}
+                aria-invalid={Boolean(fieldErrors.timing)}
+                aria-describedby={fieldErrors.timing ? fieldErrorId('timing') : undefined}
                 className={fieldInputClass(Boolean(fieldErrors.timing))}
               >
                 <option value="">--- Select a month ---</option>
@@ -342,6 +348,8 @@ export function PrivateQuoteModal({
               <select
                 value={travelYear}
                 onChange={(event) => setTravelYear(event.target.value)}
+                aria-invalid={Boolean(fieldErrors.timing)}
+                aria-describedby={fieldErrors.timing ? fieldErrorId('timing') : undefined}
                 className={fieldInputClass(Boolean(fieldErrors.timing))}
               >
                 <option value="">--- Select a year ---</option>
@@ -357,6 +365,8 @@ export function PrivateQuoteModal({
                 <select
                   value={travelers}
                   onChange={(event) => setTravelers(event.target.value)}
+                  aria-invalid={Boolean(fieldErrors.timing)}
+                  aria-describedby={fieldErrors.timing ? fieldErrorId('timing') : undefined}
                   className={fieldInputClass(Boolean(fieldErrors.timing))}
                 >
                   <option value="">--- Select number of travelers ---</option>
@@ -418,7 +428,13 @@ export function PrivateQuoteModal({
             onPhoneChange={setPhone}
           />
 
-          <div data-field-error="turnstile" className={cn(fieldErrors.turnstile && 'rounded-[6px] border border-red-400 bg-red-50/40 p-3')}>
+          <div
+            data-field-error="turnstile"
+            data-error-scroll-only
+            aria-invalid={Boolean(fieldErrors.turnstile)}
+            aria-describedby={fieldErrors.turnstile ? fieldErrorId('turnstile') : undefined}
+            className={cn(fieldErrors.turnstile && 'rounded-[6px] border border-red-400 bg-red-50/40 p-3')}
+          >
             <TurnstileWidget onTokenChange={turnstile.setToken} resetSignal={turnstile.resetSignal} />
             {fieldErrors.turnstile && (
               <p id={fieldErrorId('turnstile')} className="mt-2 text-[13px] text-red-600" role="alert">
@@ -592,6 +608,8 @@ export function GroupTourInquiryModal({
 
           <div
             data-field-error="timing"
+            aria-invalid={Boolean(fieldErrors.timing)}
+            aria-describedby={fieldErrors.timing ? fieldErrorId('timing') : undefined}
             className={cn('space-y-4', fieldErrors.timing && 'rounded-[6px] border border-red-400 bg-red-50/40 p-4')}
           >
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -600,6 +618,8 @@ export function GroupTourInquiryModal({
                   value={travelMonth}
                   onChange={(event) => setTravelMonth(event.target.value)}
                   disabled={datesFlexible}
+                  aria-invalid={Boolean(fieldErrors.timing)}
+                  aria-describedby={fieldErrors.timing ? fieldErrorId('timing') : undefined}
                   className={fieldInputClass(Boolean(fieldErrors.timing))}
                 >
                   <option value="">--- Select a month ---</option>
@@ -615,6 +635,8 @@ export function GroupTourInquiryModal({
                   value={travelYear}
                   onChange={(event) => setTravelYear(event.target.value)}
                   disabled={datesFlexible}
+                  aria-invalid={Boolean(fieldErrors.timing)}
+                  aria-describedby={fieldErrors.timing ? fieldErrorId('timing') : undefined}
                   className={fieldInputClass(Boolean(fieldErrors.timing))}
                 >
                   <option value="">--- Select a year ---</option>
@@ -631,6 +653,8 @@ export function GroupTourInquiryModal({
                 type="checkbox"
                 checked={datesFlexible}
                 onChange={(event) => setDatesFlexible(event.target.checked)}
+                aria-invalid={Boolean(fieldErrors.timing)}
+                aria-describedby={fieldErrors.timing ? fieldErrorId('timing') : undefined}
                 className="h-[16px] w-[16px] accent-[#294f5b]"
               />
               My dates are flexible — match me to the closest available departure
@@ -639,6 +663,8 @@ export function GroupTourInquiryModal({
               <select
                 value={travelers}
                 onChange={(event) => setTravelers(event.target.value)}
+                aria-invalid={Boolean(fieldErrors.timing)}
+                aria-describedby={fieldErrors.timing ? fieldErrorId('timing') : undefined}
                 className={fieldInputClass(Boolean(fieldErrors.timing))}
               >
                 <option value="">--- Select number of travelers ---</option>
@@ -691,7 +717,13 @@ export function GroupTourInquiryModal({
             onPhoneChange={setPhone}
           />
 
-          <div data-field-error="turnstile" className={cn(fieldErrors.turnstile && 'rounded-[6px] border border-red-400 bg-red-50/40 p-3')}>
+          <div
+            data-field-error="turnstile"
+            data-error-scroll-only
+            aria-invalid={Boolean(fieldErrors.turnstile)}
+            aria-describedby={fieldErrors.turnstile ? fieldErrorId('turnstile') : undefined}
+            className={cn(fieldErrors.turnstile && 'rounded-[6px] border border-red-400 bg-red-50/40 p-3')}
+          >
             <TurnstileWidget onTokenChange={turnstile.setToken} resetSignal={turnstile.resetSignal} />
             {fieldErrors.turnstile && (
               <p id={fieldErrorId('turnstile')} className="mt-2 text-[13px] text-red-600" role="alert">

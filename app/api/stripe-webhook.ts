@@ -171,11 +171,26 @@ async function sendConfirmationEmail(
 ): Promise<void> {
   if (!order) return;
 
-  const emailStatus = await sendBookingConfirmationEmail(order);
+  const emailStatus = await sendBookingConfirmationEmail(order, {
+    purpose: 'payment-confirmation',
+    onTravelerSent: () =>
+      updateConfirmationEmailStatus(order.id, 'confirmation_email_traveler_sent'),
+  });
   await updateConfirmationEmailStatus(
     order.id,
-    emailStatus === 'sent' ? 'confirmation_email_sent' : 'confirmation_email_failed',
+    emailStatus === 'sent'
+      ? 'confirmation_email_sent'
+      : emailStatus === 'traveler_sent'
+        ? 'confirmation_email_traveler_sent'
+        : 'confirmation_email_failed',
   );
+  if (emailStatus !== 'sent') {
+    throw new Error(
+      emailStatus === 'traveler_sent'
+        ? `Operations booking email failed for ${order.order_number}.`
+        : `Traveler booking email failed for ${order.order_number}.`,
+    );
+  }
 }
 
 async function handleCheckoutSessionExpired(session: Stripe.Checkout.Session): Promise<void> {

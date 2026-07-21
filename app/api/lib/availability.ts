@@ -37,6 +37,12 @@ export type DepartureInventoryRow = {
   currency: string;
   capacity: number;
   available_seats: number;
+  confirmed_roster: {
+    male: number;
+    female: number;
+    unknown: number;
+    total: number;
+  };
   included_core_items: unknown[];
   excluded_core_items: unknown[];
   important_notes: unknown[];
@@ -49,9 +55,17 @@ export type AdminDepartureRow = DepartureInventoryRow & {
   featured_on_home: boolean;
   featured_priority: number;
   policy_version: string;
+  refill_chain_key: string | null;
+  refill_sequence: number | null;
+  refill_enabled: boolean;
+  refill_max_auto_activations: number | null;
+  refill_activation_count: number;
 };
 
 function mapDepartureInventoryRow(row: Record<string, unknown>): DepartureInventoryRow {
+  const confirmedMale = Math.max(0, Number(row.confirmed_male ?? 0));
+  const confirmedFemale = Math.max(0, Number(row.confirmed_female ?? 0));
+  const confirmedTotal = Math.max(0, Number(row.confirmed_adults ?? 0));
   return {
     id: String(row.id),
     public_id: String(row.public_id),
@@ -66,6 +80,12 @@ function mapDepartureInventoryRow(row: Record<string, unknown>): DepartureInvent
     currency: String(row.currency),
     capacity: Number(row.capacity),
     available_seats: Number(row.available_seats),
+    confirmed_roster: {
+      male: confirmedMale,
+      female: confirmedFemale,
+      unknown: Math.max(0, confirmedTotal - confirmedMale - confirmedFemale),
+      total: confirmedTotal,
+    },
     included_core_items: (row.included_core_items as unknown[]) ?? [],
     excluded_core_items: (row.excluded_core_items as unknown[]) ?? [],
     important_notes: (row.important_notes as unknown[]) ?? [],
@@ -123,6 +143,9 @@ export async function listAvailableDepartures(): Promise<DepartureInventoryRow[]
       d.important_notes,
       d.cancellation_policy_snapshot,
       d.confirmation_rule,
+      COALESCE(confirmed.adults, 0) AS confirmed_adults,
+      COALESCE(confirmed.male, 0) AS confirmed_male,
+      COALESCE(confirmed.female, 0) AS confirmed_female,
       GREATEST(
         d.capacity
         - COALESCE(confirmed.adults, 0)
@@ -131,10 +154,22 @@ export async function listAvailableDepartures(): Promise<DepartureInventoryRow[]
       ) AS available_seats
     FROM departures d
     LEFT JOIN (
-      SELECT departure_id, SUM(adult_quantity) AS adults
-      FROM orders
-      WHERE status IN ('confirmed', 'cancellation_requested')
-      GROUP BY departure_id
+      SELECT
+        o.departure_id,
+        SUM(o.adult_quantity) AS adults,
+        SUM((
+          SELECT COUNT(*)
+          FROM generate_series(0, o.adult_quantity - 1) AS slot(index)
+          WHERE o.travelers -> slot.index ->> 'gender' = 'male'
+        )) AS male,
+        SUM((
+          SELECT COUNT(*)
+          FROM generate_series(0, o.adult_quantity - 1) AS slot(index)
+          WHERE o.travelers -> slot.index ->> 'gender' = 'female'
+        )) AS female
+      FROM orders o
+      WHERE o.status IN ('confirmed', 'cancellation_requested')
+      GROUP BY o.departure_id
     ) confirmed ON confirmed.departure_id = d.id
     LEFT JOIN (
       SELECT departure_id, SUM(adult_quantity) AS adults
@@ -173,6 +208,9 @@ export async function listFeaturedHomeDepartures(limit = 3): Promise<DepartureIn
       d.important_notes,
       d.cancellation_policy_snapshot,
       d.confirmation_rule,
+      COALESCE(confirmed.adults, 0) AS confirmed_adults,
+      COALESCE(confirmed.male, 0) AS confirmed_male,
+      COALESCE(confirmed.female, 0) AS confirmed_female,
       GREATEST(
         d.capacity
         - COALESCE(confirmed.adults, 0)
@@ -181,10 +219,22 @@ export async function listFeaturedHomeDepartures(limit = 3): Promise<DepartureIn
       ) AS available_seats
     FROM departures d
     LEFT JOIN (
-      SELECT departure_id, SUM(adult_quantity) AS adults
-      FROM orders
-      WHERE status IN ('confirmed', 'cancellation_requested')
-      GROUP BY departure_id
+      SELECT
+        o.departure_id,
+        SUM(o.adult_quantity) AS adults,
+        SUM((
+          SELECT COUNT(*)
+          FROM generate_series(0, o.adult_quantity - 1) AS slot(index)
+          WHERE o.travelers -> slot.index ->> 'gender' = 'male'
+        )) AS male,
+        SUM((
+          SELECT COUNT(*)
+          FROM generate_series(0, o.adult_quantity - 1) AS slot(index)
+          WHERE o.travelers -> slot.index ->> 'gender' = 'female'
+        )) AS female
+      FROM orders o
+      WHERE o.status IN ('confirmed', 'cancellation_requested')
+      GROUP BY o.departure_id
     ) confirmed ON confirmed.departure_id = d.id
     LEFT JOIN (
       SELECT departure_id, SUM(adult_quantity) AS adults
@@ -231,6 +281,11 @@ export async function listAdminDepartures(): Promise<AdminDepartureRow[]> {
       d.cancellation_policy_snapshot,
       d.policy_version,
       d.confirmation_rule,
+      refill.chain_key AS refill_chain_key,
+      refill.sequence AS refill_sequence,
+      COALESCE(refill.enabled, false) AS refill_enabled,
+      refill.max_auto_activations AS refill_max_auto_activations,
+      COALESCE(refill.activation_count, 0) AS refill_activation_count,
       GREATEST(
         d.capacity
         - COALESCE(confirmed.adults, 0)
@@ -250,6 +305,20 @@ export async function listAdminDepartures(): Promise<AdminDepartureRow[]> {
       WHERE status = 'active' AND expires_at > NOW()
       GROUP BY departure_id
     ) held ON held.departure_id = d.id
+    LEFT JOIN (
+      SELECT
+        m.departure_id,
+        m.sequence,
+        c.chain_key,
+        c.enabled,
+        c.max_auto_activations,
+        COUNT(e.id) FILTER (WHERE e.outcome = 'activated') AS activation_count
+      FROM departure_refill_chain_members m
+      JOIN departure_refill_chains c ON c.id = m.chain_id
+      LEFT JOIN departure_refill_events e ON e.chain_id = c.id
+      GROUP BY
+        m.departure_id, m.sequence, c.chain_key, c.enabled, c.max_auto_activations
+    ) refill ON refill.departure_id = d.id
     ORDER BY d.featured_on_home DESC, d.featured_priority ASC, d.start_date ASC, d.route_title ASC
   `;
 
@@ -259,5 +328,14 @@ export async function listAdminDepartures(): Promise<AdminDepartureRow[]> {
     featured_on_home: Boolean(row.featured_on_home),
     featured_priority: Number(row.featured_priority ?? 0),
     policy_version: String(row.policy_version ?? ''),
+    refill_chain_key: row.refill_chain_key ? String(row.refill_chain_key) : null,
+    refill_sequence:
+      row.refill_sequence == null ? null : Number(row.refill_sequence),
+    refill_enabled: Boolean(row.refill_enabled),
+    refill_max_auto_activations:
+      row.refill_max_auto_activations == null
+        ? null
+        : Number(row.refill_max_auto_activations),
+    refill_activation_count: Number(row.refill_activation_count ?? 0),
   }));
 }

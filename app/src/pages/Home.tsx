@@ -722,8 +722,8 @@ export default function Home() {
     <div className="bg-white text-[#002A3A]">
       <section className="home-reference-hero">
         <img
-          src="/images/forbidden-city-beijing-palace-1.jpg"
-          alt="Private China travel planned by Syncing Travel"
+          src="/images/syncing-real-place-jiuzhaigou-lake.jpg"
+          alt="Jiuzhaigou lake and mountain scenery"
           className="home-reference-hero-image"
         />
         <div className="home-reference-hero-shade" />
@@ -748,6 +748,13 @@ export default function Home() {
                 >
                   <ArrowRight size={34} strokeWidth={1.35} />
                   Explore China Trips
+                </Link>
+                <Link
+                  to="/group-tours"
+                  className="home-reference-button home-reference-button-outline"
+                >
+                  Group Tours
+                  <ArrowRight size={34} strokeWidth={1.35} />
                 </Link>
             </div>
           </div>

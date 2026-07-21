@@ -82,7 +82,10 @@ Reference URLs:
 - Stripe trust is one compact row inside the same sheet, not a separate card.
 - Do not collect card fields locally. The app should communicate that card details are entered on Stripe Checkout.
 - Primary CTA text: `Pay full amount` (guaranteed fixed departure = full payment, not deposit-only language).
-- On the group tour booking form, **already-joined** seats are shown as anonymous avatar placeholders derived from `capacity - available_seats` (no names). Do not expose other travelers’ identities. Your own Adults count + name fields stay a separate booking input block. Show this roster **only** when the selected route’s `primaryType` or `availableTypes` includes `group-tour` or `fixed-departure` — **not** on private / customizable-only routes or the route-private short inquiry form.
+- On the group tour booking form, every adult must provide a full name and self-report exactly `male` or `female`; never infer gender from a name. These values travel in the checkout payload and are stored only in the private order traveler snapshot. Checkout cancel/auth draft recovery must preserve both fields and keep the existing indexed error focus/ARIA behavior.
+- The public joined roster is aggregate-only: expose counts for `male`, `female`, `unknown`, and `total`, never traveler names, emails, order numbers, or a per-traveler array. Count only orders in `confirmed` or `cancellation_requested`; exclude pending-payment orders and active inventory holds. Historical traveler snapshots without gender contribute to `unknown` and must never be backfilled or guessed.
+- Roster `total` means confirmed travelers and is intentionally different from `capacity - available_seats`, because availability also subtracts unexpired checkout holds. Keep the remaining-seat label and explain this distinction in UI copy.
+- Anonymous roster avatars use one stable color per reported gender and gray for `unknown`. Color is never the only signal: include a visible text legend with counts and an aggregate `aria-label`. Show this roster **only** for `group-tour` or `fixed-departure`, not private/customizable-only routes or route-private inquiry.
 
 ## Payment Return Rules
 

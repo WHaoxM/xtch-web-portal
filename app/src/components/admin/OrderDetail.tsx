@@ -175,9 +175,19 @@ export function OrderDetail({ token, order, onOrderChange, onListRefresh }: Orde
         throw new Error(result.error || '重发确认邮件失败。');
       }
       const nextEmailStatus =
-        result.emailStatus === 'sent' ? 'confirmation_email_sent' : 'confirmation_email_failed';
+        result.emailStatus === 'sent'
+          ? 'confirmation_email_sent'
+          : result.emailStatus === 'traveler_sent'
+            ? 'confirmation_email_traveler_sent'
+            : 'confirmation_email_failed';
       onOrderChange({ ...order, confirmation_email_status: nextEmailStatus });
-      flash(result.emailStatus === 'sent' ? '确认邮件已重发' : '重发失败，请查看邮件状态');
+      flash(
+        result.emailStatus === 'sent'
+          ? '确认邮件已重发'
+          : result.emailStatus === 'traveler_sent'
+            ? '旅客已收到，运营副本待补发'
+            : '重发失败，请查看邮件状态',
+      );
       await onListRefresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : '重发确认邮件失败。');

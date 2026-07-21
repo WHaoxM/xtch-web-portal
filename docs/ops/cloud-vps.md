@@ -21,12 +21,22 @@ API → Postgres 127.0.0.1:5432 (xtch_prod，空库起步)
 桶 xtch-prod（空桶起步）
 ```
 
+路径职责（bootstrap 后）：
+
+| 路径 | 用途 | 属主 |
+|---|---|---|
+| `/var/lib/xtch` | 系统用户 `xtch` 的 home（npm cache 等可写） | `xtch:xtch` |
+| `/opt/xtch-web-portal` | git clone / 构建 | 部署用户（写）；组 `xtch` 可读 |
+
+**不要**把 `xtch` 的 home 设成仓库目录（旧 bootstrap 曾如此，会与 clone 冲突）。
+
 ## 上机顺序（主机开通后）
 
 ### 1. DNS 与安全组
 
 1. DNS **A 记录** → 云主机公网 IP
 2. 安全组放行 **80/443**；**不要**放行 `5432` / `9000` / `9001` / `3080`
+3. 主机 UFW（bootstrap 会配）：仅 OpenSSH + 80/443
 
 ### 2. Bootstrap
 
@@ -35,44 +45,53 @@ API → Postgres 127.0.0.1:5432 (xtch_prod，空库起步)
 ```bash
 # 若已 clone：
 bash deploy/cloud-vps/bootstrap.sh
-# 或按脚本内逐步命令：Docker / Node 20 / Caddy / UFW
+# 或按脚本内逐步命令：Docker / Node 20 / Caddy / UFW / xtch 用户
 ```
 
 装完若加入了 `docker` 组，需重新登录后再跑 compose。
 
-### 3. 仓库 + Docker
+### 3. 仓库 + 权限 + Docker
 
 ```bash
-sudo mkdir -p /opt
-sudo chown "$USER:$USER" /opt
+# bootstrap 已准备空目录时：
 git clone <YOUR_REPO_URL> /opt/xtch-web-portal
 cd /opt/xtch-web-portal
+
+# 给运行用户读权限（部署用户保留写）
+bash deploy/cloud-vps/grant-xtch-read-access.sh
+
+# Compose 凭据：无默认密码，缺省则 config/up 直接失败
+cp .env.example .env
+# 编辑全部 REPLACE_ME_*（强随机）；详见 docs/ops/shared/compose-credentials.md
 docker compose up -d
 ```
 
-**立刻改掉**默认 `postgres` / `minioadmin` 口令（compose + 已有 volume 时容器内改密），并准备写入 `env/cloud-vps/.env`。
-
-可选：创建系统用户 `xtch`（bootstrap 已尝试），并把仓库属主交给该用户，与 `xtch-app.service` 一致。
+首次空 volume：在第一次 `up` **之前**写好最终口令。已有 volume 改密见 [compose-credentials.md](./shared/compose-credentials.md)（改 compose **不会**自动改旧 volume）。
 
 ### 4. Env
 
 ```bash
 cd /opt/xtch-web-portal
 cp env/cloud-vps/.env.example env/cloud-vps/.env
-# 编辑：YOUR_DOMAIN、DB/MinIO、Prod Supabase、双名单、Resend 等
-# 禁止设置任何 DEV_* bypass；名单勿留空、勿用 you@example.com
+# 编辑：域名、DB/MinIO（与根 .env 一致）、Prod Supabase、双名单、Resend 等
+# 必填：SELFHOST_HOST=127.0.0.1、TRUST_PROXY=1（Caddy 后）
+# 禁止任何 DEV_* bypass；名单勿留空、勿用 you@example.com
+bash deploy/cloud-vps/grant-xtch-read-access.sh   # 再次收紧 .env 为 640
 ```
 
 | 变量 | 值 |
 |---|---|
-| `POSTGRES_URL` | `.../xtch_prod` |
+| `POSTGRES_URL` | `.../xtch_prod`（密码与 compose `POSTGRES_PASSWORD` 一致） |
 | `S3_ENDPOINT` | `http://127.0.0.1:9000` |
-| `S3_BROWSER_ENDPOINT` | `https://YOUR_DOMAIN/s3` |
-| `S3_PUBLIC_BASE_URL` | `https://YOUR_DOMAIN/s3/xtch-prod` |
+| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | 与 compose `MINIO_ROOT_*` 一致 |
 | `S3_BUCKET` | `xtch-prod` |
 | `APP_ENV` | `prod` |
-| `VITE_SUPABASE_*` | **Prod** Supabase（可与 win11-home 共用同一 Prod 项目） |
-| `ADMIN_OPS_EMAIL_ALLOWLIST` / `ADMIN_TECH_EMAIL_ALLOWLIST` | 真实运营/技术邮箱（必填；空或占位拒启） |
+| `SELFHOST_HOST` | `127.0.0.1`（与 systemd 一致） |
+| `TRUST_PROXY` | `1`（仅 Caddy 后） |
+| `VITE_SUPABASE_*` | **Prod** Supabase |
+| `ADMIN_OPS_EMAIL_ALLOWLIST` / `ADMIN_TECH_EMAIL_ALLOWLIST` | 真实运营/技术邮箱 |
+
+生产启动还会按角色 2 规则校验库名/桶名/占位符/bypass（见 `scripts/env/validateTargetEnv.ts`）。
 
 ### 5. 空库 migrate + 构建
 
@@ -81,29 +100,37 @@ cd /opt/xtch-web-portal/app
 npm install
 npm run db:migrate:cloud-vps   # 确认 Target 为 xtch_prod，勿误伤本机/隧道库
 npm run build:cloud-vps
+# 构建后再授权一次，确保 dist 对 xtch 可读
+cd .. && bash deploy/cloud-vps/grant-xtch-read-access.sh
 ```
 
 ### 6. systemd + Caddy
 
 ```bash
-# 按实际路径改 WorkingDirectory / User
 sudo cp /opt/xtch-web-portal/deploy/cloud-vps/xtch-app.service /etc/systemd/system/xtch-app.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now xtch-app
 sudo systemctl status xtch-app
+# 可选：systemd-analyze security xtch-app.service
 ```
 
-编辑 [`deploy/cloud-vps/Caddyfile`](../../deploy/cloud-vps/Caddyfile)：替换 `YOUR_DOMAIN`。将 Caddy 指向该文件（发行版默认 unit 常用 `/etc/caddy/Caddyfile`——可复制或改 unit 的配置路径），然后：
+单元已设置 `SELFHOST_HOST=127.0.0.1`、`TRUST_PROXY=1`，并启用 `NoNewPrivileges` / `PrivateTmp` / `ProtectSystem=strict` 等（见 unit 内注释）。
+
+编辑 [`deploy/cloud-vps/Caddyfile`](../../deploy/cloud-vps/Caddyfile)：确认域名。将 Caddy 指向该文件（发行版默认 unit 常用 `/etc/caddy/Caddyfile`），然后：
 
 ```bash
-sudo systemctl reload caddy   # 或 restart
+sudo caddy validate --config /opt/xtch-web-portal/deploy/cloud-vps/Caddyfile
+sudo systemctl reload caddy
 ```
+
+边缘层：JSON API 1 MiB、webhook 256 KiB、读超时 60 s、body 超时 30 s；HSTS 等安全头已开；**严格 CSP 未上线**（矩阵见 [caddy-csp-matrix.md](./shared/caddy-csp-matrix.md)）。
 
 本机冒烟（SSH 上）：
 
 - `curl -sS http://127.0.0.1:3080/` → HTML
 - `curl -sS http://127.0.0.1:3080/api/routes` → JSON
 - `curl -sS http://127.0.0.1:3080/s3/minio/health/live` → MinIO health
+- `ss -ltn | grep 3080` → 仅 `127.0.0.1:3080`
 
 ### 7. S1 验收
 
@@ -113,6 +140,7 @@ sudo systemctl reload caddy   # 或 restart
 4. `GET /api/routes` 正常（空库可为 `[]`）
 5. 同域 `/s3` health 或对象可读
 6. 外网端口扫描：仅 80/443；`5432`/`9000`/`9001`/`3080` 不通
+7. 超大 JSON（>1 MiB）→ 边缘或应用层 413；合法 webhook / 深链 / `/s3` 正常
 
 ### 8. 切流量
 
@@ -129,11 +157,22 @@ cd app
 npm install
 npm run db:migrate:cloud-vps   # 若有新 migration
 npm run build:cloud-vps
+cd .. && bash deploy/cloud-vps/grant-xtch-read-access.sh
 sudo systemctl restart xtch-app
 ```
+
+## 旧 bootstrap 迁移（home 曾指向仓库）
+
+若 `getent passwd xtch` 的 home 仍是 `/opt/xtch-web-portal`：
+
+1. 停服务：`sudo systemctl stop xtch-app`
+2. `sudo mkdir -p /var/lib/xtch && sudo chown xtch:xtch /var/lib/xtch`
+3. `sudo usermod -d /var/lib/xtch xtch`（确认无登录会话占用）
+4. 重新跑 `grant-xtch-read-access.sh`，再 `start` 服务
 
 ## 风险 / 后续
 
 - **数据**：云上默认空库空桶；从 Win11 迁 Postgres/MinIO 另开任务
 - **证书**：需公网 80 可达；DNS 未指向本机时 Caddy 无法签发
-- **systemd User**：若不用 `xtch` 用户，改 unit 中的 `User`/`Group`/`WorkingDirectory`
+- **systemd User**：若不用 `xtch` 用户，改 unit 中的 `User`/`Group`/`WorkingDirectory`/`ReadWritePaths`
+- **CSP**：严格策略待矩阵验证后再开

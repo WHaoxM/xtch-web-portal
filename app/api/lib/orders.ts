@@ -28,6 +28,7 @@ export type CheckoutInitResult = {
 
 export type OrderTravelerSnapshot = {
   name: string;
+  gender: 'male' | 'female';
 };
 
 type CheckoutInitParams = {

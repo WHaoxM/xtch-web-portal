@@ -97,7 +97,7 @@ import { destinationMeta, routeTours } from '@/lib/contentStore';
 import { fetchCategories, type Category } from '@/lib/categoriesClient';
 import {
   resizeTravelers,
-  validateTravelerNames,
+  validateTravelerDetails,
   type TravelerNameDraft,
 } from '@/lib/travelerNames';
 import {
@@ -193,6 +193,12 @@ type GroupTourDeparture = {
   departureCity: string;
   spotsLeft: number;
   capacity: number;
+  confirmedRoster: {
+    male: number;
+    female: number;
+    unknown: number;
+    total: number;
+  };
   adultPriceCents: number;
   currency: string;
   guaranteed: boolean;
@@ -212,6 +218,12 @@ function mapApiDepartureToUi(apiDeparture: {
   departure_city: string;
   available_seats: number;
   capacity: number;
+  confirmed_roster?: {
+    male?: number;
+    female?: number;
+    unknown?: number;
+    total?: number;
+  };
   adult_unit_price_cents: number;
   currency?: string;
   guaranteed?: boolean;
@@ -221,6 +233,12 @@ function mapApiDepartureToUi(apiDeparture: {
   important_notes?: unknown;
   cancellation_policy_snapshot?: unknown;
 }): GroupTourDeparture {
+  const male = Math.max(0, Number(apiDeparture.confirmed_roster?.male ?? 0));
+  const female = Math.max(0, Number(apiDeparture.confirmed_roster?.female ?? 0));
+  const total = Math.max(
+    male + female,
+    Number(apiDeparture.confirmed_roster?.total ?? 0),
+  );
   return {
     id: apiDeparture.public_id,
     routeSlug: apiDeparture.route_slug,
@@ -229,6 +247,12 @@ function mapApiDepartureToUi(apiDeparture: {
     departureCity: apiDeparture.departure_city,
     spotsLeft: Math.max(0, apiDeparture.available_seats),
     capacity: apiDeparture.capacity,
+    confirmedRoster: {
+      male,
+      female,
+      unknown: Math.max(0, total - male - female),
+      total,
+    },
     adultPriceCents: apiDeparture.adult_unit_price_cents,
     currency: (apiDeparture.currency || 'usd').toUpperCase(),
     guaranteed: Boolean(apiDeparture.guaranteed),
@@ -275,7 +299,7 @@ const pendingGroupDraftMaxAgeMs = 60 * 60 * 1000;
 
 const initialDraft: GroupRequestDraft = normalizeGroupDraft({
   adultQuantity: 1,
-  travelers: [{ name: '' }],
+  travelers: [{ name: '', gender: '' }],
 });
 
 const initialCustomDraft: CustomTripDraft = {
@@ -1568,7 +1592,12 @@ function RoutePrivateRequestView({
 
           <section className="iosapp-form-section">
             <h2>Travel basics</h2>
-            <div data-field-error="timing" className={cx(fieldErrors.timing && 'iosapp-timing-group is-invalid')}>
+            <div
+              data-field-error="timing"
+              aria-invalid={Boolean(fieldErrors.timing)}
+              aria-describedby={fieldErrors.timing ? fieldErrorId('timing') : undefined}
+              className={cx(fieldErrors.timing && 'iosapp-timing-group is-invalid')}
+            >
               <label className={cx('iosapp-input-row', fieldErrors.timing && 'is-invalid')}>
                 <span>Preferred start date{draft.datesFlexible ? '' : ' *'}</span>
                 <Input
@@ -1602,6 +1631,7 @@ function RoutePrivateRequestView({
                   value={draft.travelers}
                   onChange={(event) => onFieldChange('travelers', event.target.value)}
                   aria-invalid={Boolean(fieldErrors.timing)}
+                  aria-describedby={fieldErrors.timing ? fieldErrorId('timing') : undefined}
                 >
                   <option value="">Select</option>
                   {customTravelerOptions.map((option) => (
@@ -1679,6 +1709,9 @@ function RoutePrivateRequestView({
             <div
               className={cx('iosapp-turnstile-row', fieldErrors.turnstile && 'is-invalid')}
               data-field-error="turnstile"
+              data-error-scroll-only
+              aria-invalid={Boolean(fieldErrors.turnstile)}
+              aria-describedby={fieldErrors.turnstile ? fieldErrorId('turnstile') : undefined}
             >
               <TurnstileWidget onTokenChange={onTurnstileToken} resetSignal={turnstileResetSignal} />
               <FieldHint id={fieldErrorId('turnstile')} message={fieldErrors.turnstile} />
@@ -1859,12 +1892,15 @@ function FieldHint({ id, message }: { id: string; message?: string }) {
   );
 }
 
-function AnonymousJoinedAvatar({ index }: { index: number }) {
+function AnonymousJoinedAvatar({
+  gender,
+}: {
+  gender: 'male' | 'female' | 'unknown';
+}) {
   return (
     <span
-      className="iosapp-traveler-avatar is-anonymous"
+      className={`iosapp-traveler-avatar is-anonymous is-${gender}`}
       aria-hidden="true"
-      style={{ ['--avatar-hue' as string]: String((index * 47) % 360) }}
     >
       <UserRound size={18} strokeWidth={2.25} />
     </span>
@@ -1884,18 +1920,31 @@ function DepartureJoinedRoster({
     );
   }
 
-  const booked = Math.max(0, departure.capacity - departure.spotsLeft);
-  const visible = Math.min(booked, departure.capacity);
+  const roster = departure.confirmedRoster;
+  const femaleAvatars = Math.min(roster.female, departure.capacity);
+  const maleAvatars = Math.min(roster.male, departure.capacity - femaleAvatars);
+  const unknownAvatars = Math.min(
+    roster.unknown,
+    departure.capacity - femaleAvatars - maleAvatars,
+  );
+  const genders = [
+    ...Array.from({ length: femaleAvatars }, () => 'female' as const),
+    ...Array.from({ length: maleAvatars }, () => 'male' as const),
+    ...Array.from({ length: unknownAvatars }, () => 'unknown' as const),
+  ];
 
   return (
     <div
       className="iosapp-joined-roster"
-      aria-label={`${booked} of ${departure.capacity} travelers already joined this departure`}
+      aria-label={`${roster.total} confirmed travelers: ${roster.female} female, ${roster.male} male, ${roster.unknown} gender not recorded. ${departure.spotsLeft} seats currently available; temporary checkout holds can reduce this number.`}
     >
-      {visible > 0 ? (
+      {genders.length > 0 ? (
         <div className="iosapp-traveler-avatars" aria-hidden="true">
-          {Array.from({ length: visible }, (_, index) => (
-            <AnonymousJoinedAvatar key={`joined-${departure.id}-${index}`} index={index} />
+          {genders.map((gender, index) => (
+            <AnonymousJoinedAvatar
+              key={`joined-${departure.id}-${gender}-${index}`}
+              gender={gender}
+            />
           ))}
         </div>
       ) : (
@@ -1905,11 +1954,13 @@ function DepartureJoinedRoster({
           </span>
         </div>
       )}
-      <p>
-        {booked > 0
-          ? `${booked} of ${departure.capacity} already joined · ${departure.spotsLeft} seats left`
-          : `No one booked yet · ${departure.spotsLeft} of ${departure.capacity} seats open`}
-      </p>
+      <div className="iosapp-roster-legend" aria-hidden="true">
+        <span><i className="is-female" />Female {roster.female}</span>
+        <span><i className="is-male" />Male {roster.male}</span>
+        <span><i className="is-unknown" />Not recorded {roster.unknown}</span>
+      </div>
+      <p>{roster.total} confirmed travelers · {departure.spotsLeft} seats left</p>
+      <small>Confirmed bookings only. Temporary checkout holds can reduce seats left.</small>
     </div>
   );
 }
@@ -2223,6 +2274,8 @@ function CustomTab({
           <div
             className={cx('iosapp-choice-block', fieldErrors.destinations && 'is-invalid')}
             data-field-error="destinations"
+            aria-invalid={Boolean(fieldErrors.destinations)}
+            aria-describedby={fieldErrors.destinations ? fieldErrorId('destinations') : undefined}
           >
             <span>Destinations *</span>
             <div className="iosapp-choice-grid">
@@ -2232,6 +2285,8 @@ function CustomTab({
                     type="checkbox"
                     checked={draft.destinations.includes(destination)}
                     onChange={() => onToggleChoice('destinations', destination)}
+                    aria-invalid={Boolean(fieldErrors.destinations)}
+                    aria-describedby={fieldErrors.destinations ? fieldErrorId('destinations') : undefined}
                   />
                   <b>{destination}</b>
                 </label>
@@ -2246,9 +2301,15 @@ function CustomTab({
               onChange={(event) => onFieldChange('otherDestination', event.target.value)}
               placeholder="Optional"
               aria-invalid={Boolean(fieldErrors.destinations)}
+              aria-describedby={fieldErrors.destinations ? fieldErrorId('destinations') : undefined}
             />
           </label>
-          <div data-field-error="timing" className={cx(fieldErrors.timing && 'iosapp-timing-group is-invalid')}>
+          <div
+            data-field-error="timing"
+            aria-invalid={Boolean(fieldErrors.timing)}
+            aria-describedby={fieldErrors.timing ? fieldErrorId('timing') : undefined}
+            className={cx(fieldErrors.timing && 'iosapp-timing-group is-invalid')}
+          >
             <label className={cx('iosapp-input-row', fieldErrors.timing && 'is-invalid')}>
               <span>Travel date *</span>
               <Input
@@ -2266,6 +2327,7 @@ function CustomTab({
                 value={draft.travelers}
                 onChange={(event) => onFieldChange('travelers', event.target.value)}
                 aria-invalid={Boolean(fieldErrors.timing)}
+                aria-describedby={fieldErrors.timing ? fieldErrorId('timing') : undefined}
               >
                 <option value="">Select</option>
                 {customTravelerOptions.map((option) => (
@@ -2281,6 +2343,7 @@ function CustomTab({
                 value={draft.tripLength}
                 onChange={(event) => onFieldChange('tripLength', event.target.value)}
                 aria-invalid={Boolean(fieldErrors.timing)}
+                aria-describedby={fieldErrors.timing ? fieldErrorId('timing') : undefined}
               >
                 <option value="">Select</option>
                 {customTripLengthOptions.map((option) => (
@@ -2388,6 +2451,9 @@ function CustomTab({
           <div
             className={cx('iosapp-turnstile-row', fieldErrors.turnstile && 'is-invalid')}
             data-field-error="turnstile"
+            data-error-scroll-only
+            aria-invalid={Boolean(fieldErrors.turnstile)}
+            aria-describedby={fieldErrors.turnstile ? fieldErrorId('turnstile') : undefined}
           >
             <TurnstileWidget onTokenChange={onTurnstileToken} resetSignal={turnstileResetSignal} />
             <FieldHint id={fieldErrorId('turnstile')} message={fieldErrors.turnstile} />
@@ -2688,11 +2754,13 @@ function GroupRequestView({
   draft,
   selectedDeparture,
   departures,
+  initialFieldErrors,
   cancelNotice,
   onDismissCancelNotice,
   onBack,
   onDraftChange,
   onTravelerNameChange,
+  onTravelerGenderChange,
   onPhoneChange,
   onSelectDeparture,
   onViewItinerary,
@@ -2701,19 +2769,22 @@ function GroupRequestView({
   draft: GroupRequestDraft;
   selectedDeparture?: GroupTourDeparture;
   departures: GroupTourDeparture[];
+  initialFieldErrors: FieldErrors;
   cancelNotice?: string;
   onDismissCancelNotice?: () => void;
   onBack: () => void;
   onDraftChange: (field: keyof GroupRequestDraft, value: string | number) => void;
   onTravelerNameChange: (index: number, name: string) => void;
+  onTravelerGenderChange: (index: number, gender: 'male' | 'female') => void;
   onPhoneChange: (countryCode: string, nationalNumber: string) => void;
   onSelectDeparture: (departure: GroupTourDeparture) => void;
   onViewItinerary: (routeSlug: string) => void;
   onContinue: () => void;
 }) {
   const [destinationFilter, setDestinationFilter] = useState<string>(draft.destinationSlug || 'all');
-  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>(initialFieldErrors);
   const [detailsDepartureId, setDetailsDepartureId] = useState('');
+  const formRef = useRef<HTMLFormElement>(null);
   const routeScoped = Boolean(draft.routeSlug);
   const scopedRoute = routeScoped ? getRouteBySlug(draft.routeSlug) : undefined;
   const destinationFilters = getDepartureDestinationFilters(departures);
@@ -2728,15 +2799,34 @@ function GroupRequestView({
   const departureGroups = groupDeparturesByMonth(filteredDepartures);
   const detailsDeparture = departures.find((departure) => departure.id === detailsDepartureId);
 
+  useEffect(() => {
+    if (!Object.keys(initialFieldErrors).length) return;
+    const fieldOrder = [
+      'departure',
+      ...Array.from({ length: 8 }, (_, index) => [
+        `traveler-${index}`,
+        `traveler-${index}-gender`,
+      ]).flat(),
+      'email',
+      'phone',
+    ];
+    requestAnimationFrame(() => {
+      focusFirstFieldError(fieldOrder, initialFieldErrors, formRef.current);
+    });
+  }, [initialFieldErrors]);
+
   const handleContinue = (formElement: HTMLFormElement) => {
     const nextErrors: FieldErrors = {};
     const email = draft.email.trim();
-    const travelerError = validateTravelerNames(draft.travelers, draft.adultQuantity);
+    const travelerError = validateTravelerDetails(draft.travelers, draft.adultQuantity);
     const phoneError = validateOptionalPhoneInput(draft.phoneCountry, draft.phoneNational);
 
     if (!selectedDeparture) nextErrors.departure = 'Choose an available departure date.';
     if (travelerError) {
-      nextErrors[`traveler-${travelerError.index}`] = travelerError.message;
+      const key = travelerError.field === 'gender'
+        ? `traveler-${travelerError.index}-gender`
+        : `traveler-${travelerError.index}`;
+      nextErrors[key] = travelerError.message;
     }
     if (!email) nextErrors.email = 'Enter your email address.';
     else if (!isValidEmail(email)) nextErrors.email = 'Enter a valid email address.';
@@ -2744,7 +2834,10 @@ function GroupRequestView({
 
     const fieldOrder = [
       'departure',
-      ...draft.travelers.map((_, index) => `traveler-${index}`),
+      ...draft.travelers.flatMap((_, index) => [
+        `traveler-${index}`,
+        `traveler-${index}-gender`,
+      ]),
       'email',
       'phone',
     ];
@@ -2787,6 +2880,7 @@ function GroupRequestView({
         </header>
 
         <form
+          ref={formRef}
           className="iosapp-form iosapp-departure-flow"
           noValidate
           onSubmit={(event) => {
@@ -2806,6 +2900,9 @@ function GroupRequestView({
             <div
               className={cx('iosapp-departure-list', fieldErrors.departure && 'is-invalid')}
               data-field-error="departure"
+              data-error-scroll-only
+              aria-invalid={Boolean(fieldErrors.departure)}
+              aria-describedby={fieldErrors.departure ? fieldErrorId('departure') : undefined}
             >
               {filteredDepartures.length === 0 && (
                 <div className="iosapp-departure-empty">
@@ -2926,8 +3023,10 @@ function GroupRequestView({
               {draft.travelers.map((traveler, index) => {
                 const errorKey = `traveler-${index}`;
                 const error = fieldErrors[errorKey];
+                const genderErrorKey = `traveler-${index}-gender`;
+                const genderError = fieldErrors[genderErrorKey];
                 return (
-                  <div key={errorKey}>
+                  <div className="iosapp-traveler-entry" key={errorKey}>
                     <label
                       className={cx('iosapp-input-row', error && 'is-invalid')}
                       data-field-error={errorKey}
@@ -2953,6 +3052,36 @@ function GroupRequestView({
                       />
                     </label>
                     <FieldHint id={fieldErrorId(errorKey)} message={error} />
+                    <fieldset
+                      className={cx('iosapp-gender-field', genderError && 'is-invalid')}
+                      data-field-error={genderErrorKey}
+                      aria-invalid={Boolean(genderError)}
+                      aria-describedby={genderError ? fieldErrorId(genderErrorKey) : undefined}
+                    >
+                      <legend>Gender *</legend>
+                      <div className="iosapp-gender-options">
+                        {(['female', 'male'] as const).map((gender) => (
+                          <label key={gender}>
+                            <input
+                              type="radio"
+                              name={`traveler-${index}-gender`}
+                              value={gender}
+                              checked={traveler.gender === gender}
+                              onChange={() => {
+                                setFieldErrors((current) => {
+                                  const next = { ...current };
+                                  delete next[genderErrorKey];
+                                  return next;
+                                });
+                                onTravelerGenderChange(index, gender);
+                              }}
+                            />
+                            <span>{gender === 'female' ? 'Female' : 'Male'}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                    <FieldHint id={fieldErrorId(genderErrorKey)} message={genderError} />
                   </div>
                 );
               })}
@@ -3049,6 +3178,7 @@ function SignInView({
   authStatus,
   authMessage,
   authError,
+  authErrorField,
   resendIn,
   onBack,
   onEmailChange,
@@ -3065,6 +3195,7 @@ function SignInView({
   authStatus: AuthStatus;
   authMessage: string;
   authError: string;
+  authErrorField: 'email' | 'otp' | '';
   resendIn: number;
   onBack: () => void;
   onEmailChange: (value: string) => void;
@@ -3102,7 +3233,7 @@ function SignInView({
               <span />
             </div>
             <label
-              className={cx('iosapp-auth-email', authError && !isValidEmail(email.trim()) && 'is-invalid')}
+              className={cx('iosapp-auth-email', authErrorField === 'email' && 'is-invalid')}
               data-field-error="email"
             >
               <span>Email address</span>
@@ -3113,11 +3244,11 @@ function SignInView({
                 type="email"
                 inputMode="email"
                 autoComplete="email"
-                aria-invalid={Boolean(authError && !isValidEmail(email.trim()))}
-                aria-describedby={authError ? fieldErrorId('email') : undefined}
+                aria-invalid={authErrorField === 'email'}
+                aria-describedby={authErrorField === 'email' ? fieldErrorId('email') : undefined}
               />
             </label>
-            {authError && (
+            {authError && authErrorField === 'email' && (
               <p id={fieldErrorId('email')} className="iosapp-auth-error" role="alert">
                 {authError}
               </p>
@@ -3135,7 +3266,10 @@ function SignInView({
           </>
         ) : (
           <>
-            <label className="iosapp-auth-email" data-field-error="otp">
+            <label
+              className={cx('iosapp-auth-email', authErrorField === 'otp' && 'is-invalid')}
+              data-field-error="otp"
+            >
               <span>Code sent to {email.trim()}</span>
               <Input
                 value={otpCode}
@@ -3144,11 +3278,11 @@ function SignInView({
                 type="text"
                 inputMode="numeric"
                 autoComplete="one-time-code"
-                aria-invalid={Boolean(authError)}
-                aria-describedby={authError ? fieldErrorId('otp') : undefined}
+                aria-invalid={authErrorField === 'otp'}
+                aria-describedby={authErrorField === 'otp' ? fieldErrorId('otp') : undefined}
               />
             </label>
-            {authError && (
+            {authError && authErrorField === 'otp' && (
               <p id={fieldErrorId('otp')} className="iosapp-auth-error" role="alert">
                 {authError}
               </p>
@@ -3181,6 +3315,11 @@ function SignInView({
               {resendIn > 0 ? `Resend in ${resendIn}s` : 'Resend code'}
             </Button>
           </>
+        )}
+        {authError && !authErrorField && (
+          <p className="iosapp-auth-error" role="alert">
+            {authError}
+          </p>
         )}
       </main>
     </div>
@@ -3266,7 +3405,9 @@ function ReserveReviewView({
                   Traveler {index + 1}
                   {index === 0 ? ' (lead)' : ''}
                 </span>
-                <b className="iosapp-review-value">{traveler.name || 'Missing name'}</b>
+                <b className="iosapp-review-value">
+                  {traveler.name || 'Missing name'} · {traveler.gender || 'Missing gender'}
+                </b>
               </div>
             ))}
             <div className="iosapp-review-row">
@@ -3664,6 +3805,7 @@ export default function ChinaTripsMobile() {
   const [selectedRouteSlug, setSelectedRouteSlug] = useState('');
   const [checkoutStatus, setCheckoutStatus] = useState<CheckoutStatus>('idle');
   const [checkoutError, setCheckoutError] = useState('');
+  const [checkoutEditErrors, setCheckoutEditErrors] = useState<FieldErrors>({});
   const [checkoutCancelNotice, setCheckoutCancelNotice] = useState('');
   const [bookingOrder, setBookingOrder] = useState<SafeOrderSummary | null>(null);
   const [bookingStatus, setBookingStatus] = useState<BookingConfirmedStatus>('loading');
@@ -3676,6 +3818,7 @@ export default function ChinaTripsMobile() {
   const [authStatus, setAuthStatus] = useState<AuthStatus>('idle');
   const [authMessage, setAuthMessage] = useState('');
   const [authError, setAuthError] = useState('');
+  const [authErrorField, setAuthErrorField] = useState<'email' | 'otp' | ''>('');
   const [authStep, setAuthStep] = useState<'email' | 'code'>('email');
   const [otpCode, setOtpCode] = useState('');
   const [otpResendIn, setOtpResendIn] = useState(0);
@@ -3753,6 +3896,7 @@ export default function ChinaTripsMobile() {
         );
         setAuthStatus('idle');
         setAuthError('');
+        setAuthErrorField('');
         setAuthMessage('');
 
         if (intent === 'checkout') {
@@ -3765,6 +3909,7 @@ export default function ChinaTripsMobile() {
       .catch((error) => {
         if (cancelled) return;
         setAuthStatus('error');
+        setAuthErrorField('');
         setAuthError(error instanceof Error ? error.message : 'We could not complete sign-in.');
         setActiveView('signIn');
       });
@@ -4012,7 +4157,7 @@ export default function ChinaTripsMobile() {
     setCheckoutStatus('idle');
     setDraft((current) => {
       const travelers = current.travelers.map((traveler, travelerIndex) =>
-        travelerIndex === index ? { name } : traveler,
+        travelerIndex === index ? { ...traveler, name } : traveler,
       );
       return {
         ...current,
@@ -4020,6 +4165,17 @@ export default function ChinaTripsMobile() {
         name: travelers[0]?.name ?? '',
       };
     });
+  };
+
+  const updateTravelerGender = (index: number, gender: 'male' | 'female') => {
+    setCheckoutError('');
+    setCheckoutStatus('idle');
+    setDraft((current) => ({
+      ...current,
+      travelers: current.travelers.map((traveler, travelerIndex) =>
+        travelerIndex === index ? { ...traveler, gender } : traveler,
+      ),
+    }));
   };
 
   const updateGroupPhone = (countryCode: string, nationalNumber: string) => {
@@ -4103,6 +4259,7 @@ export default function ChinaTripsMobile() {
   const openGroupRequest = () => {
     setCheckoutStatus('idle');
     setCheckoutError('');
+    setCheckoutEditErrors({});
     setActiveView('groupRequest');
   };
 
@@ -4508,6 +4665,7 @@ export default function ChinaTripsMobile() {
     setAuthStatus('idle');
     setAuthMessage('');
     setAuthError('');
+    setAuthErrorField('');
     setAuthStep('email');
     setOtpCode('');
     setOtpResendIn(0);
@@ -4588,6 +4746,7 @@ export default function ChinaTripsMobile() {
     setAuthStatus('idle');
     setAuthMessage('');
     setAuthError('');
+    setAuthErrorField('');
 
     if (provider === 'email') {
       beginSignIn(intent);
@@ -4605,6 +4764,7 @@ export default function ChinaTripsMobile() {
 
     if (!isAuthConfigured()) {
       setAuthStatus('error');
+      setAuthErrorField('');
       setAuthError('Supabase Auth is not configured.');
       return;
     }
@@ -4615,6 +4775,7 @@ export default function ChinaTripsMobile() {
       await signInWithOAuth(provider, intent);
     } catch (error) {
       setAuthStatus('error');
+      setAuthErrorField('');
       setAuthError(error instanceof Error ? error.message : 'We could not start sign-in.');
     }
   };
@@ -4625,6 +4786,7 @@ export default function ChinaTripsMobile() {
     setOtpCode('');
     setAuthStatus('idle');
     setAuthError('');
+    setAuthErrorField('');
     setAuthMessage('');
 
     if (authIntent === 'checkout') {
@@ -4646,9 +4808,11 @@ export default function ChinaTripsMobile() {
     const email = draft.email.trim().toLowerCase();
     setAuthMessage('');
     setAuthError('');
+    setAuthErrorField('');
 
     if (!isValidEmail(email)) {
       setAuthStatus('error');
+      setAuthErrorField('email');
       setAuthError('Enter a valid email address first.');
       requestAnimationFrame(() => {
         focusFirstFieldError(['email'], { email: 'Enter a valid email address first.' });
@@ -4658,6 +4822,7 @@ export default function ChinaTripsMobile() {
 
     if (!isAuthConfigured()) {
       setAuthStatus('error');
+      setAuthErrorField('');
       setAuthError('Supabase Auth is not configured.');
       return;
     }
@@ -4678,6 +4843,7 @@ export default function ChinaTripsMobile() {
       setAuthMessage('We sent a 6-digit code to your email. Enter it below.');
     } catch (error) {
       setAuthStatus('error');
+      setAuthErrorField('');
       setAuthError(error instanceof Error ? error.message : 'We could not send the sign-in code.');
     }
   };
@@ -4686,10 +4852,15 @@ export default function ChinaTripsMobile() {
     const email = draft.email.trim().toLowerCase();
     setAuthMessage('');
     setAuthError('');
+    setAuthErrorField('');
 
     if (otpCode.trim().length < 6) {
       setAuthStatus('error');
+      setAuthErrorField('otp');
       setAuthError('Enter the 6-digit code from your email.');
+      requestAnimationFrame(() => {
+        focusFirstFieldError(['otp'], { otp: 'Enter the 6-digit code from your email.' });
+      });
       return;
     }
 
@@ -4698,8 +4869,13 @@ export default function ChinaTripsMobile() {
       const session = await verifyEmailOtp(email, otpCode);
       await finishEmailOtpSession(session.user);
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'We could not verify that code.';
       setAuthStatus('error');
-      setAuthError(error instanceof Error ? error.message : 'We could not verify that code.');
+      setAuthErrorField('otp');
+      setAuthError(message);
+      requestAnimationFrame(() => {
+        focusFirstFieldError(['otp'], { otp: message });
+      });
     }
   };
 
@@ -4714,39 +4890,41 @@ export default function ChinaTripsMobile() {
 
   const submitCheckout = async () => {
     const checkoutEmail = draft.email.trim().toLowerCase();
-    const travelerError = validateTravelerNames(draft.travelers, draft.adultQuantity);
+    const travelerError = validateTravelerDetails(draft.travelers, draft.adultQuantity);
     const phoneError = validateOptionalPhoneInput(draft.phoneCountry, draft.phoneNational);
+    const nextErrors: FieldErrors = {};
 
-    if (!selectedDeparture) {
-      setCheckoutStatus('error');
-      setCheckoutError('Please choose an available departure first.');
-      return;
-    }
-
+    if (!selectedDeparture) nextErrors.departure = 'Please choose an available departure first.';
     if (travelerError) {
-      setCheckoutStatus('error');
-      setCheckoutError(travelerError.message);
-      return;
+      const key = travelerError.field === 'gender'
+        ? `traveler-${travelerError.index}-gender`
+        : `traveler-${travelerError.index}`;
+      nextErrors[key] = travelerError.message;
     }
-
     if (!isValidEmail(checkoutEmail)) {
-      setCheckoutStatus('error');
-      setCheckoutError('Please enter a valid email address.');
+      nextErrors.email = 'Please enter a valid email address.';
+    }
+    if (phoneError) nextErrors.phone = phoneError;
+
+    if (Object.keys(nextErrors).length) {
+      setCheckoutStatus('idle');
+      setCheckoutError('');
+      setCheckoutEditErrors(nextErrors);
+      setActiveView('groupRequest');
       return;
     }
+    if (!selectedDeparture) return;
 
-    if (phoneError) {
-      setCheckoutStatus('error');
-      setCheckoutError(phoneError);
-      return;
-    }
-
+    setCheckoutEditErrors({});
     setCheckoutStatus('loading');
     setCheckoutError('');
     setCheckoutCancelNotice('');
 
     const authSession = readStoredAuthSession();
-    const travelers = draft.travelers.map((traveler) => ({ name: traveler.name.trim() }));
+    const travelers = draft.travelers.map((traveler) => ({
+      name: traveler.name.trim(),
+      gender: traveler.gender,
+    }));
 
     try {
       saveCheckoutCancelDraft({
@@ -4830,6 +5008,7 @@ export default function ChinaTripsMobile() {
             draft={draft}
             selectedDeparture={selectedDeparture}
             departures={departures}
+            initialFieldErrors={checkoutEditErrors}
             cancelNotice={checkoutCancelNotice}
             onDismissCancelNotice={() => setCheckoutCancelNotice('')}
             onBack={() => {
@@ -4838,11 +5017,13 @@ export default function ChinaTripsMobile() {
             }}
             onDraftChange={updateDraft}
             onTravelerNameChange={updateTravelerName}
+            onTravelerGenderChange={updateTravelerGender}
             onPhoneChange={updateGroupPhone}
             onSelectDeparture={selectDeparture}
             onViewItinerary={(routeSlug) => openRouteDetail(routeSlug, 'groupRequest')}
             onContinue={() => {
               setCheckoutCancelNotice('');
+              setCheckoutEditErrors({});
               setActiveView('reserveReview');
             }}
           />
@@ -4859,12 +5040,14 @@ export default function ChinaTripsMobile() {
           authStatus={authStatus}
           authMessage={authMessage}
           authError={authError}
+          authErrorField={authErrorField}
           resendIn={otpResendIn}
           onBack={() => {
             if (authStep === 'code') {
               setAuthStep('email');
               setOtpCode('');
               setAuthError('');
+              setAuthErrorField('');
               setAuthMessage('');
               return;
             }
@@ -4875,8 +5058,16 @@ export default function ChinaTripsMobile() {
               setActiveView('groupRequest');
             }
           }}
-          onEmailChange={(value) => updateDraft('email', value)}
-          onOtpChange={setOtpCode}
+          onEmailChange={(value) => {
+            setAuthError('');
+            setAuthErrorField('');
+            updateDraft('email', value);
+          }}
+          onOtpChange={(value) => {
+            setAuthError('');
+            setAuthErrorField('');
+            setOtpCode(value);
+          }}
           onProviderSignIn={(provider) => void handleProviderSignIn(provider)}
           onEmailSignIn={() => void submitEmailSignIn()}
           onVerifyOtp={() => void submitEmailOtpVerify()}
@@ -4885,6 +5076,7 @@ export default function ChinaTripsMobile() {
             setAuthStep('email');
             setOtpCode('');
             setAuthError('');
+            setAuthErrorField('');
             setAuthMessage('');
           }}
         />

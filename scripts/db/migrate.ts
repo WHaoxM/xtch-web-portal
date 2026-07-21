@@ -11,6 +11,7 @@ import {
   targetEnvExampleHint,
   TARGETS,
 } from '../env/targetEnv';
+import { assertTargetEnvValid } from '../env/validateTargetEnv';
 
 const migrationsDir = path.join(repoRoot, 'app', 'api', 'migrations');
 
@@ -115,6 +116,10 @@ async function main() {
   if (command !== 'up') {
     console.error(`Unknown command: ${command}. Only 'up' is supported.`);
     process.exit(1);
+  }
+
+  if (isDeployEnv(envName)) {
+    assertTargetEnvValid(target, process.env, envFile);
   }
 
   if (!process.env.POSTGRES_URL) {

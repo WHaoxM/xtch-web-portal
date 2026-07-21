@@ -39,6 +39,7 @@ export function focusFirstFieldError(
 }
 
 function resolveFocusTarget(anchor: HTMLElement): HTMLElement | null {
+  if (anchor.hasAttribute('data-error-scroll-only')) return null;
   if (isFocusable(anchor)) return anchor;
 
   const nested = anchor.querySelector<HTMLElement>(

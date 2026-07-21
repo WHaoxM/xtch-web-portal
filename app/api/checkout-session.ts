@@ -16,6 +16,7 @@ import {
 } from './lib/orderQueries';
 import { sendBookingConfirmationEmail } from './lib/email';
 import { getUserFromRequest } from './lib/userAuth';
+import { normalizeCheckoutPayload, validateCheckoutPayload } from './lib/checkoutPayload';
 
 type VercelRequestLike = {
   method?: string;
@@ -29,26 +30,7 @@ type VercelResponseLike = {
   json: (body: unknown) => void;
 };
 
-type CheckoutTraveler = {
-  name: string;
-};
-
-type CheckoutPayload = {
-  departureId?: string;
-  adultQuantity?: number;
-  name?: string;
-  email?: string;
-  phone?: string;
-  notes?: string;
-  travelers?: CheckoutTraveler[];
-  accessToken?: string;
-};
-
 const CHECKOUT_SESSION_TTL_MINUTES = 30;
-const MAX_NOTES_LENGTH = 2000;
-const MAX_PHONE_LENGTH = 50;
-const MAX_NAME_LENGTH = 200;
-const MAX_ADULT_QUANTITY = 20;
 
 export default async function handler(req: VercelRequestLike, res: VercelResponseLike) {
   if (req.method !== 'POST') {
@@ -67,8 +49,8 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
       return;
     }
 
-    const payload = normalizePayload(req.body);
-    const validationError = validatePayload(payload);
+    const payload = normalizeCheckoutPayload(req.body);
+    const validationError = validateCheckoutPayload(payload);
     if (validationError) {
       res.status(400).json({ ok: false, error: validationError });
       return;
@@ -116,7 +98,10 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
 
     const holdExpiresAt = new Date(Date.now() + CHECKOUT_SESSION_TTL_MINUTES * 60 * 1000);
 
-    const travelers = payload.travelers!;
+    const travelers = payload.travelers!.map((traveler) => ({
+      name: traveler.name,
+      gender: traveler.gender as 'male' | 'female',
+    }));
     const leadName = travelers[0]?.name || payload.name!;
 
     const { order, hold } = await createPendingOrderAndHold({
@@ -141,10 +126,18 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
 
       const confirmed = await findOrderByOrderNumber(order.orderNumber);
       if (confirmed) {
-        const emailStatus = await sendBookingConfirmationEmail(confirmed);
+        const emailStatus = await sendBookingConfirmationEmail(confirmed, {
+          purpose: 'payment-confirmation',
+          onTravelerSent: () =>
+            updateConfirmationEmailStatus(order.id, 'confirmation_email_traveler_sent'),
+        });
         await updateConfirmationEmailStatus(
           order.id,
-          emailStatus === 'sent' ? 'confirmation_email_sent' : 'confirmation_email_failed',
+          emailStatus === 'sent'
+            ? 'confirmation_email_sent'
+            : emailStatus === 'traveler_sent'
+              ? 'confirmation_email_traveler_sent'
+              : 'confirmation_email_failed',
         );
       }
 
@@ -254,107 +247,6 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
 
     res.status(500).json({ ok: false, error: 'We could not open Stripe Checkout. Please try again.' });
   }
-}
-
-function normalizePayload(body: unknown): CheckoutPayload {
-  if (!body || typeof body !== 'object') return {};
-  const raw = body as Record<string, unknown>;
-  const travelers = normalizeTravelers(raw.travelers);
-  const name = stringValue(raw.name) || travelers[0]?.name || '';
-
-  return {
-    departureId: stringValue(raw.departureId),
-    adultQuantity: numberValue(raw.adultQuantity),
-    name,
-    email: stringValue(raw.email).toLowerCase(),
-    phone: stringValue(raw.phone),
-    notes: stringValue(raw.notes),
-    travelers,
-    accessToken: stringValue(raw.accessToken),
-  };
-}
-
-function validatePayload(payload: CheckoutPayload): string {
-  if (!payload.departureId) return 'Please choose an available departure.';
-  if (!isSafePublicId(payload.departureId)) return 'Invalid departure selection.';
-
-  if (
-    typeof payload.adultQuantity !== 'number' ||
-    !Number.isFinite(payload.adultQuantity) ||
-    payload.adultQuantity < 1 ||
-    payload.adultQuantity > MAX_ADULT_QUANTITY ||
-    !Number.isInteger(payload.adultQuantity)
-  ) {
-    return `Please choose 1 to ${MAX_ADULT_QUANTITY} adult travelers.`;
-  }
-
-  const travelers = payload.travelers ?? [];
-  if (travelers.length !== payload.adultQuantity) {
-    return 'Traveler names must match the number of adults.';
-  }
-
-  for (let index = 0; index < travelers.length; index++) {
-    const travelerName = travelers[index]?.name ?? '';
-    if (!travelerName) {
-      return `Please enter traveler ${index + 1}'s full name.`;
-    }
-    if (travelerName.length > MAX_NAME_LENGTH) {
-      return `Traveler ${index + 1}'s name is too long.`;
-    }
-  }
-
-  if (!payload.name || payload.name.length > MAX_NAME_LENGTH) {
-    return 'Please enter the lead traveler name.';
-  }
-
-  if (!isValidEmail(payload.email)) {
-    return 'Please enter a valid email address.';
-  }
-
-  if (payload.phone) {
-    if (payload.phone.length > MAX_PHONE_LENGTH) {
-      return 'Please enter a shorter phone number.';
-    }
-    if (!/^\+[1-9]\d{6,14}$/.test(payload.phone)) {
-      return 'Please enter a valid international phone number, or leave it blank.';
-    }
-  }
-
-  if (payload.notes && payload.notes.length > MAX_NOTES_LENGTH) {
-    return 'Please keep notes under 2000 characters.';
-  }
-
-  return '';
-}
-
-function normalizeTravelers(value: unknown): CheckoutTraveler[] {
-  if (!Array.isArray(value)) return [];
-  return value.map((item) => {
-    if (!item || typeof item !== 'object') return { name: '' };
-    const record = item as Record<string, unknown>;
-    return { name: stringValue(record.name) };
-  });
-}
-
-function stringValue(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : '';
-}
-
-function numberValue(value: unknown): number | undefined {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'string') {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) return parsed;
-  }
-  return undefined;
-}
-
-function isValidEmail(value: string | undefined): boolean {
-  return Boolean(value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value));
-}
-
-function isSafePublicId(value: string | undefined): boolean {
-  return Boolean(value && /^[a-z0-9_-]+$/i.test(value));
 }
 
 function getOrigin(req: VercelRequestLike): string {

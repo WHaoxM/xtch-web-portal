@@ -12,7 +12,10 @@ const sampleDraft = {
   departureId: 'dep-1',
   dateRange: '2026-08-01 – 2026-08-05',
   adultQuantity: 2,
-  travelers: [{ name: 'Ada' }, { name: 'Bob' }],
+  travelers: [
+    { name: 'Ada', gender: 'female' as const },
+    { name: 'Bob', gender: 'male' as const },
+  ],
   name: 'Ada',
   email: 'ada@example.com',
   phoneCountry: 'US',

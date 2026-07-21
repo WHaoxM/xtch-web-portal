@@ -3331,6 +3331,72 @@ span.iosapp-provider-mark {
   border-top: 1px solid var(--ios-separator);
 }
 
+.iosapp-traveler-entry {
+  min-width: 0;
+  border-bottom: 1px solid var(--ios-separator);
+}
+
+.iosapp-traveler-entry:last-child {
+  border-bottom: 0;
+}
+
+.iosapp-gender-field {
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 4px 16px 14px;
+}
+
+.iosapp-gender-field legend {
+  padding: 0 0 8px;
+  color: var(--ios-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.iosapp-gender-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.iosapp-gender-options label {
+  min-width: 0;
+  cursor: pointer;
+}
+
+.iosapp-gender-options input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.iosapp-gender-options span {
+  display: grid;
+  min-height: 44px;
+  place-items: center;
+  border: 1px solid var(--ios-separator);
+  border-radius: 12px;
+  color: var(--ios-secondary);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.iosapp-gender-options input:checked + span {
+  border-color: #075985;
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.iosapp-gender-options input:focus-visible + span {
+  outline: 2px solid var(--ios-blue);
+  outline-offset: 2px;
+}
+
+.iosapp-gender-field.is-invalid {
+  background: rgba(255, 59, 48, 0.04);
+}
+
 .iosapp-joined-roster {
   display: grid;
   gap: 6px;
@@ -3345,6 +3411,49 @@ span.iosapp-provider-mark {
   font-size: 13px;
   font-weight: 600;
   line-height: 1.35;
+}
+
+.iosapp-joined-roster > small {
+  padding: 0 16px;
+  color: var(--ios-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.iosapp-roster-legend {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  padding: 0 16px;
+}
+
+.iosapp-roster-legend span {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ios-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.iosapp-roster-legend i {
+  width: 10px;
+  height: 10px;
+  margin-right: 5px;
+  border-radius: 50%;
+}
+
+.iosapp-roster-legend i.is-female {
+  background: #9d174d;
+}
+
+.iosapp-roster-legend i.is-male {
+  background: #1e3a8a;
+}
+
+.iosapp-roster-legend i.is-unknown {
+  background: #4b5563;
 }
 
 .iosapp-joined-roster.is-empty > p {
@@ -3386,8 +3495,23 @@ span.iosapp-provider-mark {
 }
 
 .iosapp-traveler-avatar.is-anonymous {
-  background: hsl(var(--avatar-hue, 210) 28% 92%);
-  color: hsl(var(--avatar-hue, 210) 32% 38%);
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.iosapp-traveler-avatar.is-anonymous.is-female {
+  background: #fce7f3;
+  color: #831843;
+}
+
+.iosapp-traveler-avatar.is-anonymous.is-male {
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+
+.iosapp-traveler-avatar.is-anonymous.is-unknown {
+  background: #e5e7eb;
+  color: #374151;
 }
 
 .iosapp-traveler-avatar.is-ghost {

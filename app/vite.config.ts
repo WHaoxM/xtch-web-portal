@@ -6,6 +6,7 @@ import { defineConfig, loadEnv, type Plugin } from "vite"
 import { inspectAttr } from 'kimi-plugin-inspect-react'
 import { localApiRoutes, rawBodyRoutes } from './scripts/localApiRoutes'
 import { loadTargetEnv, normalizeTarget } from '../scripts/env/targetEnv'
+import { assertTargetEnvValid, isProdDeployTarget } from '../scripts/env/validateTargetEnv'
 
 type VercelResponseLike = {
   status: (code: number) => VercelResponseLike;
@@ -96,7 +97,10 @@ export default defineConfig(({ mode }) => {
   // Canonical secrets: env/<target>/.env (legacy app/.env.*.local still falls back).
   // Re-apply with override so Vite in-process restarts pick up edited secrets.
   const target = normalizeTarget(mode);
-  loadTargetEnv(target, { override: true });
+  const loaded = loadTargetEnv(target, { override: true });
+  if (isProdDeployTarget(target)) {
+    assertTargetEnvValid(target, process.env, loaded?.path);
+  }
 
   const outDir = path.join('dist', target);
 

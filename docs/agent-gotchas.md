@@ -48,7 +48,7 @@
 | 环境分层：两套生产，不是 selfhost vs cloud | 四层 = `local` / `tunnel` / `win11-home` / `cloud-vps`。配置在 `env/<target>/.env`；生产只有 **win11-home + cloud-vps**；`selfhost` 只是旧别名。总览：`docs/ops/README.md` |
 | Env 路径 | 真相源 `env/<target>/.env`；旧 `app/.env.*.local` 仅一轮回退（`targetEnv` 会 warn）。勿再新增 `app/.env*.example` |
 | Deploy target：同一时刻一个公网 DNS | `win11-home` 与 `cloud-vps` 换的是机器/域名/env/Caddy；勿两边同时接同一域名。索引见 `docs/ops/README.md` |
-| 公网部署勿把 5432/9000 暴露 | `docker-compose.yml` 端口须绑 `127.0.0.1`；只放行 80/443；公网前改掉 postgres/minio 默认口令。见 `docs/ops/win11-home.md` / `cloud-vps.md` |
+| 公网部署勿把 5432/9000 暴露 | `docker-compose.yml` 端口须绑 `127.0.0.1`；只放行 80/443；Compose **无默认密码**（根 `.env` 必填）。见 `docs/ops/shared/compose-credentials.md` |
 | 公网 deploy 禁止 auth/checkout bypass | `env/win11-home/.env` / `env/cloud-vps/.env` 不得设 `DEV_CHECKOUT_BYPASS` / `DEV_AUTH_BYPASS_*`；`npm run deploy:serve` 会拒绝启动 |
 | Admin 双名单 + 角色 | 服务端 `resolveAdminRole`：`ADMIN_TECH_EMAIL_ALLOWLIST` / `ADMIN_OPS_EMAIL_ALLOWLIST`；两边都有 → tech；旧 `ADMIN_EMAIL_ALLOWLIST` 仅在新名单皆空时兼容为全部 tech。bypass 邮箱也必须落在名单内。**非名单账号**：`/api/admin/me` 403 后前端只渲染独立 Access denied 页，不展示侧栏/工作台壳 |
 | 公网 deploy 拒启空/占位 Admin 名单（G1） | `win11-home` / `cloud-vps`：名单全空或仅 `you@example.com` 时 `deploy:serve` `process.exit(1)`；不影响 Vite `local` |

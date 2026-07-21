@@ -366,6 +366,8 @@ export default function CustomTrip() {
               <div className="mt-14 space-y-7">
                 <div
                   data-field-error="timing"
+                  aria-invalid={Boolean(fieldErrors.timing)}
+                  aria-describedby={fieldErrors.timing ? fieldErrorId('timing') : undefined}
                   className={cn(
                     'space-y-7 rounded-[6px]',
                     fieldErrors.timing && 'border border-red-400 bg-red-50/40 p-4 md:p-5',
@@ -376,6 +378,7 @@ export default function CustomTrip() {
                     label="Estimated Travel Date *"
                     placeholder="Select estimated travel date"
                     invalid={Boolean(fieldErrors.timing)}
+                    describedBy={fieldErrors.timing ? fieldErrorId('timing') : undefined}
                   />
                   <SelectField
                     name="travelers"
@@ -383,6 +386,7 @@ export default function CustomTrip() {
                     placeholder="--- Select number of travelers ---"
                     options={['1 traveler', '2 travelers', '3-4 travelers', '5-8 travelers', '9+ travelers']}
                     invalid={Boolean(fieldErrors.timing)}
+                    describedBy={fieldErrors.timing ? fieldErrorId('timing') : undefined}
                   />
                   <SelectField
                     name="days"
@@ -390,6 +394,7 @@ export default function CustomTrip() {
                     placeholder="--- Select your trip length ---"
                     options={['1-3 days', '4-6 days', '7-10 days', '11-14 days', '15+ days', 'Not sure yet']}
                     invalid={Boolean(fieldErrors.timing)}
+                    describedBy={fieldErrors.timing ? fieldErrorId('timing') : undefined}
                   />
                   {fieldErrors.timing && (
                     <p id={fieldErrorId('timing')} className="text-[14px] text-red-600" role="alert">
@@ -493,6 +498,9 @@ export default function CustomTrip() {
 
                 <div
                   data-field-error="turnstile"
+                  data-error-scroll-only
+                  aria-invalid={Boolean(fieldErrors.turnstile)}
+                  aria-describedby={fieldErrors.turnstile ? fieldErrorId('turnstile') : undefined}
                   className={cn(
                     fieldErrors.turnstile && 'rounded-[6px] border border-red-400 bg-red-50/40 p-4',
                   )}
@@ -544,6 +552,7 @@ function TextField({
   hint,
   error,
   invalid,
+  describedBy,
 }: {
   name: string;
   label: string;
@@ -552,9 +561,10 @@ function TextField({
   hint?: string;
   error?: string;
   invalid?: boolean;
+  describedBy?: string;
 }) {
   const showInvalid = Boolean(error || invalid);
-  const describedBy = error ? fieldErrorId(name) : undefined;
+  const errorDescription = error ? fieldErrorId(name) : describedBy;
 
   return (
     <label className="block" data-field-error={error ? name : undefined}>
@@ -566,7 +576,7 @@ function TextField({
         type={type}
         placeholder={placeholder}
         aria-invalid={showInvalid}
-        aria-describedby={describedBy}
+        aria-describedby={errorDescription}
         className={cn(
           'min-h-[58px] w-full rounded-[6px] border border-[#dce5ee] bg-[#f8fafc] px-5 text-[16px] text-[#122332] outline-none placeholder:text-[#a8b0b8] focus:border-[#294f5b]',
           showInvalid && 'border-red-500 focus:border-red-500',
@@ -590,6 +600,7 @@ function SelectField({
   hint,
   error,
   invalid,
+  describedBy,
 }: {
   name: string;
   label: string;
@@ -598,9 +609,10 @@ function SelectField({
   hint?: string;
   error?: string;
   invalid?: boolean;
+  describedBy?: string;
 }) {
   const showInvalid = Boolean(error || invalid);
-  const describedBy = error ? fieldErrorId(name) : undefined;
+  const errorDescription = error ? fieldErrorId(name) : describedBy;
 
   return (
     <label className="block" data-field-error={error ? name : undefined}>
@@ -610,7 +622,7 @@ function SelectField({
       <select
         name={name}
         aria-invalid={showInvalid}
-        aria-describedby={describedBy}
+        aria-describedby={errorDescription}
         className={cn(
           'min-h-[58px] w-full rounded-[6px] border border-[#dce5ee] bg-[#f8fafc] px-5 text-[16px] text-[#394a5a] outline-none focus:border-[#294f5b]',
           showInvalid && 'border-red-500 focus:border-red-500',

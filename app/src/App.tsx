@@ -15,6 +15,7 @@ import Contact from './pages/Contact';
 import Search from './pages/Search';
 import DestinationDetail from './pages/DestinationDetail';
 import RouteDetail from './pages/RouteDetail';
+import GroupTours from './pages/GroupTours';
 import TourCost from './pages/TourCost';
 import FeaturedServices from './pages/FeaturedServices';
 import PrivacyPolicy from './pages/PrivacyPolicy';
@@ -146,6 +147,7 @@ function App() {
           <Route path="/destinations/:slug" element={<DestinationDetail />} />
           <Route path="/china-trips" element={<ChinaTours />} />
           <Route path="/china-tours" element={<Navigate to="/china-trips" replace />} />
+          <Route path="/group-tours" element={<GroupTours />} />
           <Route path="/tours/:slug" element={<RouteDetail />} />
           <Route path="/custom-trip" element={<CustomTrip />} />
           <Route path="/featured-services" element={<FeaturedServices />} />

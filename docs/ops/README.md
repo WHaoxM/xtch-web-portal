@@ -31,8 +31,11 @@
 
 ### 共享专题
 
+- [shared/compose-credentials.md](./shared/compose-credentials.md) — Compose 无默认密码；首启 / 旧 volume 改密
+- [shared/caddy-csp-matrix.md](./shared/caddy-csp-matrix.md) — CSP 上线前测试矩阵（V1 未启用严格 CSP）
 - [shared/minio.md](./shared/minio.md)
 - [shared/content-backup.md](./shared/content-backup.md)
+- [shared/booking-email.md](./shared/booking-email.md) — 支付成功旅客确认信、运营副本与重试语义
 
 ## S1 身份与双名单
 

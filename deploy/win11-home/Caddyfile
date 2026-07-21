@@ -3,10 +3,85 @@
 # Install Caddy, then run as a Windows service with this file, e.g.:
 #   caddy run --config D:\XTCH_PROJECT\xtch-web-portal\deploy\win11-home\Caddyfile
 #
-# Caddy obtains and renews HTTPS certificates automatically (needs public 80/443).
+# Body limits and timeouts align with role-2 runtime constants
+# (app/scripts/requestBodyLimits.ts):
+#   JSON API 1 MiB · Stripe webhook 256 KiB · read 60s · body 30s
+#
+# Requires Caddy 2.10+ for `request_body`.
 # Docs: docs/ops/win11-home.md
+#
+# Prefer SELFHOST_HOST=127.0.0.1 when Caddy is the only public entry.
+# LAN direct :3080 is optional for debugging — do not expose 3080 to the internet.
+
+{
+	servers {
+		timeouts {
+			read_body 30s
+			read_header 10s
+		}
+	}
+}
+
+(xtch_security_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+	}
+	# Strict Content-Security-Policy is NOT enabled for V1.
+	# Build and verify a source matrix first (see docs/ops/shared/caddy-csp-matrix.md).
+}
+
+(xtch_proxy_api) {
+	reverse_proxy 127.0.0.1:3080 {
+		transport http {
+			response_header_timeout 60s
+			read_timeout 60s
+			write_timeout 60s
+		}
+	}
+}
+
+(xtch_proxy_default) {
+	reverse_proxy 127.0.0.1:3080 {
+		transport http {
+			response_header_timeout 60s
+			read_timeout 60s
+			write_timeout 60s
+		}
+	}
+}
 
 xuntingtravel.com, www.xuntingtravel.com {
+	import xtch_security_headers
 	encode gzip
-	reverse_proxy 127.0.0.1:3080
+
+	handle /api/stripe-webhook* {
+		request_body {
+			max_size 256KB
+		}
+		import xtch_proxy_api
+	}
+
+	handle /api/* {
+		request_body {
+			max_size 1MB
+		}
+		import xtch_proxy_api
+	}
+
+	handle /s3/* {
+		reverse_proxy 127.0.0.1:3080 {
+			transport http {
+				response_header_timeout 120s
+				read_timeout 120s
+				write_timeout 120s
+			}
+		}
+	}
+
+	handle {
+		import xtch_proxy_default
+	}
 }

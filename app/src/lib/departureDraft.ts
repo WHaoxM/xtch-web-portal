@@ -15,6 +15,10 @@ export type DepartureEditDraft = {
   capacity: string;
   featuredOnHome: boolean;
   featuredPriority: string;
+  refillChainKey: string;
+  refillSequence: string;
+  refillEnabled: boolean;
+  refillMaxAutoActivations: string;
   confirmationRule: string;
   includedText: string;
   excludedText: string;
@@ -36,6 +40,11 @@ export type AdminDepartureRecord = {
   guaranteed?: boolean;
   featured_on_home?: boolean;
   featured_priority?: number;
+  refill_chain_key?: string | null;
+  refill_sequence?: number | null;
+  refill_enabled?: boolean;
+  refill_max_auto_activations?: number | null;
+  refill_activation_count?: number;
   confirmation_rule?: string;
   included_core_items?: unknown[];
   excluded_core_items?: unknown[];
@@ -66,6 +75,10 @@ export function emptyDepartureDraft(
     capacity: '8',
     featuredOnHome: false,
     featuredPriority: '0',
+    refillChainKey: '',
+    refillSequence: '1',
+    refillEnabled: false,
+    refillMaxAutoActivations: '1',
     confirmationRule:
       'Minimum travelers may apply. If the minimum is not met, you will be offered a full refund or a date change.',
     includedText: 'Hotel accommodation\nDaily breakfast\nLocal guide\nEntrance fees',
@@ -89,6 +102,10 @@ export function departureToDraft(departure: AdminDepartureRecord): DepartureEdit
     capacity: String(departure.capacity),
     featuredOnHome: Boolean(departure.featured_on_home),
     featuredPriority: String(departure.featured_priority ?? 0),
+    refillChainKey: departure.refill_chain_key ?? '',
+    refillSequence: String(departure.refill_sequence ?? 1),
+    refillEnabled: Boolean(departure.refill_enabled),
+    refillMaxAutoActivations: String(departure.refill_max_auto_activations ?? 1),
     confirmationRule: departure.confirmation_rule || '',
     includedText: (departure.included_core_items ?? []).map(String).join('\n'),
     excludedText: (departure.excluded_core_items ?? []).map(String).join('\n'),

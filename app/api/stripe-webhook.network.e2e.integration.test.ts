@@ -155,7 +155,7 @@ if (!isTestKey) {
       leadName: 'Net Paid',
       leadEmail: `net-paid-${RUN}@example.com`,
       leadPhone: '',
-      travelers: [{ name: 'Net Paid' }],
+      travelers: [{ name: 'Net Paid', gender: 'female' }],
       holdExpiresAt: new Date(Date.now() + 30 * 60 * 1000),
     });
     await attachStripeSessionToOrder(created.order.id, created.hold.id, sessionId);
@@ -221,7 +221,7 @@ if (!isTestKey) {
       leadName: 'Net Refund',
       leadEmail: `net-ref-${RUN}@example.com`,
       leadPhone: '',
-      travelers: [{ name: 'Net Refund' }],
+      travelers: [{ name: 'Net Refund', gender: 'male' }],
       holdExpiresAt: new Date(Date.now() + 30 * 60 * 1000),
     });
     await attachStripeSessionToOrder(created.order.id, created.hold.id, sessionId);

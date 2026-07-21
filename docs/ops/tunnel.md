@@ -34,7 +34,7 @@ Presign 的 Host 必须等于隧道域名：脚本把 `S3_ENDPOINT` / `S3_PUBLIC
 
 ## 前置
 
-1. Docker Desktop：`docker compose up -d`（Postgres + MinIO）
+1. Docker Desktop：先配置仓库根 `.env`（见 [shared/compose-credentials.md](./shared/compose-credentials.md)），再 `docker compose up -d`（Postgres + MinIO）
 2. [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/) 在 PATH
 3. Resend API key（试用域需 `BOOKING_EMAIL_OVERRIDE_TO` = 账号本人邮箱）
 

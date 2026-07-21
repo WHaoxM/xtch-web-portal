@@ -127,10 +127,22 @@ async function handleResendConfirmation(
   }
 
   await updateConfirmationEmailStatus(order.id, 'confirmation_email_retrying');
-  const emailStatus = await sendBookingConfirmationEmail(order);
+  const purpose =
+    order.confirmation_email_status === 'confirmation_email_sent'
+      ? 'admin-resend'
+      : 'payment-confirmation';
+  const emailStatus = await sendBookingConfirmationEmail(order, {
+    purpose,
+    onTravelerSent: () =>
+      updateConfirmationEmailStatus(order.id, 'confirmation_email_traveler_sent'),
+  });
   await updateConfirmationEmailStatus(
     order.id,
-    emailStatus === 'sent' ? 'confirmation_email_sent' : 'confirmation_email_failed',
+    emailStatus === 'sent'
+      ? 'confirmation_email_sent'
+      : emailStatus === 'traveler_sent'
+        ? 'confirmation_email_traveler_sent'
+        : 'confirmation_email_failed',
   );
 
   await writeAuditLog({
@@ -139,7 +151,7 @@ async function handleResendConfirmation(
     action: 'admin_resend_confirmation_email',
     targetType: 'order',
     targetId: order.order_number,
-    metadata: { emailStatus },
+    metadata: { emailStatus, purpose },
     ipHash: hashIp(getClientIp(req)),
     userAgent: getHeaderValue(req.headers['user-agent']),
   });

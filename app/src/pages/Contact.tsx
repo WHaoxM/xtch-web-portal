@@ -281,6 +281,9 @@ export default function Contact() {
                 </div>
                 <div
                   data-field-error="turnstile"
+                  data-error-scroll-only
+                  aria-invalid={Boolean(fieldErrors.turnstile)}
+                  aria-describedby={fieldErrors.turnstile ? fieldErrorId('turnstile') : undefined}
                   className={cn(
                     fieldErrors.turnstile && 'rounded-[10px] border border-red-300 bg-red-50/60 p-3',
                   )}
