@@ -28,6 +28,7 @@ export const CONFIRMATION_EMAIL_STATUS_LABELS: Record<string, string> = {
   confirmation_email_sent: '已发送',
   confirmation_email_failed: '发送失败',
   confirmation_email_retrying: '重试中',
+  confirmation_email_traveler_sent: '旅客已收到，运营副本待补发',
 };
 
 /** Order status = fulfillment progress (plain language). */

@@ -1,4 +1,5 @@
 import { sql } from './db';
+import { refillAfterConfirmedOrder } from './departureRefill';
 import { hashToken } from './orders';
 import type { Order } from './bookingSchema';
 
@@ -264,6 +265,8 @@ export async function confirmOrderAndConsumeHold(
         AND status = 'active'
     `;
 
+    await refillAfterConfirmedOrder(tx, orderId);
+
     return true;
   });
 }
@@ -309,7 +312,12 @@ export async function updateOrderRefundState(
 
 export async function updateConfirmationEmailStatus(
   orderId: string,
-  status: 'confirmation_email_pending' | 'confirmation_email_sent' | 'confirmation_email_failed' | 'confirmation_email_retrying',
+  status:
+    | 'confirmation_email_pending'
+    | 'confirmation_email_sent'
+    | 'confirmation_email_failed'
+    | 'confirmation_email_retrying'
+    | 'confirmation_email_traveler_sent',
 ): Promise<void> {
   await sql`
     UPDATE orders

@@ -1143,6 +1143,10 @@ function DeparturesPanel({ token }: { token: string }) {
       capacity: Number(draft.capacity),
       featuredOnHome: draft.featuredOnHome,
       featuredPriority: Number(draft.featuredPriority) || 0,
+      refillChainKey: draft.refillChainKey || undefined,
+      refillSequence: Number(draft.refillSequence) || undefined,
+      refillEnabled: draft.refillEnabled,
+      refillMaxAutoActivations: Number(draft.refillMaxAutoActivations) || undefined,
       confirmationRule: draft.confirmationRule,
       includedCoreItems: draft.includedText
         .split('\n')
@@ -1214,6 +1218,19 @@ function DeparturesPanel({ token }: { token: string }) {
           isCreate={isCreate}
           routes={routes}
           destinations={destinations}
+          refillChains={Array.from(
+            new Map(
+              departures
+                .filter((departure) => departure.refill_chain_key)
+                .map((departure) => [
+                  departure.refill_chain_key as string,
+                  {
+                    key: departure.refill_chain_key as string,
+                    routeSlug: departure.route_slug,
+                  },
+                ]),
+            ).values(),
+          )}
           availableSeats={editingSeats}
           onCancel={() => {
             setEditing(null);

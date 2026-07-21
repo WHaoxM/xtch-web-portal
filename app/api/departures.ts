@@ -27,6 +27,12 @@ function toCustomerDeparture(d: {
   currency: string;
   capacity: number;
   available_seats: number;
+  confirmed_roster: {
+    male: number;
+    female: number;
+    unknown: number;
+    total: number;
+  };
   included_core_items: unknown[];
   excluded_core_items: unknown[];
   important_notes: unknown[];
@@ -46,6 +52,12 @@ function toCustomerDeparture(d: {
     currency: d.currency,
     capacity: d.capacity,
     available_seats: d.available_seats,
+    confirmed_roster: {
+      male: d.confirmed_roster.male,
+      female: d.confirmed_roster.female,
+      unknown: d.confirmed_roster.unknown,
+      total: d.confirmed_roster.total,
+    },
     included_core_items: d.included_core_items,
     excluded_core_items: d.excluded_core_items,
     important_notes: d.important_notes,

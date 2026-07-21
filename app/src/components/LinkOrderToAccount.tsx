@@ -10,6 +10,7 @@ import {
   parseOrderClaimInput,
   type ClaimOrderProof,
 } from '@/lib/orderClient';
+import { fieldErrorId, focusFirstFieldError } from '@/lib/formErrors';
 import { Button } from '@/components/ui/button';
 
 type LinkOrderToAccountProps = {
@@ -36,7 +37,9 @@ export function LinkOrderToAccount({
   const [pasteValue, setPasteValue] = useState('');
   const [status, setStatus] = useState<'idle' | 'working' | 'linked' | 'error'>('idle');
   const [message, setMessage] = useState('');
+  const [claimInputError, setClaimInputError] = useState('');
   const autoTriedKey = useRef('');
+  const shellRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     return subscribeAuthSession((next) => {
@@ -100,11 +103,17 @@ export function LinkOrderToAccount({
       return;
     }
     if (!activeProof) {
+      const inputError = 'Paste the full link from your confirmation email (includes token).';
       setStatus('error');
-      setMessage('Paste the full link from your confirmation email (includes token).');
+      setMessage(inputError);
+      setClaimInputError(inputError);
+      requestAnimationFrame(() => {
+        focusFirstFieldError(['claimInput'], { claimInput: inputError }, shellRef.current);
+      });
       return;
     }
 
+    setClaimInputError('');
     setStatus('working');
     setMessage('');
     try {
@@ -133,7 +142,7 @@ export function LinkOrderToAccount({
     : 'mt-6 rounded-lg border bg-slate-50 p-4';
 
   return (
-    <div className={[shellClass, className].filter(Boolean).join(' ')}>
+    <div ref={shellRef} className={[shellClass, className].filter(Boolean).join(' ')}>
       <p className={isMobile ? 'iosapp-booking-cta-note' : 'text-sm font-medium text-slate-900'}>
         Save this booking to your account
       </p>
@@ -160,7 +169,7 @@ export function LinkOrderToAccount({
       ) : (
         <div className={isMobile ? 'iosapp-booking-actions mt-3' : 'mt-3 space-y-3'}>
           {allowPaste && (
-            <label className="block space-y-1">
+            <label className="block space-y-1" data-field-error="claimInput">
               <span className={isMobile ? 'sr-only' : 'text-xs text-muted-foreground'}>
                 Confirmation link
               </span>
@@ -172,8 +181,11 @@ export function LinkOrderToAccount({
                 }
                 placeholder="Paste confirmation link (/orders/…?token=…)"
                 value={pasteValue}
+                aria-invalid={Boolean(claimInputError)}
+                aria-describedby={claimInputError ? fieldErrorId('claimInput') : undefined}
                 onChange={(event) => {
                   setPasteValue(event.target.value);
+                  setClaimInputError('');
                   if (status === 'error') {
                     setStatus('idle');
                     setMessage('');
@@ -209,7 +221,11 @@ export function LinkOrderToAccount({
             </p>
           )}
           {message && status === 'error' && (
-            <p className={isMobile ? 'iosapp-checkout-note text-destructive' : 'text-sm text-destructive'}>
+            <p
+              id={claimInputError ? fieldErrorId('claimInput') : undefined}
+              className={isMobile ? 'iosapp-checkout-note text-destructive' : 'text-sm text-destructive'}
+              role="alert"
+            >
               {message}
             </p>
           )}

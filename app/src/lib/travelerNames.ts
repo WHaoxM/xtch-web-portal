@@ -1,11 +1,12 @@
 export type TravelerNameDraft = {
   name: string;
+  gender: 'male' | 'female' | '';
 };
 
 export const MAX_TRAVELER_NAME_LENGTH = 200;
 
 export function createEmptyTravelers(count: number): TravelerNameDraft[] {
-  return Array.from({ length: Math.max(0, count) }, () => ({ name: '' }));
+  return Array.from({ length: Math.max(0, count) }, () => ({ name: '', gender: '' }));
 }
 
 /** Resize traveler slots when adult quantity changes; keep existing names in order. */
@@ -15,10 +16,15 @@ export function resizeTravelers(
   leadName = '',
 ): TravelerNameDraft[] {
   const safeCount = Math.max(1, nextCount);
-  const base = Array.isArray(current) ? current.map((item) => ({ name: item?.name ?? '' })) : [];
+  const base: TravelerNameDraft[] = Array.isArray(current)
+    ? current.map((item) => ({
+        name: item?.name ?? '',
+        gender: item?.gender === 'male' || item?.gender === 'female' ? item.gender : '',
+      }))
+    : [];
 
   if (base.length === 0 && leadName.trim()) {
-    base.push({ name: leadName });
+    base.push({ name: leadName, gender: '' });
   }
 
   if (base.length === safeCount) return base;
@@ -65,6 +71,35 @@ export function validateTravelerNames(
     }
     if (name.length > MAX_TRAVELER_NAME_LENGTH) {
       return { index, message: `Traveler ${index + 1}'s name is too long.` };
+    }
+  }
+
+  return null;
+}
+
+export function validateTravelerDetails(
+  travelers: TravelerNameDraft[],
+  adultQuantity: number,
+): { index: number; field: 'name' | 'gender'; message: string } | null {
+  if (travelers.length !== adultQuantity) {
+    return {
+      index: 0,
+      field: 'name',
+      message: 'Traveler details must match the number of adults.',
+    };
+  }
+
+  for (let index = 0; index < travelers.length; index++) {
+    const traveler = travelers[index];
+    const name = traveler?.name?.trim() ?? '';
+    if (!name) {
+      return { index, field: 'name', message: `Enter traveler ${index + 1}'s full name.` };
+    }
+    if (name.length > MAX_TRAVELER_NAME_LENGTH) {
+      return { index, field: 'name', message: `Traveler ${index + 1}'s name is too long.` };
+    }
+    if (traveler.gender !== 'male' && traveler.gender !== 'female') {
+      return { index, field: 'gender', message: `Select traveler ${index + 1}'s gender.` };
     }
   }
 

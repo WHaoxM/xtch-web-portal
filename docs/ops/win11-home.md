@@ -32,7 +32,8 @@ Presign 签本机 MinIO（桶 xtch-prod）；浏览器 PUT/GET 走 https://YOUR_
 ## 安全（必读）
 
 - **禁止** `DEV_CHECKOUT_BYPASS` / `DEV_AUTH_BYPASS_EMAIL` / `VITE_DEV_AUTH_BYPASS_EMAIL`。`npm run deploy:serve`（或 `selfhost`）检测到会直接退出。
-- Docker 端口已绑 `127.0.0.1`（见仓库根 `docker-compose.yml`）。公网前务必改掉默认 `postgres` / `minioadmin` 口令，并同步改 `env/win11-home/.env` 与 `minio-init` 里的 mc 凭据。
+- Docker 端口已绑 `127.0.0.1`（见仓库根 `docker-compose.yml`）。**无内置默认密码**——必须先配置仓库根 `.env`（见 [compose-credentials.md](./shared/compose-credentials.md)）。
+- Caddy 为公网入口时：`SELFHOST_HOST=127.0.0.1`、`TRUST_PROXY=1`；**不要**对公网开放 `3080`。
 - Admin 只走真实 **Prod Supabase** 登录 + 双名单：`ADMIN_OPS_EMAIL_ALLOWLIST` / `ADMIN_TECH_EMAIL_ALLOWLIST`（旧 `ADMIN_EMAIL_ALLOWLIST` 仍兼容，全部视为 tech）。空名单或仅 `you@example.com` 时 `deploy:serve` 拒启。
 
 ## 首次准备
@@ -42,16 +43,15 @@ Presign 签本机 MinIO（桶 xtch-prod）；浏览器 PUT/GET 走 https://YOUR_
 仓库根：
 
 ```powershell
+Copy-Item .env.example .env
+# 编辑全部 REPLACE_ME_*（强随机）；与 env/win11-home/.env 保持一致
 docker compose up -d
 ```
 
 确认本机可连 `127.0.0.1:5432` 与 `127.0.0.1:9000`（外网应不通）。
 
-公网前改密示例（新 volume 可直接改 compose；已有 volume 需在容器内 `ALTER USER` / MinIO 控制台改密，并改 compose 环境变量后重建）：
-
-- `POSTGRES_PASSWORD`
-- `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD`
-- `minio-init` 里 `mc alias set ...` 的用户名密码
+- **新 volume**：第一次 `up` 前就把最终口令写进根 `.env`。
+- **已有 volume**：改 `.env` / compose **不会**自动改旧密码；按 [compose-credentials.md](./shared/compose-credentials.md) 在容器内 `ALTER USER` / MinIO 控制台改密后再同步 env。
 
 ### 2. Env
 
@@ -62,7 +62,7 @@ Copy-Item env\win11-home\.env.example env\win11-home\.env
 
 若仍有旧文件 `app/.env.win11-home.local` 或 `app/.env.selfhost.local`：serve/migrate/`build:win11-home` 会回退读取并 warn；建议迁到 `env/win11-home/.env`。
 
-填数据库/MinIO 口令、Supabase、Resend（可选）、Stripe（可选）。公网询盘表单还需 **Cloudflare Turnstile**（见下）。多入口公开地址：
+填数据库/MinIO 口令（与根 `.env` 一致）、Supabase、Resend（可选）、Stripe（可选）。公网询盘表单还需 **Cloudflare Turnstile**（见下）。多入口公开地址：
 
 | 变量 | 值 |
 |---|---|
@@ -72,8 +72,9 @@ Copy-Item env\win11-home\.env.example env\win11-home\.env
 | `APP_ENV` | `prod` |
 | `PUBLIC_DOMAIN` | 有域名时填（最高优先，默认 https） |
 | `PUBLIC_IP` | 可选公网 IP（次优先，http） |
-| `SELFHOST_HOST` | 默认 `0.0.0.0`（局域网/公网网卡可达）；本机-only 用 `127.0.0.1` |
+| `SELFHOST_HOST` | 有 Caddy 时用 `127.0.0.1`；仅当需要局域网直连 `:3080` 时用 `0.0.0.0` |
 | `SELFHOST_PORT` | 默认 `3080`（与 Vite 开发 `:3000` 分开；可用 env 覆盖） |
+| `TRUST_PROXY` | Caddy 后设 `1`；直连 Node 时设 `0` |
 
 `S3_BROWSER_ENDPOINT` / `S3_PUBLIC_BASE_URL` 可留空：浏览器 `/s3` **跟当前访问 Host**；无请求时按 `PUBLIC_DOMAIN` > `PUBLIC_IP` > 局域网侦测。
 
@@ -160,7 +161,7 @@ caddy run --config D:\XTCH_PROJECT\xtch-web-portal\deploy\win11-home\Caddyfile
 完成下列再对外宣告「生产可用」：
 
 1. 域名 DNS A 指向本机；路由器 80/443 端口映射；`https://YOUR_DOMAIN` 证书有效
-2. Docker 已改掉默认 `postgres` / `minioadmin` 口令，并同步到 `env/win11-home/.env`
+2. 根 `.env` 与 `env/win11-home/.env` 使用强随机口令且一致（无 compose 默认弱口令）
 3. **Prod** Supabase 项目：`VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` 已填；Auth 回调含 `https://YOUR_DOMAIN/#/...`
 4. 双名单已填真实邮箱：`ADMIN_OPS_EMAIL_ALLOWLIST` / `ADMIN_TECH_EMAIL_ALLOWLIST`（勿留空、勿用 `you@example.com`）
 5. **禁止** `DEV_CHECKOUT_BYPASS` / `DEV_AUTH_BYPASS_*`；空/占位名单时 `deploy:serve` 必须拒启
@@ -172,6 +173,7 @@ caddy run --config D:\XTCH_PROJECT\xtch-web-portal\deploy\win11-home\Caddyfile
 
 - 媒体：presign → PUT `https://YOUR_DOMAIN/s3/...` → 前台同域显示（非 403）
 - 外网只扫到 80/443；`5432` / `9000` / `9001` / `3080` 外网不通
+- Caddy：JSON API >1 MiB → 413；webhook / `/s3` / BrowserRouter 深链正常；安全头可见；严格 CSP 未启用（见 [caddy-csp-matrix.md](./shared/caddy-csp-matrix.md)）
 - 重启 Win11 后 Docker + Caddy + Node 自动恢复
 
 ## 日常命令

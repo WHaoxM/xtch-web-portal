@@ -2,21 +2,143 @@
 
 ## Status
 
-**blocked（Subagent-4 SEO/prerender）** — 已审计现状；构建期内容真相源待用户确认后才能实现。未部署、未读真实生产数据、未改真实密钥。
+**review-needed（7.20 整合验证）** — 6 个领域均已完成代码或清单交付；自动补团与表单已有完整命令验证，桌面 Group Tours 有数据测试和双视口冒烟。支付邮件与性别头像因当前命令执行器无退出状态仍需统一复跑；性别头像另需 320/375/390 浏览器验收。游记扩至 10 条继续等待用户提供 7 份真实内容与图片。
 
-### Progress note（SEO/prerender 开工，2026-07-20）
+### Progress note（7.20 用户决策与实施分配，2026-07-21）
 
-- 角色：`docs/release/v1-source-audit/04-seo-prerender.md` + README。
-- 已读：`prerender.mjs`、`seo-public-routes.mjs`、`generate-sitemap.mjs`、`Seo.tsx`、`routeMeta.ts`、`contentStore.ts`、`App.tsx` 内容门禁。
-- 现状证据：
-  1. prerender 静态服对 `/api/*` 回退 SPA HTML；`App` 内容加载失败仍 `contentDataLoaded=true`；`Seo` 无条件 `seoReady=1` → 空壳/not found 可进正式 HTML 且构建成功。
-  2. sitemap 含 20 条 `/tours/:slug`，`getPrerenderRoutes()` 不含。
-  3. 无 `*` 路由；未知路径回退首页 meta。
-  4. sitemap `lastmod` 每次 `new Date()`。
-- 门禁：已提交构建期数据方案，等用户确认后再改代码。
-- 下一步：确认真相源 → 实现 adapter + 统一路由 + 404/noindex + lastmod + 产物断言；向角色 2 交公开路由 manifest。
+- 桌面 Hero：现有两个按钮下新增 `Group Tours`，进入新的桌面路线拼团页；Hero 使用仓库 4032×3024 九寨沟实景。
+- 游记：用户提供 7 份真实游记与图片；供稿前不补写。
+- 表单：覆盖所有旅客侧表单，包括移动 checkout、OTP、订单认领。
+- 性别头像：每位旅客必填男/女；仅使用自报数据，两色匿名头像，禁止姓名推断。
+- 支付邮件：旅客确认信 + 运营副本；旅客邮件 Reply-To 到运营邮箱。
+- 自动补团：Admin 预建后续班期；确认满团后激活下一期；配置激活总数上限，不自动生成日期/价格。
+- 内容终审：生成 12 目的地 + 20 路线逐条审核清单，由用户勾选。
+- 并行约束：Subagent-8 完成前，Subagent-9 不改 `ChinaTripsMobile.tsx`。
 
-**done（V1 审计角色 3：前端关键流程）** — 四项 P1 已修；typecheck/lint/build + 9 单元测试通过。未部署、未改真实 env。
+### Progress note（7.20 业务终审清单完成，2026-07-21）
+
+- 已创建 `docs/content/business-approved-catalog.md`，逐条列出 12 个目的地与 20 条路线，无遗漏或重复。
+- 清单明确 `published`/`featured` 不等于业务批准，保留批准/暂缓/下架/仅询价及审核人、日期、备注栏。
+- 已显式标记路线 11/12 证据缺口、路线 9/17 时长冲突、Zhangjiajie/Guilin 导航冲突、路线类型与 bootstrap/运行库漂移风险。
+- 未改数据库、公开状态或生产；审批后的 Admin/SEO/sitemap/prerender 动作仅列出，未执行。
+
+### Progress note（7.20 表单必填跳转完成，2026-07-21）
+
+- 桌面与移动旅客表单已统一首个字段错误的滚动/聚焦；Turnstile、班期卡等非输入控件只滚动。
+- Checkout 字段错误返回编辑页并聚焦；API/网络错误保留复核页；OTP 与订单认领空输入可聚焦。
+- 已补相关 `aria-invalid` / `aria-describedby`；未改服务端业务校验、gender、头像或自动补团。
+- 验证：`formErrors` 4/4、typecheck、build、lint、IDE diagnostics 全绿；浏览器逐表人工交互未验。
+- `ChinaTripsMobile.tsx` 已移交 Subagent-9，后者不得回滚本次聚焦与 aria 改动。
+
+### Progress note（7.20 桌面 Group Tours 页面完成，2026-07-21）
+
+- Home Hero 已换为 4032×3024 九寨沟实景，并在原两个 CTA 下增加 `Group Tours` → `/group-tours`。
+- 新页按现有公开 routes/departures API 展示真实日期、价格、库存与保证出发状态；无班期时引导浏览路线或定制，不编造数据。
+- 已新增 departures client 与 3 项数据测试，App 仅注册新路由；未改 Navbar、Traveler Stories、Home 其他区或全局 CSS。
+- 验证：lint、3 tests、Vite bundle、1280/390 浏览器冒烟与 IDE lints 通过；Agent 执行时全量 build 曾受并行表单测试瞬时类型状态阻塞，待所有并行改动完成后由主 Agent统一复跑。
+- 数据风险：本地 API 当前出现 `$0.98` 成人价和中文出发地“ 四川”，页面忠实显示；需业务数据审核，不应在 UI 层偷偷修正。
+
+### Progress note（7.20 支付双向邮件实现，2026-07-21）
+
+- 已实现旅客确认信、独立运营副本与 Reply-To；运营副本只含订单号、旅客邮箱、金额和路线。
+- 新增分阶段状态 `confirmation_email_traveler_sent` 与 migration `011_booking_email_delivery_stage`：旅客已发而运营失败时，Webhook 重试只补运营副本；运营副本使用稳定 Resend Idempotency-Key。
+- Admin resend 在未完成时补缺失阶段，全部完成后只重发旅客信；邮件失败不反转已确认订单。
+- 已更新四套 env examples、生产配置校验、运维说明与纯单元测试；未读真实 env、未发真实邮件、未跑迁移。
+- IDE diagnostics 绿；主 Agent 与 shell 验证 Agent 均遇到命令执行器不返回输出/退出状态，邮件测试/typecheck/lint 结果暂不能声明通过，待执行环境恢复后整合复跑。
+
+### Progress note（7.20 预配置自动补团完成，2026-07-21）
+
+- 新增 migration `012_departure_refill_chains`：显式 chain、顺序成员与审计事件；既有班期默认不受影响。
+- Admin 可预建完整草稿班期并配置链 key、顺序、启用和最多自动激活数；校验同路线、连续顺序与后续 draft 状态。
+- 订单从 pending→confirmed 的事务内锁定 chain；仅 confirmed/cancellation_requested 人数满 capacity 时激活下一期，active hold 不触发；Webhook 重试/并发只激活一次。
+- 新班期继承满团班期的 featured 标记/优先级；退款不撤销已激活班期；达上限写 `limit_reached` 审计，不自动生成日期、价格或政策。
+- 验证：21/21 tests、typecheck、lint、build 通过，IDE lints 绿；未写生产 DB、未执行 migration。
+- 部署门禁：先运行目标环境 migration 并确认 011 邮件状态迁移与 012 补团链迁移顺序完成，再发布 API。
+
+### Progress note（7.20 拼团性别头像实现，2026-07-21）
+
+- 每位成人现需自报 `male`/`female`，姓名与 gender 在前端、checkout payload、服务端校验和订单 JSONB 快照中严格对齐；支付取消/登录草稿恢复保留 gender。
+- 公开 departures 只返回 confirmed/cancellation_requested 的匿名聚合 `male/female/unknown/total`，不返回姓名、邮箱、订单号或逐旅客数组；active hold 仅减少可用座位，不计入性别构成。
+- 历史缺 gender 的订单计入 unknown/灰色，不推断、不回填，因此无需 migration。
+- UI 增加两色头像、unknown 灰色、可见图例、文本数量和 aria-label；主 Agent 修正了 seats-left 说明，明确临时 hold 会减少可用座位，而非被计入 confirmed roster。
+- 已新增 checkout payload 单测与 confirmed roster PG 集成测试；IDE lints 绿。命令执行器未返回 typecheck/build/lint/test 状态，320/375/390 浏览器尚未验。
+
+### Progress note（7.20 桌面首页摸底，2026-07-21）
+
+- Hero 当前只有 `Plan My Trip`、`Explore China Trips` 两个 CTA；桌面无独立拼团落点。
+- 当前首图为 1080×1440，在宽屏 90vh hero 会明显放大；仓库有 4032×3024 九寨沟实景等高分辨率候选，但选材属于审美门禁。
+- Traveler Story 当前在 `Home.tsx` 硬编码 3 条，无 DB/Admin 管线；增加到 10 条需 7 条经核实内容与图片来源，不能自行编造。
+- `Home.tsx` 与正在进行的 desktop-audit-follow-up 共用；实施需串行合并或严格按 section 分区。
+
+### Progress note（7.20 支付双向邮件摸底，2026-07-21）
+
+- 现状：付款成功仅给旅客发确认信；询盘仅通知运营；退款、取消、取消申请、Stripe 过期均无邮件；Resend 调用未设置 Reply-To。
+- 风险：当前确认信写有 “reply to this email”，但代码未把回复导向运营邮箱。
+- 人工门禁：需用户选择“双向”含义——A 旅客+运营双投递、B Reply-To、C 全生命周期双方通知、D 完整 inbound 邮件线程。
+- 本阶段未改代码、未发邮件、未读取真实 env、未操作 Stripe/生产订单。
+
+### Progress note（7.20 拼团性别头像 / 自动补团 / 内容清单摸底，2026-07-21）
+
+- 性别头像：当前 UI 仅以 `capacity - available_seats` 生成匿名占位头像；订单旅客快照只有姓名，没有 gender/sex，禁止按姓名推断。实现前需确认自报采集时机、枚举、是否必填、匿名聚合展示与隐私说明。
+- 自动补团：热门团由 `departures.featured_on_home` 与动态库存驱动，满团后只从首页查询中消失，仓库无自动克隆班期。推荐在支付确认事务成功后幂等触发，但上限语义、满团阈值、新日期/价格、退款放座后行为均待业务确认。
+- 真实投放：仓库技术候选为 12 个目的地 + 20 条路线，来自 backfill/SEO bootstrap catalog；`published`/`featured` 仅表示技术可见/展示位，不等于业务终审。需产品运营逐条批准，且有 Zhangjiajie/Guilin、路线类型和 2 条日行程证据缺口。
+- 三项均保持只读；未改 schema/代码、未写数据库、未接触生产。
+
+### Progress note（7.20 表单必填项跳转摸底，2026-07-21）
+
+- 现有 `app/src/lib/formErrors.ts` 已提供按错误顺序滚动并聚焦首个无效字段；桌面 Contact、CustomTrip、两类路线询盘弹窗及移动主要询盘/拼团 Step 1 已接入。
+- 缺口集中在 checkout 只读复核页、OTP 验证、订单认领，以及部分 `aria-describedby` / `aria-invalid` 连线；服务端错误仍应保留全局 banner。
+- 不建议改用原生 `required/reportValidity` 或引入表单依赖，因为现有组合字段、动态偏好与 Turnstile 使用统一自定义校验。
+- 待用户确认：仅收口桌面第 4 项，还是把移动 checkout/登录/认领一并纳入；非输入控件只滚动是否可接受。
+
+**blocked（Subagent-5 release-engineering）** — 已按任务书做只读摸底；启动门禁未齐，**不生成 RC、不改 package.json/lockfile**。交付：`docs/release/v1-source-audit/deliveries/05-release-engineering.md`（`blocked`）。
+
+### Progress note（角色 5 只读摸底，2026-07-21）
+
+- 角色：`Subagent-5 (release-engineering)`；Owns/May Touch 已登任务板。
+- 门禁缺口：无冻结 commit/target/registry；工作树 16 行脏；03/04 deliveries 仍 `incomplete`；06 尚在 `working`；`serve-selfhost.mjs` 未阶段性移交。
+- 只读证据：无字面量 `\` 文件名；lockfile 混 `npmjs` 512 + `npmmirror` 120；`dist/win11-home` canonical 仍为 syncingtravel.com；serve 仅验 target+bypass。
+- 待收口 BR：角色 2 `test:runtime-security`；角色 4 SEO scripts；角色 1 booking 测试脚本。
+- 下一步：等协调代理冻结工作树与用户确认 registry 后再建 RC。
+
+**done（Subagent-6 infra-hardening）** — Compose 无默认密码、bootstrap 路径分离、systemd loopback+hardening、Caddy 对齐角色 2 体限/超时与安全头。交付：`docs/release/v1-source-audit/deliveries/06-infrastructure-hardening.md`（`ready-for-validation`）。9 单测 + caddy validate 绿。未连真机、未读真实 env。
+
+### Progress note（角色 6 完成，2026-07-21）
+
+- Owns：compose、bootstrap/grant、systemd、两套 Caddyfile、ops 文档、`deploy/validate-infra.test.mjs`。
+- May Touch：两套生产 `.env.example`、`/.gitignore`、gotchas 一行。
+- 上游：角色 2 体限 1MiB/256KiB、超时 60s/30s；角色 1 `TRUST_PROXY=1`。
+- 验证：`node --test deploy/validate-infra.test.mjs` → 9 pass（shellcheck/systemd-analyze 本机 skip）。
+- 给角色 5：Blocking Request 登记 `test:infra`。
+- 未验证：Linux systemd-analyze、真机 413/webhook/`/s3` 联调、严格 CSP。
+- 运维注意：已有 Docker volume 需按 `docs/ops/shared/compose-credentials.md` 旋转口令；根目录需 `.env`。
+
+**done（Subagent-2 runtime-api-security）** — 请求体上限、生产 env fail-closed、SEO manifest 页面 HTTP 404 已落地；22 单测 + typecheck/lint/build 绿。交付：`docs/release/v1-source-audit/deliveries/02-runtime-api-security.md`（`ready-for-validation`）。未部署、未读真实生产数据、未改真实密钥。
+
+### Progress note（角色 2 完成，2026-07-21）
+
+- Owns：`serve-selfhost.mjs`、`validateTargetEnv.ts`、`requestBodyLimits.ts`、`httpRoutePolicy.ts` + 测试。
+- May Touch：`vite.config.ts` / `migrate.ts` 仅接入公共 env 校验；`tsconfig.node.json` include。
+- 上限：JSON 1 MiB；webhook 256 KiB；代理建议 60s/30s。
+- 给角色 6：变量清单见 delivery / `describeProdEnvRequirements()`。
+- 给角色 5：Blocking Request 登记 `test:runtime-security`。
+- 未验证：真实生产 env 启动冒烟、浏览器抽检 404、Vite 本地 API body 上限。
+
+**done（Subagent-4 SEO/prerender）** — 方案 A 已落地；local 预渲染 45/45 + assert 通过。未部署、未读真实生产数据、未改真实密钥。
+
+### Progress note（SEO/prerender 实现，2026-07-20）
+
+- 用户确认：构建期真相源 = 仓库快照 `app/scripts/seo-build-content.json`（方案 A）。
+- 已改：
+  1. 快照 + `seo-export-build-content.mjs` / `seo-bootstrap-build-content.mjs`；prerender 对 `/api/destinations|routes` 返回快照 JSON，其它 `/api/*` 404 JSON（不再回 SPA）。
+  2. `seo-public-routes.mjs`：sitemap 与 prerender 同一路径集（含全部 published `/tours/:slug`）；`lastmod` 仅来自快照 `updatedAtByPath`，无则省略。
+  3. `App.tsx`：内容加载失败不设 ready、不挂 Seo；`*` → `NotFound`（`noindex`）；`RouteDetail` 缺内容标记 `data-seo-content="missing"`。
+  4. 交付 `app/scripts/seo-public-route-manifest.json` 给角色 2；Blocking Request 给角色 5 登记 npm scripts。
+- 验证：`typecheck`/`lint`/`build` 绿；`node --test scripts/seo-build-content.test.mjs` 6 pass；`prerender dist/local` 45 ok 0 fail；`seo-assert-prerender dist/local` OK。
+- 未验证：完整 `build:cloud-vps` 末尾 prerender（vite 产物曾生成，prerender 因缺 playwright 中断后改在 `dist/local` 验）；有 DB 时的 `seo-export`。
+- 给角色 2：读 `app/scripts/seo-public-route-manifest.json` 的 `paths` 作 HTTP 404 白名单。
+
+**done（V1 审计角色 3：前端关键流程）** — 四项 P1 已修；typecheck/lint/build + 9 单元测试通过；**真实 E2E（含 Stripe Cancel）已通过**。未部署、未改真实密钥文件内容（仅本机 `xtch` 班期 capacity 8→20 供测）。
 
 ### Progress note（V1 审计 03 前端关键流程，2026-07-20）
 
@@ -28,28 +150,44 @@
   4. Navbar 关菜单 `inert` + 焦点回触发钮。
 - 测试：`scripts/hashLegacyRedirect.test.ts` + `scripts/checkoutCancelDraft.test.ts`（9 pass）。
 - 验证：`npm run typecheck` / `lint` / `build` 全绿。
+- **E2E（2026-07-20 晚）** `node scripts/e2e-frontend-critical-flows.mjs` 全绿：
+  - Destination/Search/Navbar 无 `#` 内链
+  - 移动菜单 inert + Escape 焦点回按钮
+  - Account 订单卡为 `<a href="/orders/...">`
+  - 真实 Stripe Checkout（`cs_test_…`）打开 → Cancel 回流 → 草稿恢复 + 提示 + query 清理；刷新不再弹提示
+- 本机辅助：`departures.capacity` 8→20（座位已满无法下单）；脚本见 `app/scripts/e2e-frontend-critical-flows.mjs`
+- 剩余风险：`env/local/.env` 的 `STRIPE_CHECKOUT_*_URL` 仍含旧 `#/china-trips?...`（靠开机 `migrateLegacyHashRoute` 兼容）；建议改为无 `#` path。
 - May Touch：`checkoutClient.ts`、`hashLegacyRedirect.ts`、`chinaTripsMobile.css`、`Search.tsx`（经批准）。
-- 未验证：真实 Stripe Cancel 端到端、320/375/390 手工键盘走查。
-- 下一步：交给协调代理收口；浏览器回归可选。
+- 未部署、未改生产库/DNS。
 
-**done（V1 预订/支付一致性 · Subagent-1）** — A/B/C 已实现；真实 `xtch` PG 集成 6/6 + 本地签名 webhook E2E 4/4 + 单元 12/12；typecheck/lint/build 全绿。
+**done（V1 预订/支付一致性 · Subagent-1）** — 交付报告已填：`docs/release/v1-source-audit/deliveries/01-booking-payment-integrity.md`（`ready-for-validation`）。PG 6/6 + 本地 webhook 4/4 + 网络 E2E 2/2 + 单元 12/12；typecheck/lint/build 全绿。
+
+### Progress note（交付报告更新，2026-07-20）
+
+- 按 README 统一交付格式写入 `deliveries/01-booking-payment-integrity.md`。
+- 含用户确认 A/B/C、四项修复、May Touch、全部命令退出码、网络 E2E（rk_test 进程态）与剩余风险。
+- 状态：`ready-for-validation`（待主协调代理独立复跑）。
+
+### Progress note（Stripe 网络 E2E，2026-07-20）
+
+- 用户提供 `rk_test_` 受限密钥（仅本次进程环境，**未写入**仓库跟踪文件）。
+- 权限探测：balance/charges/PI/checkout/refunds 均可。
+- `api/stripe-webhook.network.e2e.integration.test.ts`：**2/2 pass**（paid completed PI retrieve；refund.updated + charges.retrieve）。
+- 确认邮件：Resend key 无效仅打日志，不影响订单状态。
+- 安全：密钥曾出现在对话中，建议用户轮换。
 
 ### Progress note（预订与支付一致性 · PG/Webhook 验证，2026-07-20）
 
-- PG 集成（`localhost/xtch`，非生产）：并发 hold 拒绝、fail 释放、A1 过期、邮箱限流 5、取消门禁、全额退款释放 consumed。
-- Webhook E2E：本地 `whsec` 签名；expired 释放；unpaid completed 不确认；charge.refunded 部分→累计全额 + 幂等；Charge.amount 陷阱。
-- E2E 中发现并修复：`canAutoReleaseSeats` 的 `EXTRACT(DAY FROM date-date)` 在 PG 报 42883 → 改为 `(start_date - CURRENT_DATE)::int`。
-- 环境限制：各 env 均无 `sk_test`；未走 Stripe 网络 API（PI retrieve / refund.updated charge.retrieve）。有 test key 后可补付费确认与 refund.updated 真网测。
-- 声明：未部署、未访问生产库、未改真实密钥、未启用 Stripe live。
+- PG 集成（`localhost/xtch`）：并发 hold、fail 释放、A1 过期、邮箱限流、取消门禁、全额退款释放 consumed。
+- 本地签名 webhook：expired、unpaid completed、charge.refunded 部分→全额+幂等、amount 陷阱。
+- 修复：`canAutoReleaseSeats` → `(start_date - CURRENT_DATE)::int`。
+- 声明：未部署、未访问生产库、未启用 Stripe live。
 
 ### Progress note（预订与支付一致性收口，2026-07-20）
 
 - 确认：A=推荐限流+A1+同主体拒绝+建议频率+TRUST_PROXY 仅 Caddy；B=B1 仅卡；C=仅 confirmed+paid，幂等，部分退款不可申请。
-- 已改 Owns：checkout-session / stripe-webhook / orders / lib/{orders,orderQueries,availability,bookingSchema}；新建 bookingIntegrity + checkoutRateLimit + 测试。
-- May Touch：`vite.config.ts`、`serve-selfhost.mjs` 传入 `socket.remoteAddress`。
-- 交接角色 6：Caddy 后环境设 `TRUST_PROXY=1`（未改 env examples）。
-- 交接角色 5：建议 `test:booking-integrity` 脚本（未改 package.json）。
-- 已验证：见上方 PG/Webhook note + 单元 + typecheck/lint/build。
+- Owns 与 May Touch 见交付报告。
+- 交接角色 6：`TRUST_PROXY=1`；角色 5：测试脚本登记。
 
 **done（About 数据统计区编辑感动效）** — Playfair 数字、Manrope 标签、稳定单行数值、响应式分隔线与遮罩错峰揭示已完成。
 

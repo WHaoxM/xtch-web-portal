@@ -82,7 +82,7 @@ export async function up(tx: SqlClient) {
       CONSTRAINT orders_payment_status_known CHECK (payment_status IN ('unpaid', 'paid', 'partially_refunded', 'refunded', 'failed')),
       CONSTRAINT orders_refund_status_known CHECK (refund_status IN ('none', 'pending', 'partially_refunded', 'refunded')),
       CONSTRAINT orders_traveler_status_known CHECK (traveler_details_status IN ('traveler_details_pending', 'traveler_details_submitted', 'needs_manual_follow_up')),
-      CONSTRAINT orders_email_status_known CHECK (confirmation_email_status IN ('confirmation_email_pending', 'confirmation_email_sent', 'confirmation_email_failed', 'confirmation_email_retrying')),
+      CONSTRAINT orders_email_status_known CHECK (confirmation_email_status IN ('confirmation_email_pending', 'confirmation_email_sent', 'confirmation_email_failed', 'confirmation_email_retrying', 'confirmation_email_traveler_sent')),
       CONSTRAINT orders_currency_usd CHECK (currency = 'usd')
     )
   `;

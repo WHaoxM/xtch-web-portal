@@ -100,7 +100,7 @@ test('PG: same email+departure second active hold is rejected', async () => {
     leadName: 'Traveler One',
     leadEmail: EMAIL,
     leadPhone: '',
-    travelers: [{ name: 'Traveler One' }],
+    travelers: [{ name: 'Traveler One', gender: 'female' }],
     holdExpiresAt,
   });
   assert.equal(first.hold.status, 'active');
@@ -113,7 +113,7 @@ test('PG: same email+departure second active hold is rejected', async () => {
         leadName: 'Traveler One',
         leadEmail: EMAIL,
         leadPhone: '',
-        travelers: [{ name: 'Traveler One' }],
+        travelers: [{ name: 'Traveler One', gender: 'female' }],
         holdExpiresAt,
       }),
     /already have an open checkout/i,
@@ -140,7 +140,7 @@ test('PG: failOrderAndReleaseHold releases active hold after Stripe-create failu
     leadName: 'Fail Path',
     leadEmail: `fail-${RUN}@example.com`,
     leadPhone: '',
-    travelers: [{ name: 'Fail Path' }],
+    travelers: [{ name: 'Fail Path', gender: 'male' }],
     holdExpiresAt: new Date(Date.now() + 30 * 60 * 1000),
   });
 
@@ -166,7 +166,7 @@ test('PG: A1 expireExpiredHolds expires overdue hold + pending_payment order', a
     leadName: 'Expire Path',
     leadEmail: `expire-${RUN}@example.com`,
     leadPhone: '',
-    travelers: [{ name: 'Expire Path' }],
+    travelers: [{ name: 'Expire Path', gender: 'female' }],
     holdExpiresAt: new Date(Date.now() + 30 * 60 * 1000),
   });
 
@@ -220,7 +220,7 @@ test('PG: cancellation gate confirmed+paid only; partial/refunded denied; idempo
     leadName: 'Cancel Path',
     leadEmail: `cancel-${RUN}@example.com`,
     leadPhone: '',
-    travelers: [{ name: 'Cancel Path' }],
+    travelers: [{ name: 'Cancel Path', gender: 'male' }],
     holdExpiresAt: new Date(Date.now() + 30 * 60 * 1000),
   });
 
@@ -263,7 +263,7 @@ test('PG: full refund releases consumed hold; repeat apply is idempotent', async
     leadName: 'Refund Path',
     leadEmail: `refund-${RUN}@example.com`,
     leadPhone: '',
-    travelers: [{ name: 'Refund Path' }],
+    travelers: [{ name: 'Refund Path', gender: 'female' }],
     holdExpiresAt: new Date(Date.now() + 30 * 60 * 1000),
   });
   assert.equal(

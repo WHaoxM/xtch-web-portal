@@ -7,12 +7,16 @@
 #   sudo systemctl enable --now xtch-app
 #
 # Requires: Node 20+, npm deps installed in app/, dist built (npm run build:cloud-vps),
-# Docker Postgres/MinIO healthy on 127.0.0.1.
+# Docker Postgres/MinIO healthy on 127.0.0.1, grant-xtch-read-access.sh applied.
+#
+# Listen boundary: SELFHOST_HOST=127.0.0.1 — Caddy is the only public entry (80/443).
+# Do not open 3080 in the cloud security group or host firewall.
 
 [Unit]
 Description=XTCH web portal (cloud-vps deploy serve)
 After=network-online.target docker.service
 Wants=network-online.target
+# Soft dependency: app still starts if docker unit name differs; sleep below covers boot race.
 
 [Service]
 Type=simple
@@ -21,12 +25,56 @@ Group=xtch
 WorkingDirectory=/opt/xtch-web-portal/app
 Environment=DEPLOY_TARGET=cloud-vps
 Environment=NODE_ENV=production
-# Prefer npx/tsx from local node_modules
+Environment=SELFHOST_HOST=127.0.0.1
+Environment=SELFHOST_PORT=3080
+# Trust X-Forwarded-* only behind Caddy (booking rate-limit IP). Never enable without the edge proxy.
+Environment=TRUST_PROXY=1
+# Keep npm cache under the system home (writable), not under the read-mostly repo tree.
+Environment=HOME=/var/lib/xtch
+Environment=npm_config_cache=/var/lib/xtch/.npm
 ExecStart=/usr/bin/npm run deploy:serve
 Restart=on-failure
 RestartSec=5
+TimeoutStartSec=90
+TimeoutStopSec=30
 # Give Docker a moment after reboot
 ExecStartPre=/bin/sleep 15
+
+# --- Hardening (compatible with reading dist/env and dialing loopback Postgres/MinIO) ---
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+# Node/V8 needs JIT write+execute; enabling MDWE would break the runtime.
+RestrictRealtime=true
+RestrictNamespaces=true
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateDevices=true
+# Allow loopback + outbound (Stripe/Resend/Supabase); deny raw sockets.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+# Writable: system home (npm cache). Repo is read-only via ProtectSystem=strict.
+ReadWritePaths=/var/lib/xtch
+# Explicit read access to the application tree (ProtectSystem=strict still allows reads;
+# listing here documents the intended path and survives future Protect* tightening).
+ReadOnlyPaths=/opt/xtch-web-portal
+# Resource caps — adjust if build-host sizing differs; not a DoS edge (Caddy is).
+MemoryMax=1G
+TasksMax=512
+LimitNOFILE=65536
+
+# Intentionally NOT enabled (compatibility):
+# - PrivateNetwork=true — would block Postgres/MinIO/Stripe/Resend
+# - ProtectKernelLogs / more SystemCallFilter=@system-service — Node + native addons
+#   vary; left off for V1 until validated on the target image
+# - DynamicUser=true — conflicts with fixed uid ownership of /var/lib/xtch and ACL plan
 
 [Install]
 WantedBy=multi-user.target

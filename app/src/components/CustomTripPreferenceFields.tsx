@@ -38,12 +38,15 @@ export function PreferenceFieldControl({
 }) {
   const options = enabledOptions(field);
   const invalid = Boolean(error);
+  const describedBy = invalid ? fieldErrorId(field.fieldKey) : undefined;
 
   if (variant === 'mobile') {
     return (
       <div
         className={cn('iosapp-pref-field', invalid && 'is-invalid')}
         data-field-error={field.fieldKey}
+        aria-invalid={invalid}
+        aria-describedby={describedBy}
       >
         <div className="iosapp-pref-label-row">
           <span>
@@ -53,7 +56,14 @@ export function PreferenceFieldControl({
           {showsDefaultBadge(field, value) && <DefaultBadge />}
         </div>
         {field.description && <p className="iosapp-pref-hint">{field.description}</p>}
-        <MobileControl field={field} value={value} options={options} invalid={invalid} onChange={onChange} />
+        <MobileControl
+          field={field}
+          value={value}
+          options={options}
+          invalid={invalid}
+          describedBy={describedBy}
+          onChange={onChange}
+        />
         {error && (
           <p id={fieldErrorId(field.fieldKey)} className="iosapp-field-error" role="alert">
             {error}
@@ -67,6 +77,8 @@ export function PreferenceFieldControl({
     <div
       className={cn('space-y-3', invalid && 'rounded-[6px] border border-red-400 bg-red-50/40 p-4')}
       data-field-error={field.fieldKey}
+      aria-invalid={invalid}
+      aria-describedby={describedBy}
     >
       <div className="flex flex-wrap items-center gap-2">
         <legend className={cn('text-[17px] font-bold text-[#122332]', invalid && 'text-red-700')}>
@@ -78,7 +90,14 @@ export function PreferenceFieldControl({
       {field.description && (
         <p className="text-[14px] leading-6 text-[#6c747b]">{field.description}</p>
       )}
-      <DesktopControl field={field} value={value} options={options} invalid={invalid} onChange={onChange} />
+      <DesktopControl
+        field={field}
+        value={value}
+        options={options}
+        invalid={invalid}
+        describedBy={describedBy}
+        onChange={onChange}
+      />
       {error && (
         <p id={fieldErrorId(field.fieldKey)} className="text-[14px] text-red-600" role="alert">
           {error}
@@ -93,12 +112,14 @@ function DesktopControl({
   value,
   options,
   invalid,
+  describedBy,
   onChange,
 }: {
   field: CustomTripFormField;
   value: unknown;
   options: CustomTripFormOption[];
   invalid: boolean;
+  describedBy?: string;
   onChange: (next: unknown) => void;
 }) {
   if (field.controlType === 'single_select') {
@@ -122,6 +143,8 @@ function DesktopControl({
                 value={option.optionKey}
                 checked={selected}
                 onChange={() => onChange(option.optionKey)}
+                aria-invalid={invalid}
+                aria-describedby={describedBy}
                 className="h-[18px] w-[18px] accent-[#294f5b]"
               />
               <span className="flex items-center gap-2">
@@ -154,6 +177,8 @@ function DesktopControl({
               <input
                 type="checkbox"
                 checked={checked}
+                aria-invalid={invalid}
+                aria-describedby={describedBy}
                 onChange={() => {
                   onChange(
                     checked
@@ -176,6 +201,7 @@ function DesktopControl({
       <select
         value={String(value ?? '')}
         aria-invalid={invalid}
+        aria-describedby={describedBy}
         onChange={(event) => onChange(event.target.value)}
         className={cn(
           'min-h-[58px] w-full rounded-[6px] border border-[#dce5ee] bg-[#f8fafc] px-5 text-[16px] text-[#394a5a] outline-none focus:border-[#294f5b]',
@@ -200,6 +226,7 @@ function DesktopControl({
         rows={5}
         value={String(value ?? '')}
         aria-invalid={invalid}
+        aria-describedby={describedBy}
         onChange={(event) => onChange(event.target.value)}
         className={cn(
           'w-full resize-none rounded-[6px] border border-[#dce5ee] bg-[#f8fafc] px-5 py-4 text-[16px] text-[#122332] outline-none focus:border-[#294f5b]',
@@ -214,6 +241,7 @@ function DesktopControl({
       type="text"
       value={String(value ?? '')}
       aria-invalid={invalid}
+      aria-describedby={describedBy}
       onChange={(event) => onChange(event.target.value)}
       className={cn(
         'min-h-[58px] w-full rounded-[6px] border border-[#dce5ee] bg-[#f8fafc] px-5 text-[16px] text-[#122332] outline-none focus:border-[#294f5b]',
@@ -228,12 +256,14 @@ function MobileControl({
   value,
   options,
   invalid,
+  describedBy,
   onChange,
 }: {
   field: CustomTripFormField;
   value: unknown;
   options: CustomTripFormOption[];
   invalid: boolean;
+  describedBy?: string;
   onChange: (next: unknown) => void;
 }) {
   if (field.controlType === 'single_select' || field.controlType === 'multi_select') {
@@ -255,6 +285,8 @@ function MobileControl({
                 type={field.controlType === 'multi_select' ? 'checkbox' : 'radio'}
                 name={field.fieldKey}
                 checked={isSelected}
+                aria-invalid={invalid}
+                aria-describedby={describedBy}
                 onChange={() => {
                   if (field.controlType === 'multi_select') {
                     onChange(
@@ -282,6 +314,7 @@ function MobileControl({
         <select
           value={String(value ?? '')}
           aria-invalid={invalid}
+          aria-describedby={describedBy}
           onChange={(event) => onChange(event.target.value)}
         >
           <option value="">Select</option>
@@ -302,6 +335,7 @@ function MobileControl({
         <textarea
           value={String(value ?? '')}
           aria-invalid={invalid}
+          aria-describedby={describedBy}
           onChange={(event) => onChange(event.target.value)}
         />
       </label>
@@ -314,6 +348,7 @@ function MobileControl({
       <Input
         value={String(value ?? '')}
         aria-invalid={invalid}
+        aria-describedby={describedBy}
         onChange={(event) => onChange(event.target.value)}
       />
     </label>

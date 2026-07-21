@@ -22,5 +22,12 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["vite.config.ts", "scripts/localApiRoutes.ts", "../scripts/env/targetEnv.ts"]
+  "include": [
+    "vite.config.ts",
+    "scripts/localApiRoutes.ts",
+    "scripts/requestBodyLimits.ts",
+    "scripts/httpRoutePolicy.ts",
+    "../scripts/env/targetEnv.ts",
+    "../scripts/env/validateTargetEnv.ts"
+  ]
 }

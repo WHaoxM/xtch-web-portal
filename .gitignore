@@ -38,6 +38,9 @@ app/out.txt
 /env/**/*.secrets*
 !/env/**/.env.example
 
+# Docker Compose credential file at repo root (see .env.example)
+/.env
+
 # Local-only reference / intake (not part of origin/dev portal tree)
 /data/
 /本站/

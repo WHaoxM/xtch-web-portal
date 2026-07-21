@@ -1,5 +1,6 @@
 export type CheckoutTraveler = {
   name: string;
+  gender: 'male' | 'female' | '';
 };
 
 export type FixedDepartureCheckoutPayload = {
@@ -52,9 +53,19 @@ function asString(value: unknown): string {
 }
 
 function asTravelerNames(value: unknown): CheckoutTraveler[] {
-  if (!Array.isArray(value) || value.length === 0) return [{ name: '' }];
+  if (!Array.isArray(value) || value.length === 0) {
+    return [{ name: '', gender: '' }];
+  }
   return value.map((item) => ({
     name: typeof item === 'object' && item && 'name' in item ? asString((item as { name: unknown }).name) : '',
+    gender:
+      typeof item === 'object' &&
+      item &&
+      'gender' in item &&
+      ((item as { gender: unknown }).gender === 'male' ||
+        (item as { gender: unknown }).gender === 'female')
+        ? ((item as { gender: 'male' | 'female' }).gender)
+        : '',
   }));
 }
 
@@ -110,7 +121,10 @@ export function serializeCheckoutCancelDraft(
       departureId: draft.departureId,
       dateRange: draft.dateRange,
       adultQuantity: Math.max(1, Number(draft.adultQuantity) || 1),
-      travelers: draft.travelers.map((traveler) => ({ name: traveler.name })),
+      travelers: draft.travelers.map((traveler) => ({
+        name: traveler.name,
+        gender: traveler.gender,
+      })),
       name: draft.name,
       email: draft.email,
       phoneCountry: draft.phoneCountry,

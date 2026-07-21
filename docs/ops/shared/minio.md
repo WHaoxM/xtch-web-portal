@@ -4,7 +4,10 @@
 
 From repo root `xtch-web-portal`:
 
+    Copy-Item .env.example .env   # set MINIO_ROOT_* / POSTGRES_* (required; no defaults)
     docker compose up -d
+
+Credentials: [compose-credentials.md](./compose-credentials.md). `minio-init` reuses the same `MINIO_ROOT_*` vars.
 
 Services: Postgres `127.0.0.1:5432`, MinIO API `127.0.0.1:9000`, Console `127.0.0.1:9001`, buckets `xtch-public` + `xtch-tunnel` + `xtch-prod` (public-read). Ports are loopback-only. Daily local media uses `xtch-public`. Public tunnel testbed uses `xtch-tunnel` — see [tunnel.md](../tunnel.md). Public deploy targets (`win11-home` / `cloud-vps`) use isolated `xtch-prod` — see [README.md](../README.md) and [win11-home.md](../win11-home.md). Content backup import / multi-DB isolation — see [content-backup.md](./content-backup.md).
 

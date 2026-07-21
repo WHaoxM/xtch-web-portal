@@ -61,6 +61,7 @@ type DepartureEditorProps = {
   isCreate: boolean;
   routes: RouteRecord[];
   destinations: Destination[];
+  refillChains: Array<{ key: string; routeSlug: string }>;
   /** Known available seats when editing; create uses capacity. */
   availableSeats?: number;
   onCancel: () => void;
@@ -73,6 +74,7 @@ export function DepartureEditor({
   isCreate,
   routes,
   destinations,
+  refillChains,
   availableSeats,
   onCancel,
   onSaved,
@@ -153,7 +155,7 @@ export function DepartureEditor({
     });
   }
 
-  function validateForSave(): string | null {
+  function validateForSave(nextStatus: string): string | null {
     if (!draft.routeSlug) return '请选择路线。';
     if (!draft.startDate || !draft.endDate) return '请填写开始与结束日期。';
     const priceUsd = Number(draft.adultUnitPriceUsd);
@@ -161,11 +163,22 @@ export function DepartureEditor({
     const capacity = Number(draft.capacity);
     if (!Number.isFinite(capacity) || capacity < 1) return '容量须至少为 1。';
     if (!draft.departureCity.trim() && !draft.destinationSlug) return '请填写出发城市。';
+    if (draft.refillChainKey.trim()) {
+      const sequence = Number(draft.refillSequence);
+      const maxActivations = Number(draft.refillMaxAutoActivations);
+      if (!Number.isInteger(sequence) || sequence < 1) return '补团顺序须为正整数。';
+      if (!Number.isInteger(maxActivations) || maxActivations < 1) {
+        return '最多自动激活数须为正整数。';
+      }
+      if (sequence > 1 && nextStatus !== 'draft' && draft.status !== 'sellable') {
+        return '后续班期须先存为草稿，不能手动上架。';
+      }
+    }
     return null;
   }
 
   async function saveWithStatus(nextStatus: string, successMessage: string) {
-    const validationError = validateForSave();
+    const validationError = validateForSave(nextStatus);
     if (validationError) {
       setError(validationError);
       return;
@@ -190,6 +203,10 @@ export function DepartureEditor({
       capacity: Number(draft.capacity) || 8,
       featuredOnHome: draft.featuredOnHome,
       featuredPriority: Number(draft.featuredPriority) || 0,
+      refillChainKey: draft.refillChainKey.trim() || undefined,
+      refillSequence: Number(draft.refillSequence) || undefined,
+      refillEnabled: draft.refillEnabled,
+      refillMaxAutoActivations: Number(draft.refillMaxAutoActivations) || undefined,
       confirmationRule: draft.confirmationRule,
       includedCoreItems: draft.includedText
         .split('\n')
@@ -481,6 +498,92 @@ export function DepartureEditor({
 
           {showMore && (
             <>
+              <FormSection
+                title="满团自动补团"
+                description="把同一路线的完整草稿班期排成显式链；只有已确认订单坐满当前班期才激活下一期。"
+              >
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="space-y-2 text-sm md:col-span-2">
+                    <span>补团链标识</span>
+                    <Input
+                      list="departure-refill-chain-options"
+                      value={draft.refillChainKey}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          refillChainKey: event.target.value,
+                          refillEnabled: event.target.value.trim()
+                            ? current.refillEnabled
+                            : false,
+                        }))
+                      }
+                      placeholder="例如 beijing-summer-2026"
+                    />
+                    <datalist id="departure-refill-chain-options">
+                      {refillChains
+                        .filter((chain) => chain.routeSlug === draft.routeSlug)
+                        .map((chain) => (
+                          <option key={chain.key} value={chain.key} />
+                        ))}
+                    </datalist>
+                    <FieldHint>同一路线各班期填写同一标识；清空即退出该链。</FieldHint>
+                  </label>
+                  <label className="space-y-2 text-sm">
+                    <span>链内顺序</span>
+                    <Input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={draft.refillSequence}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          refillSequence: event.target.value,
+                        }))
+                      }
+                      disabled={!draft.refillChainKey.trim()}
+                    />
+                    <FieldHint>当前在售期通常为 1，后续预建草稿依次为 2、3…</FieldHint>
+                  </label>
+                  <label className="space-y-2 text-sm">
+                    <span>最多自动激活期数</span>
+                    <Input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={draft.refillMaxAutoActivations}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          refillMaxAutoActivations: event.target.value,
+                        }))
+                      }
+                      disabled={!draft.refillChainKey.trim()}
+                    />
+                  </label>
+                  <label className="flex items-start gap-2 text-sm md:col-span-2">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={draft.refillEnabled}
+                      disabled={!draft.refillChainKey.trim()}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          refillEnabled: event.target.checked,
+                        }))
+                      }
+                    />
+                    <span>
+                      启用这条补团链
+                      <FieldHint>
+                        先保存至少两个完整班期，再启用。新激活班期继承满团班期的首页推荐开关与优先级；退款不会撤销已激活班期。
+                      </FieldHint>
+                    </span>
+                  </label>
+                </div>
+              </FormSection>
+
               <FormSection title="首页推荐" description="控制是否进入移动端首页热门拼团。">
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="flex items-start gap-2 text-sm md:col-span-2">

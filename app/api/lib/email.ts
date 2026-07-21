@@ -22,118 +22,231 @@ type PriceSnapshot = {
   total_price_cents?: number;
 };
 
-export async function sendBookingConfirmationEmail(order: Order): Promise<'sent' | 'failed'> {
+export type BookingEmailDeliveryResult = 'sent' | 'traveler_sent' | 'failed';
+export type BookingEmailPurpose = 'payment-confirmation' | 'admin-resend';
+
+export type BookingEmailMessage = {
+  from: string;
+  to: string[];
+  replyTo?: string[];
+  subject: string;
+  html?: string;
+  text?: string;
+  idempotencyKey?: string;
+};
+
+type BookingEmailDeliveryOptions = {
+  purpose: BookingEmailPurpose;
+  fromEmail: string;
+  operationsEmails: string[];
+  publicAppUrl: string;
+  orderUrl?: string;
+  travelerOverrideTo?: string;
+  send: (message: BookingEmailMessage) => Promise<boolean>;
+  onTravelerSent?: () => Promise<void>;
+};
+
+type SendBookingEmailOptions = {
+  purpose?: BookingEmailPurpose;
+  onTravelerSent?: () => Promise<void>;
+};
+
+export async function sendBookingConfirmationEmail(
+  order: Order,
+  options: SendBookingEmailOptions = {},
+): Promise<BookingEmailDeliveryResult> {
   const fromEmail = process.env.BOOKING_FROM_EMAIL || process.env.INQUIRY_FROM_EMAIL;
   const emailMode = process.env.BOOKING_EMAIL_MODE || process.env.INQUIRY_EMAIL_MODE || 'resend';
+  const purpose = options.purpose ?? 'payment-confirmation';
+  const operationsEmails = resolveOperationsEmails(process.env);
 
   if (!fromEmail) {
     console.error('BOOKING_FROM_EMAIL or INQUIRY_FROM_EMAIL is not configured.');
     return 'failed';
   }
-
-  const token = await rotateAccessToken(order.id);
-  const routeSnapshot = (order.route_snapshot as RouteSnapshot) ?? {};
-  const priceSnapshot = (order.price_snapshot as PriceSnapshot) ?? {};
-  const policySnapshot = order.policy_snapshot;
-
-  const unitPriceDollars = ((priceSnapshot.adult_unit_price_cents ?? 0) / 100).toFixed(2);
-  const totalPriceDollars = ((priceSnapshot.total_price_cents ?? order.total_price_cents) / 100).toFixed(2);
-  const orderUrl = buildOrderUrl(order.order_number, token);
-  const startDate = formatTripDate(routeSnapshot.start_date ?? '');
-  const endDate = formatTripDate(routeSnapshot.end_date ?? '');
-  const policySummary = formatPolicySnapshot(policySnapshot);
-
-  const subject = `Your Syncing Travel booking is confirmed · ${order.order_number}`;
-  const html = buildConfirmationHtml({
-    orderNumber: order.order_number,
-    routeTitle: routeSnapshot.route_title ?? 'Your trip',
-    departureCity: routeSnapshot.departure_city ?? '',
-    startDate,
-    endDate,
-    adultQuantity: priceSnapshot.adult_quantity ?? order.adult_quantity,
-    unitPriceDollars,
-    totalPriceDollars,
-    currency: priceSnapshot.currency?.toUpperCase() ?? 'USD',
-    travelerDetailsDueAt: order.traveler_details_due_at,
-    orderUrl,
-    policySummary,
-  });
-
-  const text = buildConfirmationText({
-    orderNumber: order.order_number,
-    routeTitle: routeSnapshot.route_title ?? 'Your trip',
-    departureCity: routeSnapshot.departure_city ?? '',
-    startDate,
-    endDate,
-    adultQuantity: priceSnapshot.adult_quantity ?? order.adult_quantity,
-    unitPriceDollars,
-    totalPriceDollars,
-    currency: priceSnapshot.currency?.toUpperCase() ?? 'USD',
-    travelerDetailsDueAt: order.traveler_details_due_at,
-    orderUrl,
-    policySummary,
-  });
-
-  const intendedTo = order.lead_email;
-  const overrideTo = process.env.BOOKING_EMAIL_OVERRIDE_TO?.trim();
-  const toEmail = overrideTo || intendedTo;
-
-  if (emailMode === 'console') {
-    console.info('--- Booking confirmation email ---');
-    console.info('To:', toEmail);
-    if (overrideTo && overrideTo.toLowerCase() !== intendedTo.toLowerCase()) {
-      console.info('Intended to:', intendedTo);
-    }
-    console.info('Subject:', subject);
-    console.info(text);
-    console.info('---');
-    return 'sent';
+  if (operationsEmails.length === 0) {
+    console.error('BOOKING_OPERATIONS_EMAIL or INQUIRY_TO_EMAIL is not configured.');
+    return 'failed';
   }
 
-  const resendApiKey = process.env.RESEND_API_KEY;
-  if (!resendApiKey) {
+  if (emailMode === 'off') {
+    console.error('BOOKING_EMAIL_MODE is off.');
+    return 'failed';
+  }
+
+  const isConsoleMode = emailMode === 'console' || emailMode === 'log';
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!isConsoleMode && !apiKey) {
     console.error('RESEND_API_KEY is not configured.');
     return 'failed';
   }
 
-  try {
-    if (overrideTo && overrideTo.toLowerCase() !== intendedTo.toLowerCase()) {
-      console.info(
-        `[BOOKING_EMAIL_OVERRIDE_TO] Sending confirmation for ${order.order_number} to ${toEmail} (lead was ${intendedTo}).`,
-      );
-    }
+  let orderUrl: string | undefined;
+  const travelerAlreadySent =
+    purpose === 'payment-confirmation' &&
+    order.confirmation_email_status === 'confirmation_email_traveler_sent';
+  if (!travelerAlreadySent) {
+    const token = await rotateAccessToken(order.id);
+    orderUrl = buildOrderTokenUrl(order.order_number, token, process.env.PUBLIC_APP_URL);
+  }
 
+  if (isConsoleMode) {
+    return deliverBookingConfirmationEmails(order, {
+      purpose,
+      fromEmail,
+      operationsEmails,
+      publicAppUrl: process.env.PUBLIC_APP_URL || 'https://www.xuntingtravel.com',
+      orderUrl,
+      travelerOverrideTo: process.env.BOOKING_EMAIL_OVERRIDE_TO?.trim(),
+      onTravelerSent: options.onTravelerSent,
+      send: async (message) => {
+        console.info('--- Booking email preview ---');
+        console.info('To:', message.to.join(', '));
+        if (message.replyTo?.length) console.info('Reply-To:', message.replyTo.join(', '));
+        console.info('Subject:', message.subject);
+        console.info(message.text || message.html || '');
+        console.info('---');
+        return true;
+      },
+    });
+  }
+
+  return deliverBookingConfirmationEmails(order, {
+    purpose,
+    fromEmail,
+    operationsEmails,
+    publicAppUrl: process.env.PUBLIC_APP_URL || 'https://www.xuntingtravel.com',
+    orderUrl,
+    travelerOverrideTo: process.env.BOOKING_EMAIL_OVERRIDE_TO?.trim(),
+    onTravelerSent: options.onTravelerSent,
+    send: (message) => sendResendEmail(apiKey!, message),
+  });
+}
+
+export async function deliverBookingConfirmationEmails(
+  order: Order,
+  options: BookingEmailDeliveryOptions,
+): Promise<BookingEmailDeliveryResult> {
+  const intendedTo = order.lead_email;
+  const travelerTo = options.travelerOverrideTo || intendedTo;
+  const travelerAlreadySent =
+    options.purpose === 'payment-confirmation' &&
+    order.confirmation_email_status === 'confirmation_email_traveler_sent';
+
+  if (!travelerAlreadySent) {
+    const content = buildConfirmationContent(order, resolveOrderUrl(order, options));
+    const travelerSent = await options.send({
+      from: options.fromEmail,
+      to: [travelerTo],
+      replyTo: options.operationsEmails,
+      subject: `Your Syncing Travel booking is confirmed · ${order.order_number}`,
+      html: buildConfirmationHtml(content),
+      text: buildConfirmationText(content),
+    });
+    if (!travelerSent) return 'failed';
+    await options.onTravelerSent?.();
+  }
+
+  if (options.purpose === 'admin-resend') {
+    return 'sent';
+  }
+
+  const operationsSent = await options.send({
+    from: options.fromEmail,
+    to: options.operationsEmails,
+    subject: `[Syncing Travel] Paid booking · ${order.order_number}`,
+    text: buildOperationsCopyText(order),
+    html: buildOperationsCopyHtml(order),
+    idempotencyKey: `booking-confirmation/${order.id}/operations`,
+  });
+
+  return operationsSent ? 'sent' : 'traveler_sent';
+}
+
+function resolveOrderUrl(order: Order, options: BookingEmailDeliveryOptions): string {
+  if (options.orderUrl) return options.orderUrl;
+  return `${options.publicAppUrl.replace(/\/$/, '')}/orders/${encodeURIComponent(order.order_number)}`;
+}
+
+function buildOrderTokenUrl(orderNumber: string, token: string, publicAppUrl?: string): string {
+  const base = publicAppUrl || 'https://www.xuntingtravel.com';
+  return `${base}/orders/${encodeURIComponent(orderNumber)}?token=${encodeURIComponent(token)}`;
+}
+
+function buildConfirmationContent(order: Order, orderUrl: string): ConfirmationContent {
+  const routeSnapshot = (order.route_snapshot as RouteSnapshot) ?? {};
+  const priceSnapshot = (order.price_snapshot as PriceSnapshot) ?? {};
+  return {
+    orderNumber: order.order_number,
+    routeTitle: routeSnapshot.route_title ?? 'Your trip',
+    departureCity: routeSnapshot.departure_city ?? '',
+    startDate: formatTripDate(routeSnapshot.start_date ?? ''),
+    endDate: formatTripDate(routeSnapshot.end_date ?? ''),
+    adultQuantity: priceSnapshot.adult_quantity ?? order.adult_quantity,
+    unitPriceDollars: ((priceSnapshot.adult_unit_price_cents ?? order.adult_unit_price_cents) / 100).toFixed(2),
+    totalPriceDollars: ((priceSnapshot.total_price_cents ?? order.total_price_cents) / 100).toFixed(2),
+    currency: priceSnapshot.currency?.toUpperCase() ?? order.currency.toUpperCase(),
+    travelerDetailsDueAt: order.traveler_details_due_at,
+    orderUrl,
+    policySummary: formatPolicySnapshot(order.policy_snapshot),
+  };
+}
+
+function buildOperationsCopyText(order: Order): string {
+  const routeSnapshot = (order.route_snapshot as RouteSnapshot) ?? {};
+  return [
+    'A paid booking has been confirmed.',
+    `Order: ${order.order_number}`,
+    `Traveler email: ${order.lead_email}`,
+    `Amount: ${(order.total_price_cents / 100).toFixed(2)} ${order.currency.toUpperCase()}`,
+    `Route: ${routeSnapshot.route_title ?? 'Not provided'}`,
+  ].join('\n');
+}
+
+function buildOperationsCopyHtml(order: Order): string {
+  return `<pre style="font-family: system-ui, sans-serif; white-space: pre-wrap;">${escapeHtml(buildOperationsCopyText(order))}</pre>`;
+}
+
+function resolveOperationsEmails(env: NodeJS.ProcessEnv): string[] {
+  const configured = env.BOOKING_OPERATIONS_EMAIL?.trim() || env.INQUIRY_TO_EMAIL?.trim() || '';
+  return configured
+    .split(',')
+    .map((value) => value.trim())
+    .filter((value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value));
+}
+
+export function buildResendPayload(message: BookingEmailMessage) {
+  return {
+    from: message.from,
+    to: message.to,
+    ...(message.replyTo?.length ? { reply_to: message.replyTo } : {}),
+    subject: message.subject,
+    ...(message.html !== undefined ? { html: message.html } : {}),
+    ...(message.text !== undefined ? { text: message.text } : {}),
+  };
+}
+
+async function sendResendEmail(apiKey: string, message: BookingEmailMessage): Promise<boolean> {
+  try {
     const response = await fetch(RESEND_API_URL, {
       method: 'POST',
       headers: {
-        authorization: `Bearer ${resendApiKey}`,
+        authorization: `Bearer ${apiKey}`,
         'content-type': 'application/json',
+        ...(message.idempotencyKey ? { 'idempotency-key': message.idempotencyKey } : {}),
       },
-      body: JSON.stringify({
-        from: fromEmail,
-        to: [toEmail],
-        subject,
-        html,
-        text,
-      }),
+      body: JSON.stringify(buildResendPayload(message)),
     });
-
     if (!response.ok) {
       const result = (await response.json().catch(() => ({}))) as { message?: string };
-      console.error('Resend confirmation email failed:', result.message || response.statusText);
-      return 'failed';
+      console.error('Resend booking email failed:', result.message || response.statusText);
+      return false;
     }
-
-    return 'sent';
+    return true;
   } catch (error) {
-    console.error('Resend confirmation email error:', error);
-    return 'failed';
+    console.error('Resend booking email error:', error);
+    return false;
   }
-}
-
-function buildOrderUrl(orderNumber: string, token: string): string {
-  const base = process.env.PUBLIC_APP_URL || 'https://www.xuntingtravel.com';
-  return `${base}/orders/${encodeURIComponent(orderNumber)}?token=${encodeURIComponent(token)}`;
 }
 
 function formatTripDate(value: string): string {

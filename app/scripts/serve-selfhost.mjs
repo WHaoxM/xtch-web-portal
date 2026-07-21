@@ -17,12 +17,25 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { localApiRoutes, rawBodyRoutes } from './localApiRoutes.ts';
-import { getAdminAllowlistStatus } from '../api/lib/adminAllowlist.ts';
 import { detectLanIPv4, resolvePublicOrigin } from '../api/lib/publicOrigin.ts';
 import {
   requireTargetEnv,
   targetEnvExampleHint,
 } from '../../scripts/env/targetEnv.ts';
+import { assertTargetEnvValid } from '../../scripts/env/validateTargetEnv.ts';
+import {
+  bodyLimitBytesForKind,
+  ClientAbortedError,
+  InvalidJsonBodyError,
+  PayloadTooLargeError,
+  readLimitedRequestBody,
+} from './requestBodyLimits.ts';
+import {
+  classifyPagePath,
+  createPublicPathSet,
+  loadPublicRouteManifest,
+  looksLikeStaticAssetPath,
+} from './httpRoutePolicy.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const appRoot = path.resolve(__dirname, '..');
@@ -42,6 +55,8 @@ function distRootForTarget(target) {
 
 /** Set in main() after target is known. */
 let distRoot = '';
+/** SEO public indexable paths (role 4 manifest). */
+let publicPaths = new Set();
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -89,40 +104,6 @@ function parseTarget(argv) {
   return target;
 }
 
-function envTruthy(name) {
-  const value = process.env[name]?.trim().toLowerCase();
-  return value === '1' || value === 'true' || value === 'yes';
-}
-
-function assertSafeForPublicDeploy(envPath) {
-  const blockers = [];
-  if (envTruthy('DEV_CHECKOUT_BYPASS')) {
-    blockers.push('DEV_CHECKOUT_BYPASS must not be set for a public deploy target');
-  }
-  if (process.env.DEV_AUTH_BYPASS_EMAIL?.trim()) {
-    blockers.push('DEV_AUTH_BYPASS_EMAIL must not be set for a public deploy target');
-  }
-  if (process.env.VITE_DEV_AUTH_BYPASS_EMAIL?.trim()) {
-    blockers.push('VITE_DEV_AUTH_BYPASS_EMAIL must not be set for a public deploy target');
-  }
-
-  const allowlist = getAdminAllowlistStatus();
-  if (!allowlist.hasUsableEmails) {
-    if (!allowlist.configured || allowlist.onlyPlaceholders) {
-      blockers.push(
-        'Admin allowlist must include at least one real email (not empty, not you@example.com). Set ADMIN_TECH_EMAIL_ALLOWLIST and/or ADMIN_OPS_EMAIL_ALLOWLIST (legacy ADMIN_EMAIL_ALLOWLIST still accepted as tech-only).',
-      );
-    }
-  }
-
-  if (blockers.length > 0) {
-    console.error('Refusing to start public deploy target (safety):');
-    for (const line of blockers) console.error(`  - ${line}`);
-    console.error(`Fix these in ${envPath} and restart.`);
-    process.exit(1);
-  }
-}
-
 /** Catch wrong-target or local-bypass dist before serving. */
 function assertDistSafeForPublicDeploy(distRoot, target) {
   const markerPath = path.join(distRoot, '.xtch-build-target');
@@ -155,18 +136,6 @@ function assertDistSafeForPublicDeploy(distRoot, target) {
       process.exit(1);
     }
   }
-}
-
-async function readBody(req, raw) {
-  const chunks = [];
-  for await (const chunk of req) {
-    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
-  }
-  const buf = Buffer.concat(chunks);
-  if (raw) return buf;
-  const text = buf.toString('utf8').trim();
-  if (!text) return undefined;
-  return JSON.parse(text);
 }
 
 function createVercelResponse(res) {
@@ -202,11 +171,43 @@ async function getHandler(modulePath) {
   return handler;
 }
 
+function sendJsonError(res, statusCode, error) {
+  if (res.headersSent) {
+    res.destroy();
+    return;
+  }
+  res.statusCode = statusCode;
+  res.setHeader('content-type', 'application/json; charset=utf-8');
+  res.end(JSON.stringify({ ok: false, error }));
+}
+
 async function handleApi(req, res, apiPath) {
   const modulePath = localApiRoutes[apiPath];
+  const useRawBody = rawBodyRoutes.has(apiPath);
+  const limitBytes = bodyLimitBytesForKind(useRawBody ? 'webhook' : 'json');
+
+  let body;
   try {
-    const useRawBody = rawBodyRoutes.has(apiPath);
-    const body = await readBody(req, useRawBody);
+    body = await readLimitedRequestBody(req, { raw: useRawBody, limitBytes });
+  } catch (error) {
+    if (error instanceof PayloadTooLargeError) {
+      sendJsonError(res, 413, 'Payload Too Large');
+      return;
+    }
+    if (error instanceof InvalidJsonBodyError) {
+      sendJsonError(res, 400, 'Invalid JSON body.');
+      return;
+    }
+    if (error instanceof ClientAbortedError) {
+      if (!res.headersSent) res.destroy();
+      return;
+    }
+    console.error('Deploy API body read failed:', error instanceof Error ? error.name : error);
+    sendJsonError(res, 400, 'Invalid request body.');
+    return;
+  }
+
+  try {
     const handler = await getHandler(modulePath);
     await handler(
       {
@@ -219,11 +220,9 @@ async function handleApi(req, res, apiPath) {
       createVercelResponse(res),
     );
   } catch (error) {
-    console.error('Deploy API request failed:', error);
+    console.error('Deploy API request failed:', error instanceof Error ? error.message : error);
     if (!res.headersSent) {
-      res.statusCode = 500;
-      res.setHeader('content-type', 'application/json; charset=utf-8');
-      res.end(JSON.stringify({ ok: false, error: 'Deploy API request failed.' }));
+      sendJsonError(res, 500, 'Deploy API request failed.');
     }
   }
 }
@@ -248,7 +247,7 @@ function proxyToMinio(req, res, pathnameWithQuery) {
   );
 
   proxyReq.on('error', (error) => {
-    console.error('MinIO proxy failed:', error);
+    console.error('MinIO proxy failed:', error instanceof Error ? error.message : error);
     if (!res.headersSent) {
       res.statusCode = 502;
       res.setHeader('content-type', 'application/json; charset=utf-8');
@@ -269,10 +268,10 @@ function safeJoinDist(urlPathname) {
   return abs;
 }
 
-function sendFile(res, filePath) {
+function sendFile(res, filePath, statusCode = 200) {
   const ext = path.extname(filePath).toLowerCase();
   const type = MIME[ext] || 'application/octet-stream';
-  res.statusCode = 200;
+  res.statusCode = statusCode;
   res.setHeader('content-type', type);
   fs.createReadStream(filePath).pipe(res);
 }
@@ -294,6 +293,23 @@ function resolveDistFile(urlPathname) {
   return null;
 }
 
+function sendSpaShell(res, method, statusCode) {
+  const indexHtml = path.join(distRoot, 'index.html');
+  if (!fs.existsSync(indexHtml)) {
+    res.statusCode = 503;
+    res.setHeader('content-type', 'text/plain; charset=utf-8');
+    res.end('Missing deploy static files. Run npm run build:<target> before npm run deploy:serve.');
+    return;
+  }
+  if (method === 'HEAD') {
+    res.statusCode = statusCode;
+    res.setHeader('content-type', 'text/html; charset=utf-8');
+    res.end();
+    return;
+  }
+  sendFile(res, indexHtml, statusCode);
+}
+
 function serveStatic(req, res, urlPathname) {
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     res.statusCode = 405;
@@ -309,25 +325,25 @@ function serveStatic(req, res, urlPathname) {
       res.end();
       return;
     }
-    sendFile(res, filePath);
+    sendFile(res, filePath, 200);
     return;
   }
 
-  // BrowserRouter SPA fallback
-  const indexHtml = path.join(distRoot, 'index.html');
-  if (!fs.existsSync(indexHtml)) {
-    res.statusCode = 503;
+  if (looksLikeStaticAssetPath(urlPathname)) {
+    res.statusCode = 404;
     res.setHeader('content-type', 'text/plain; charset=utf-8');
-    res.end('Missing deploy static files. Run npm run build:<target> before npm run deploy:serve.');
+    res.end('Not found');
     return;
   }
-  if (req.method === 'HEAD') {
-    res.statusCode = 200;
-    res.setHeader('content-type', 'text/html; charset=utf-8');
-    res.end();
+
+  const kind = classifyPagePath(urlPathname, publicPaths);
+  if (kind === 'public' || kind === 'spa') {
+    sendSpaShell(res, req.method, 200);
     return;
   }
-  sendFile(res, indexHtml);
+
+  // Determinable unknown page: HTTP 404 + SPA HTML (client NotFound), not homepage 200.
+  sendSpaShell(res, req.method, 404);
 }
 
 function main() {
@@ -350,7 +366,22 @@ function main() {
     process.exit(1);
   }
   const envPath = loaded.path;
-  assertSafeForPublicDeploy(envPath);
+
+  try {
+    assertTargetEnvValid(target, process.env, envPath);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  }
+
+  try {
+    const manifest = loadPublicRouteManifest();
+    publicPaths = createPublicPathSet(manifest);
+  } catch (error) {
+    console.error('Failed to load SEO public route manifest:');
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  }
 
   distRoot = distRootForTarget(target);
   const legacyFlatDist = path.join(appRoot, 'dist', 'index.html');
@@ -401,6 +432,7 @@ function main() {
     }
     console.log(`  static: ${distRoot}`);
     console.log(`  api: ${Object.keys(localApiRoutes).length} routes`);
+    console.log(`  public paths (SEO manifest): ${publicPaths.size}`);
     console.log(`  s3 proxy → http://${MINIO_HOST}:${MINIO_PORT}`);
     console.log(`  env: ${envPath}`);
     console.log(
