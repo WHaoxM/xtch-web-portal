@@ -581,7 +581,7 @@ export function GroupTourInquiryModal({
       <DialogContent className="max-h-[90vh] overflow-y-auto rounded-[10px] sm:max-w-[560px]">
         <DialogHeader>
           <p className="text-[13px] font-semibold uppercase tracking-[0.08em] text-[#88929c]">
-            Small Group Tour Inquiry:
+            Small Social Tour Inquiry:
           </p>
           <DialogTitle className="font-serif text-[24px] font-medium leading-tight text-[#122332]">
             {tour.title}
@@ -748,7 +748,7 @@ export function GroupTourInquiryModal({
             disabled={submitting}
             className="min-h-[52px] w-full rounded-[6px] bg-[#ef4f43] px-6 text-[16px] font-semibold text-white transition-colors hover:bg-[#d84338] disabled:cursor-not-allowed disabled:opacity-65"
           >
-            {submitting ? 'Sending inquiry...' : 'Send Group Tour Inquiry'}
+            {submitting ? 'Sending inquiry...' : 'Send Social Tour Inquiry'}
           </button>
         </form>
       </DialogContent>

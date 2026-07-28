@@ -37,6 +37,20 @@
     scroll-behavior: smooth;
   }
 
+  @media (max-width: 900px) {
+    html {
+      /* Finger scrolling should not fight programmatic smooth-scroll easing. */
+      scroll-behavior: auto;
+    }
+
+    body {
+      /* Keep document as the primary vertical scrollport on phones. */
+      overscroll-behavior-y: auto;
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }
+  }
+
   body {
     font-family: var(--font-sans);
     color: #5D5D5D;
@@ -184,7 +198,7 @@
     position: relative;
     min-height: 893px;
     height: 90vh;
-    overflow: hidden;
+    overflow: clip;
     background: #07191c;
   }
 
@@ -543,7 +557,7 @@
 
   .curated-card-top {
     position: absolute;
-    z-index: 1;
+    z-index: 2;
     top: 28px;
     left: 26px;
     right: 20px;
@@ -604,7 +618,13 @@
     z-index: 1;
     left: 38px;
     right: 26px;
+    /* Stay below .curated-card-top (pill / price) so titles never cover the badge. */
+    top: 78px;
     bottom: 28px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    overflow: hidden;
     color: #fff;
   }
 
@@ -746,6 +766,8 @@
   }
 
   .curated-trust-bar {
+    position: relative;
+    z-index: 1;
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     margin-top: 28px;
@@ -785,9 +807,11 @@
 
   .real-moments-section {
     position: relative;
-    overflow-x: hidden;
-    margin: -72px -5vw;
-    padding: 88px 32px 70px;
+    overflow-x: clip;
+    /* Horizontal full-bleed only — do not pull up over curated trust bar.
+       (Old -72px assumed a Tailwind py-18 gap that does not exist in v3.) */
+    margin: 0 -5vw;
+    padding: 72px 32px 70px;
     background:
       radial-gradient(circle at 9% 22%, rgba(0, 42, 58, 0.08), transparent 18%),
       radial-gradient(circle at 91% 22%, rgba(0, 42, 58, 0.08), transparent 18%),
@@ -1146,13 +1170,13 @@
   .real-story-carousel {
     position: relative;
     z-index: 1;
-    overflow: hidden;
+    overflow: clip;
     width: min(1780px, calc(100% - 96px));
     margin: 54px auto 16px;
   }
 
   .real-story-viewport {
-    overflow: hidden;
+    overflow: clip;
     width: 100%;
   }
 
@@ -1400,7 +1424,7 @@
 
   .home-final-cta {
     position: relative;
-    overflow: hidden;
+    overflow: clip;
     min-height: 720px;
     background: #0a1b1f;
   }
@@ -1490,7 +1514,7 @@
     }
 
     .home-reference-hero {
-      min-height: 760px;
+      min-height: min(760px, 100svh);
       height: auto;
     }
 
@@ -1504,15 +1528,29 @@
     }
 
     .home-reference-hero-title {
-      font-size: 44px;
+      font-size: clamp(30px, 9vw, 44px);
+      line-height: 1.18;
     }
 
     .home-reference-hero-actions {
       width: min(365px, 100%);
+      gap: 18px;
+      margin-top: 48px;
+    }
+
+    .home-reference-button {
+      min-height: 56px;
+      font-size: clamp(18px, 5.2vw, 28px);
+      gap: 12px;
+    }
+
+    .home-reference-button svg {
+      width: clamp(22px, 6vw, 34px);
+      height: clamp(22px, 6vw, 34px);
     }
 
     .home-reference-intro {
-      min-height: 480px;
+      min-height: 0;
     }
 
     .home-reference-intro-inner {
@@ -1520,7 +1558,7 @@
     }
 
     .home-reference-intro-title {
-      font-size: 34px;
+      font-size: clamp(24px, 7vw, 34px);
       letter-spacing: 0.06em;
     }
 
@@ -1540,10 +1578,15 @@
 
     .recognition-panel {
       overflow-x: auto;
+      overscroll-behavior-x: contain;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-x pan-y;
     }
 
     .recognition-logo-strip {
-      min-width: 720px;
+      min-width: min(720px, 220vw);
+      width: max-content;
+      max-width: none;
     }
 
     .curated-journeys-section {
@@ -1551,7 +1594,7 @@
     }
 
     .curated-journeys-title {
-      font-size: 42px;
+      font-size: clamp(28px, 8.5vw, 42px);
     }
 
     .curated-journeys-subtitle {
@@ -1562,6 +1605,9 @@
       display: flex;
       gap: 16px;
       overflow-x: auto;
+      overscroll-behavior-x: contain;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-x pan-y;
       scroll-snap-type: x mandatory;
       padding-bottom: 8px;
     }
@@ -1585,22 +1631,46 @@
     }
 
     .curated-card-content {
-      left: 24px;
-      right: 20px;
+      left: 20px;
+      right: 16px;
+      top: 72px;
+      bottom: 20px;
     }
 
     .curated-card-content h3,
     .curated-banner-content h3 {
-      font-size: 28px;
+      font-size: clamp(22px, 6.2vw, 28px);
+    }
+
+    .curated-card-content p,
+    .curated-banner-content p {
+      margin-top: 6px;
+      font-size: 15px;
+      line-height: 1.35;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
+      overflow: hidden;
+    }
+
+    .curated-tags {
+      margin-top: 14px;
+      gap: 6px;
     }
 
     .curated-card-bottom {
       display: block;
+      margin-top: 16px;
+    }
+
+    .curated-from strong {
+      font-size: 26px;
     }
 
     .curated-button {
-      margin-top: 20px;
+      margin-top: 14px;
       width: 100%;
+      min-width: 0;
     }
 
     .curated-trust-bar {
@@ -1613,17 +1683,17 @@
     }
 
     .real-moments-section {
-      margin: -72px -5vw;
-      padding: 88px 20px 54px;
+      margin: 0 -5vw;
+      padding: 56px 20px 54px;
     }
 
     .real-moments-header h2 {
-      font-size: 42px;
+      font-size: clamp(28px, 8.5vw, 42px);
       letter-spacing: 0.08em;
     }
 
     .real-moments-script {
-      font-size: 23px;
+      font-size: clamp(18px, 5vw, 23px);
     }
 
     .real-moments-copy {
@@ -1660,13 +1730,13 @@
     }
 
     .real-place-card {
-      width: 300px;
-      height: 300px;
+      width: min(300px, 78vw);
+      height: min(300px, 78vw);
     }
 
     .real-traveler-card {
-      width: 240px;
-      height: 300px;
+      width: min(240px, 68vw);
+      height: min(300px, 78vw);
     }
 
     .real-moments-lightbox-panel {
@@ -1708,7 +1778,7 @@
     }
 
     .real-story-card h3 {
-      font-size: 36px;
+      font-size: clamp(26px, 8vw, 36px);
     }
 
     .real-story-byline {
@@ -1771,7 +1841,7 @@
     }
 
     .home-final-cta-copy h2 {
-      font-size: 38px;
+      font-size: clamp(28px, 8vw, 38px);
       letter-spacing: 0.05em;
     }
 
@@ -1789,7 +1859,104 @@
       min-height: 58px;
       min-width: 0;
       width: min(100%, 360px);
-      font-size: 19px;
+      font-size: clamp(16px, 4.6vw, 19px);
+    }
+  }
+
+  @media (max-width: 390px) {
+    .home-reference-hero-content {
+      padding: 96px 16px 40px;
+    }
+
+    .home-reference-hero-actions {
+      gap: 14px;
+      margin-top: 36px;
+    }
+
+    .home-reference-intro-inner {
+      padding: 56px 16px;
+    }
+
+    .curated-journeys-section {
+      padding: 44px 14px;
+    }
+
+    .curated-card,
+    .curated-banner {
+      width: min(88vw, 420px);
+      min-height: 480px;
+    }
+
+    .curated-banner,
+    .curated-banner-content {
+      min-height: 320px;
+    }
+
+    .curated-card-content {
+      top: 68px;
+      bottom: 16px;
+      left: 14px;
+      right: 14px;
+    }
+
+    .curated-card-content h3,
+    .curated-banner-content h3 {
+      font-size: clamp(20px, 6.5vw, 26px);
+    }
+
+    .curated-card-content p,
+    .curated-banner-content p {
+      -webkit-line-clamp: 2;
+      font-size: 14px;
+    }
+
+    .curated-tags {
+      margin-top: 10px;
+    }
+
+    .curated-card-bottom {
+      margin-top: 12px;
+    }
+
+    .curated-from strong {
+      font-size: 24px;
+    }
+
+    .curated-button {
+      margin-top: 12px;
+      min-height: 48px;
+      font-size: 16px;
+    }
+
+    .real-moments-section {
+      margin: 0 -5vw;
+      padding: 48px 14px 46px;
+    }
+
+    .real-story-carousel {
+      width: calc(100% - 24px);
+    }
+
+    .real-story-card {
+      padding: 28px 16px 26px;
+    }
+
+    .real-story-card blockquote {
+      padding-left: 34px;
+      font-size: 15px;
+    }
+
+    .real-story-visual,
+    .real-story-main-image {
+      min-height: 320px;
+    }
+
+    .home-final-cta-inner {
+      width: min(100% - 28px, 620px);
+    }
+
+    .home-final-cta-copy p {
+      font-size: 15px;
     }
   }
 
@@ -1903,6 +2070,9 @@
     display: flex;
     gap: 16px;
     overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x pan-y;
     scroll-snap-type: x mandatory;
     scroll-padding-left: 5vw;
     padding-left: 5vw;

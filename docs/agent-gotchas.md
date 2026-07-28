@@ -29,7 +29,10 @@
 | 首页 Curated「View Itinerary」仍进 `/china-trips` 总览 | 桌面链 `/tours/:slug`；手机链 `/china-trips?route={slug}`（打开详情后清 query） |
 | RouteDetail 段导航（Itinerary/Included/FAQ/Price）切过中间内容 | 子导航 `sticky top-24` 假定主 Navbar 仍占顶；`/tours/` 上勿对主 Navbar 做下滚隐藏（`-translate-y-full`），否则会空出顶距让正文从缝里穿过 |
 | Home traveler story 又改回 CSS `real-story-slide` 自动切 | 已改为 Embla JS 轮播（交互暂停 + 8s 恢复、圆点可点）；不要恢复无限 CSS 动画；图片 marquee 是另一套，勿混改 |
-| Mini-App 无回门户入口 | 顶栏品牌 Syncing Travel + Me「Back to website」链到 `/`；勿把预订主路径改成外跳 |
+| Mini-App 无回门户入口 | 顶栏右上：返回箭头 `navigate(-1)` + Home 图标链到 `/`；品牌 Syncing Travel / Me「Back to website」仍可用；勿把预订主路径改成外跳 |
+| 主站手机竖滑发涩 | 全页裁切用 `overflow-x: clip`（勿用会建 scrollport 的 `hidden`）；横滑轨加 `touch-action: pan-x pan-y` + `overscroll-behavior-x: contain`；≤900px 关闭 `html { scroll-behavior: smooth }` |
+| Tailwind `py-18` / `md:py-18` | Tailwind **v3** 无 spacing `18`，类会被丢掉；用 `16`/`20`/`24`。Home Real Moments 曾用无效 `py-18` + `margin-top:-72px` 盖住 Curated trust bar |
+| 跟团游英文产品名 | 旅客可见英文用 **Social Tours / social tour**；URL `/group-tours`、API `group-tour` / `group_tour_inquiry` 与 CSS class 名保持不变 |
 | `AGENTS.md` 不是知识库 | 详细内容放入对应 `docs/` 文件 |
 | 本机 `docker` CLI（`docker ps` 等）在这个 shell 环境里可能一直挂起不返回，即使 Docker Desktop 里真的有容器在跑（可能是 shell 会话拿不到桌面会话的 named pipe） | 不要死等 `docker ps`；改用直连 `pg`/`fetch` 测 `POSTGRES_URL` 指向的端口（如 `localhost:5432`）是否能连通，能连通就说明数据库可用，不用管 `docker` CLI 卡不卡 |
 | PowerShell（本项目终端默认）不支持 `&&` 链接命令（会报 `token '&&' is not a valid statement separator`） | 用 `;` 分隔，或用 Shell 工具的 `working_directory` 参数代替 `cd xxx &&` |

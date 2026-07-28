@@ -2,6 +2,15 @@
 
 ## Status
 
+**in-progress（7.28 移动体验）** — Home 返回网站、主站滑动、窄屏自适应、跟团游英文→社交游。
+
+### Progress note（7.28 移动体验，2026-07-28）
+
+- 目标：`docs/problem/7.28.md` 体验四条。
+- 已读：mobile-ios 设计合同、chinaTripsMobile Home/Me、index.css 900px 断点、Home/GroupTours 文案。
+- 计划改：`ChinaTripsMobile.tsx`+css；`index.css` 滑动/窄屏；旅客侧 Group→Social 文案；progress/task-board/gotchas/mobile doc。
+- 验证计划：`build`/`lint`；320/375/390 溢出与 Home 出口目视。
+
 **done（Admin 快捷密码登录）** — env 单组邮箱+密码 + `aq1.` HMAC（12h）；Admin SignIn：Google→密码→OTP。本地 `env/local/.env` 已写凭据（gitignore）。`build`/`lint` 绿。浏览器点验待做。
 
 ### Progress note（Admin 快捷密码登录，2026-07-28）
@@ -12,6 +21,14 @@
 - 验证：`npm run build`、`npm run lint`。未验：重启 Vite 后浏览器密码登录；公网 target 需另配 env。
 - 风险：本地弱口令勿用于公网生产。
 - 下一步：公网 target 另配强口令后 rebuild；浏览器点验登录。
+
+**done（cloud-vps 快捷登录部署）** — VPS `git pull` → `58e74f8`；强口令写入 `env/cloud-vps/.env`（本机同步）；ops 名单含 `hosheil@outlook.com`；Vite `build:cloud-vps` 成功（prerender 缺 Playwright）；`xtch-app` 已重启；`auth-password` `enabled=true`。
+
+### Progress note（cloud-vps 快捷登录部署，2026-07-28）
+
+- 未进 git：真实口令仅 env（gitignore）。
+- 未完成：VPS `npx playwright install` 后补 prerender。
+- 下一步：浏览器 `/admin` 邮箱+密码点验。
 
 **done（cloud-vps 生产内容迁移）** — 本机 `xtch_prod` → VPS：12 目的地 / 20 路线 / 627 素材 / 7 班期 / 111 行程日；MinIO `prod/` 约 860MB（630 对象）。公网 `/api/routes` 非空，样例 `/s3/...` 200。
 

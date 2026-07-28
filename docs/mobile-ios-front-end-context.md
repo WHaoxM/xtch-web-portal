@@ -14,7 +14,7 @@ This file is the working design contract for `app/src/components/ChinaTripsMobil
 - Final balance is confirmed at checkout for sellable fixed departures; do not use deposit-only language on route booking CTAs.
 - Route selection is structured only. Do not allow arbitrary custom route text in the group tour reserve flow.
 - Route detail booking card has two CTAs:
-  - **Join a group tour**: open `groupRequest` filtered to that route’s sellable departures. If none exist, open the route-based private short form with a short explanation.
+  - **Join a social tour**: open `groupRequest` filtered to that route’s sellable departures. If none exist, open the route-based private short form with a short explanation.
   - **Plan private trip**: open `routePrivateRequest` (“Private trip based on this route”) — core fields (dates, travelers, contact, optional change notes) + preference fields Admin marks **用于路线私人短表单** (`useOnRoutePrivate`). Submit as `type: route_private` with `requestedTour`. Do **not** send this CTA into the blank Custom tab form.
 - Custom tab remains the blank **Custom Trip Request** path (from-scratch private planning).
 
@@ -44,13 +44,14 @@ Reference URLs:
 - Home must start with custom-trip intent: large title, search, then a clear private custom trip module.
 - After custom, Home shows one group tour **module container card** (not a separate Popular section, not a single-product card). Admin controls which departures appear via existing `featured_on_home` + `featured_priority`.
 - Dual states for that card:
-  - **Has featured** (max 2 rows): kicker `Popular group tours`, title `Join a featured departure`, no body paragraph; each row shows thumbnail · route name · dates · price · seats left; row opens `featuredGroupDetail`; bottom CTA `Find another departure` opens `groupRequest`.
-  - **No featured / empty**: kicker `Group tour`, title `Join a group tour`, keep the existing short explanation; bottom CTA `Book a group tour` opens `groupRequest`. Do not show fake Popular copy.
+  - **Has featured** (max 2 rows): kicker `Popular social tours`, title `Join a featured departure`, no body paragraph; each row shows thumbnail · route name · dates · price · seats left; row opens `featuredGroupDetail`; bottom CTA `Find another departure` opens `groupRequest`.
+  - **No featured / empty**: kicker `Social tour`, title `Join a social tour`, keep the existing short explanation; bottom CTA `Book a social tour` opens `groupRequest`. Do not show fake Popular copy.
   - **Loading**: keep the card shell + Users icon and show `Loading featured...`; do not flash an empty Popular list.
 - Destinations and existing routes form the middle discovery layer after those two booking choices.
 - Recommended routes must not be horizontally clipped. If a card extends off-screen, it must be an intentional carousel with visible snap behavior; otherwise use full-width stacked cards.
 - Destination cards need stable image aspect ratios and readable overlays.
 - Home bottom (after Browse routes) is **Real Moments**: a single horizontal snap carousel of real Syncing traveler/place photos (same asset family as desktop Home Real Moments: `public/images/syncing-real-*`). Cards are **full content-width** (one complete photo per snap — no right-edge peek strip). Cards open a fullscreen lightbox (title + place, close returns to Home; optional prev/next). Do **not** navigate to destinations, routes, or external links from Moments. No marquee and no long traveler-story cards. Do not use placeholders or invent photos.
+- After Real Moments, do **not** add a large Home “Back to website” card. Exit chrome lives in the tab AppHeader trailing actions (back + website) and Me settings row.
 - Home search stays inside the Mini-App: submit opens an in-app `searchResults` view (destinations + routes matching title/slug/keywords). Do **not** navigate to desktop `/search`. Opening a result goes to place/route detail and back returns to the results view.
 - Do not use generic placeholder illustrations, decorative blobs, or synthetic icon art.
 
@@ -100,7 +101,7 @@ Reference URLs:
 ## Me / Orders Rules
 
 - Me → **My Orders** stays inside the Mini-App (`myOrders` view). Do **not** `navigate('/account')` or open the desktop Account page from China Trips.
-- Me and tab headers expose a light exit to the portal homepage: AppHeader brand **Syncing Travel** and Me **Back to website** both link to `/`. Booking flows stay in-app; this is not a primary CTA.
+- Me and tab headers expose a light exit to the portal homepage: AppHeader trailing **home** button, BackBar trailing **home** button, brand **Syncing Travel**, and Me **Back to website** all link to `/`. Tab AppHeader also shows a **back** (chevron) that runs `navigate(-1)`. Booking flows stay in-app; these are not primary CTAs.
 - Homepage Curated “View Itinerary” on mobile opens `/#/china-trips?route={slug}` which clears the query and opens that route detail. Desktop Curated links go to `/tours/{slug}`.
 - List loads via `fetchMyOrders` (`/api/my-orders` + Bearer token). Empty state CTA **Explore trips** returns to the Home tab.
 - Opening a list row shows order details in-app (`bookingConfirmed` with `mode: 'detail'`); Back returns to `myOrders`, not Home.

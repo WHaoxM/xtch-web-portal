@@ -1,5 +1,5 @@
 ﻿import { type ComponentType, type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion, MotionConfig } from 'motion/react';
 import {
   BadgeCheck,
@@ -417,6 +417,26 @@ function FilterRail<T extends string>({
   );
 }
 
+function HeaderChromeActions() {
+  const navigate = useNavigate();
+
+  return (
+    <div className="iosapp-header-actions">
+      <button
+        type="button"
+        className="iosapp-round-button"
+        aria-label="Go back"
+        onClick={() => navigate(-1)}
+      >
+        <ChevronLeft size={22} strokeWidth={2.25} aria-hidden="true" />
+      </button>
+      <Link to="/" className="iosapp-round-button" aria-label="Back to website homepage">
+        <Home size={18} strokeWidth={2.25} aria-hidden="true" />
+      </Link>
+    </div>
+  );
+}
+
 function AppHeader({
   title,
   subtitle,
@@ -435,7 +455,7 @@ function AppHeader({
         {subtitle && subtitle !== 'Syncing Travel' ? <p>{subtitle}</p> : null}
         <h1>{title}</h1>
       </div>
-      {trailing}
+      {trailing ?? <HeaderChromeActions />}
     </header>
   );
 }
@@ -533,13 +553,13 @@ function GroupTourReserveCard({
       <div className="iosapp-grouptour-copy">
         {hasFeatured ? (
           <>
-            <span className="iosapp-kicker">Popular group tours</span>
+            <span className="iosapp-kicker">Popular social tours</span>
             <h2 id="grouptour-title">Join a featured departure</h2>
           </>
         ) : (
           <>
-            <span className="iosapp-kicker">Group tour</span>
-            <h2 id="grouptour-title">Join a group tour</h2>
+            <span className="iosapp-kicker">Social tour</span>
+            <h2 id="grouptour-title">Join a social tour</h2>
             {!loading ? (
               <p>
                 Pick a guaranteed fixed departure, choose your adult seats, and pay the full amount to confirm your
@@ -562,7 +582,7 @@ function GroupTourReserveCard({
           {featured.map((departure) => {
             const route = getRouteBySlug(departure.routeSlug);
             const image = route?.image || '/images/route-beijing-forbidden-01.png';
-            const title = route?.title || 'Group tour departure';
+            const title = route?.title || 'Social tour departure';
 
             return (
               <motion.button
@@ -590,7 +610,7 @@ function GroupTourReserveCard({
       ) : null}
 
       <motion.button type="button" className="iosapp-grouptour-button" onClick={onOpenGroup} whileTap={tapScale}>
-        <span>{hasFeatured ? 'Find another departure' : 'Book a group tour'}</span>
+        <span>{hasFeatured ? 'Find another departure' : 'Book a social tour'}</span>
         <ChevronRight size={18} />
       </motion.button>
     </motion.section>
@@ -608,7 +628,7 @@ function FeaturedGroupDetailView({
 }) {
   const route = getRouteBySlug(departure.routeSlug);
   const image = route?.image || '/images/route-beijing-forbidden-01.png';
-  const title = route?.title || 'Group tour departure';
+  const title = route?.title || 'Social tour departure';
   const itinerary = route?.itinerarySummary ?? [];
   const destinationNames = route
     ? destinationMeta
@@ -633,7 +653,7 @@ function FeaturedGroupDetailView({
           </button>
         </nav>
         <div className="iosapp-detail-title">
-          <span className="iosapp-pill">Featured group tour</span>
+          <span className="iosapp-pill">Featured social tour</span>
           <h1>{title}</h1>
           <p>{destinationNames.join(' · ') || route?.desc || departure.departureCity}</p>
         </div>
@@ -660,7 +680,7 @@ function FeaturedGroupDetailView({
         <section className="iosapp-featured-book-card" aria-label="Book this departure">
           <div>
             <h2>Ready to join?</h2>
-            <p>Continue to the existing group tour booking flow with this departure selected.</p>
+            <p>Continue to the existing social tour booking flow with this departure selected.</p>
           </div>
           <button type="button" className="iosapp-grouptour-button" onClick={onBook}>
             <span>Book this departure</span>
@@ -1368,7 +1388,7 @@ function PlaceDetailView({
             Plan private trip
           </button>
           <button type="button" className="iosapp-secondary-button" onClick={onOpenGroup}>
-            Join a group tour
+            Join a social tour
           </button>
         </div>
       </main>
@@ -1441,9 +1461,9 @@ function RouteDetailView({
             <button type="button" className="iosapp-route-booking-option is-primary" onClick={onOpenGroup}>
               <span>
                 <UsersRound size={19} />
-                Group tour
+                Social tour
               </span>
-              <b>Join a group tour</b>
+              <b>Join a social tour</b>
               <small>Full payment · guaranteed fixed departure</small>
             </button>
             <button type="button" className="iosapp-route-booking-option" onClick={onOpenCustom}>
@@ -2741,11 +2761,13 @@ function MyOrdersView({
 function BackBar({ title, onBack }: { title: string; onBack: () => void }) {
   return (
     <header className="iosapp-nav-bar">
-      <button type="button" onClick={onBack} aria-label="Back">
-        <ChevronLeft size={24} />
+      <button type="button" onClick={onBack} aria-label="Go back">
+        <ChevronLeft size={24} aria-hidden="true" />
       </button>
       <strong>{title}</strong>
-      <span />
+      <Link to="/" className="iosapp-nav-bar-home" aria-label="Back to website homepage">
+        <Home size={20} strokeWidth={2.25} aria-hidden="true" />
+      </Link>
     </header>
   );
 }
@@ -2855,7 +2877,7 @@ function GroupRequestView({
 
   return (
     <div className="china-trips-mobile-page iosapp-page">
-      <BackBar title="Group tour" onBack={onBack} />
+      <BackBar title="Social tour" onBack={onBack} />
       <main className="iosapp-screen">
         {cancelNotice && (
           <div className="iosapp-checkout-cancel-notice" role="status">
@@ -2870,8 +2892,8 @@ function GroupRequestView({
           </div>
         )}
         <header className="iosapp-flow-intro">
-          <span className="iosapp-kicker">Group tour</span>
-          <h1>{scopedRoute ? scopedRoute.title : 'Group tour departures'}</h1>
+          <span className="iosapp-kicker">Social tour</span>
+          <h1>{scopedRoute ? scopedRoute.title : 'Social tour departures'}</h1>
           <p>
             {scopedRoute
               ? 'Fixed-price, guaranteed departures for this route. Full payment confirms your booking.'
@@ -3382,7 +3404,7 @@ function ReserveReviewView({
 
         <section className="iosapp-form-section iosapp-checkout-review">
           <header className="iosapp-checkout-hero">
-            <span className="iosapp-kicker">{selectedDestinationName || 'Group tour'}</span>
+            <span className="iosapp-kicker">{selectedDestinationName || 'Social tour'}</span>
             <h1>{selectedRouteTitle || 'Confirm booking'}</h1>
             <p>{dateLabel}</p>
             {(selectedDeparture?.status || spotsLabel) && (
@@ -4329,7 +4351,7 @@ export default function ChinaTripsMobile() {
     if (routeDepartures.length === 0) {
       openRoutePrivateFromRoute(
         tour,
-        'No group tour departures are available for this route yet. Tell us your dates and we will plan a private trip based on it.',
+        'No social tour departures are available for this route yet. Tell us your dates and we will plan a private trip based on it.',
       );
       return;
     }

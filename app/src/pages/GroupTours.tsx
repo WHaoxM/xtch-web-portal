@@ -64,7 +64,7 @@ export default function GroupTours() {
               Fixed departures
             </p>
             <h1 className="font-serif text-[44px] font-medium leading-[1.08] text-white md:text-[68px]">
-              Group Tours
+              Social Tours
               <br />
               Ready to Join
             </h1>

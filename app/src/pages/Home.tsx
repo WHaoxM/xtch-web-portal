@@ -880,7 +880,7 @@ export default function Home() {
                   to="/group-tours"
                   className="home-reference-button home-reference-button-outline"
                 >
-                  Group Tours
+                  Social Tours
                   <ArrowRight size={34} strokeWidth={1.35} />
                 </Link>
             </div>
@@ -1047,7 +1047,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="overflow-x-hidden bg-white py-18 section-padding md:py-24">
+      <section className="overflow-x-clip bg-white pb-16 section-padding md:pb-24">
         <RealMomentsSection />
       </section>
 

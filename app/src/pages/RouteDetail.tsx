@@ -46,7 +46,7 @@ const wayCards = [
   {
     Icon: CalendarDays,
     title: 'Travel Style Options',
-    text: 'Private or group tour travel can be arranged depending on your dates and pace.',
+    text: 'Private or social tour travel can be arranged depending on your dates and pace.',
   },
   {
     Icon: BedDouble,
@@ -159,7 +159,7 @@ export default function RouteDetail() {
           </p>
           <div className="mt-7 flex flex-wrap items-center gap-x-8 gap-y-3 text-[16px] font-semibold uppercase tracking-[0.12em] text-[#74839a]">
             <span>Tour Type:</span>
-            <span className="normal-case tracking-normal">Group tour</span>
+            <span className="normal-case tracking-normal">Social tour</span>
             <span className="normal-case tracking-normal">Private</span>
           </div>
         </div>
@@ -201,7 +201,7 @@ export default function RouteDetail() {
         <div className="mx-auto grid max-w-[1500px] grid-cols-1 gap-4 md:grid-cols-4">
           {[
             ['LOCAL TRAVEL EXPERTS', 'Real on-the-ground insight'],
-            ['TOUR OPTIONS AVAILABLE', 'Private or group tour'],
+            ['TOUR OPTIONS AVAILABLE', 'Private or social tour'],
             ['ALL TRANSFERS INCLUDED', 'Smooth transfers throughout'],
             ['LICENSED LOCAL GUIDES', 'Professional English-speaking'],
           ].map(([title, text]) => (
@@ -342,7 +342,7 @@ export default function RouteDetail() {
                 onClick={() => setGroupModalOpen(true)}
                 className="mt-7 inline-flex min-h-[56px] w-full items-center justify-center rounded-[8px] bg-[#ef4f43] px-5 text-[20px] font-semibold text-white"
               >
-                Group tour inquiry
+                Social tour inquiry
               </button>
               <button
                 type="button"
@@ -354,7 +354,7 @@ export default function RouteDetail() {
               <div className="mt-8 space-y-5 text-left text-[16px] leading-7 text-[#6b7378]">
                 <p className="flex gap-4">
                   <Users className="mt-1 shrink-0" size={24} />
-                  Group tour departures are offered on selected dates.
+                  Social tour departures are offered on selected dates.
                 </p>
                 <p className="flex gap-4">
                   <CalendarDays className="mt-1 shrink-0" size={22} />

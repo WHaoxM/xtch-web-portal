@@ -1446,6 +1446,28 @@
   padding: 12px 0 14px;
 }
 
+.iosapp-header > div:first-child {
+  min-width: 0;
+  flex: 1;
+}
+
+.iosapp-header-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.iosapp-header-actions .iosapp-round-button {
+  text-decoration: none;
+  color: var(--ios-text);
+}
+
+.iosapp-header-actions .iosapp-round-button:active {
+  opacity: 0.72;
+}
+
 .iosapp-header p,
 .iosapp-header-brand,
 .iosapp-kicker {
@@ -2819,7 +2841,8 @@ span.iosapp-provider-mark {
   backdrop-filter: blur(20px);
 }
 
-.iosapp-nav-bar button {
+.iosapp-nav-bar button,
+.iosapp-nav-bar-home {
   display: grid;
   height: 44px;
   width: 44px;
@@ -2829,6 +2852,11 @@ span.iosapp-provider-mark {
   background: transparent;
   color: var(--ios-blue);
   padding: 0;
+  text-decoration: none;
+}
+
+.iosapp-nav-bar-home:active {
+  opacity: 0.72;
 }
 
 .iosapp-nav-bar strong {
@@ -4742,6 +4770,27 @@ span.iosapp-provider-mark {
 }
 
 @media (max-width: 380px) {
+  .iosapp-screen {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .iosapp-header h1,
+  .iosapp-grouped-card h1,
+  .iosapp-checkout-card h1 {
+    font-size: clamp(28px, 8.5vw, 34px);
+  }
+
+  .iosapp-header-actions {
+    gap: 6px;
+  }
+
+  .iosapp-header-actions .iosapp-round-button {
+    height: 40px;
+    min-height: 40px;
+    width: 40px;
+  }
+
   .iosapp-departure-select {
     grid-template-columns: 72px minmax(0, 1fr);
     gap: 10px;
