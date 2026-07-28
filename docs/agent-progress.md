@@ -2,6 +2,32 @@
 
 ## Status
 
+**done（找素材筛选关联）** — tags 搜索；关联强提醒可跳过；标题软提示；选图器与素材库同套目的地/路线/标题·标签筛。`build`/`lint` 绿。浏览器点验未人工完成。
+
+### Progress note（找素材筛选关联，2026-07-28）
+
+- 已改：`contentQueries.ts`；新 `MediaBrowseFilters.tsx`、`mediaBrowseHints.ts`；`ImageFieldPicker.tsx`；`Admin.tsx` MediaPanel。
+- 设计稿：`docs/superpowers/specs/2026-07-28-admin-media-find-browse-design.md`（Approved）。
+- 验证：tsc/lint 通过。下一步：登录 Admin 验选图器筛、库筛、无关联确认。
+
+**done（素材视频持久封面）** — `cover_url` 列 + 浏览器抽帧上传；MediaPanel 上传视频自动封面；卡片优先 coverUrl；编辑可重生。`build`/`lint` 绿。实际上传 mp4 未人工点验。
+
+### Progress note（素材视频持久封面，2026-07-28）
+
+- 已改：`contentSchema.ts`、`contentQueries.ts`、`mediaClient.ts`、新 `videoPoster.ts`、`Admin.tsx`（MediaPanel/MediaCardThumb）。
+- 未改：选图器、批量回填历史视频、ffmpeg、驳回备注。
+- 验证：build、lint；Vite 模块含抽帧逻辑。下一步：登录 Admin 上传 mp4 目视封面。
+
+**done（Admin 素材审库体验）** — MediaPanel 默认待审页签 + 卡片网格 + 一键通过/驳回确认弹窗 + 空状态；无 URL；视频首帧/占位。`build`/`lint` 绿。浏览器登录点验未人工完成。
+
+### Progress note（Admin 素材审库体验，2026-07-28）
+
+- 目标：列表主任务=审库；默认待审网格；混合审核；无 URL。
+- 已改：`app/src/pages/Admin.tsx`（`MediaCardThumb`、`MEDIA_LIST_TABS`、`MediaPanel` 列表区）。
+- 未改：选图器、cover_url/服务端抽帧、驳回备注入库。
+- 验证：`npm run build`、`npm run lint` 通过。
+- 下一步：登录 Admin「素材」目视确认待审/通过/驳回/空状态/视频占位。
+
 **done（表单必填勾选与跳转收口）** — Admin「表单配置」列表可直接勾选必填；路线/目的地编辑保存失败跳到首个缺项；旅客询盘偏好字段沿用既有跳转。`build`/`lint` 绿。浏览器勾选与跳转未人工验。
 
 ### Progress note（表单必填勾选与跳转，2026-07-28）

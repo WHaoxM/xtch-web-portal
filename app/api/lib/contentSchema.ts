@@ -86,6 +86,7 @@ export type MediaAssetRow = {
   status: 'review' | 'published' | 'rejected' | 'archived';
   type: 'image' | 'video';
   public_url: string;
+  cover_url: string | null;
   title: string;
   alt_text: string | null;
   destination_slugs: string[];
@@ -202,6 +203,10 @@ async function runContentColumnPatches() {
   await sql`
     ALTER TABLE media_assets
     ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  `;
+  await sql`
+    ALTER TABLE media_assets
+    ADD COLUMN IF NOT EXISTS cover_url TEXT
   `;
 }
 
@@ -321,6 +326,7 @@ async function runEnsureContentTables() {
       status TEXT NOT NULL DEFAULT 'review',
       type TEXT NOT NULL,
       public_url TEXT NOT NULL,
+      cover_url TEXT,
       original_path TEXT,
       title TEXT NOT NULL,
       alt_text TEXT,

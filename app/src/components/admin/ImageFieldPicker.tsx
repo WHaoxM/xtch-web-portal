@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -8,6 +8,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { MediaBrowseFilters } from '@/components/admin/MediaBrowseFilters';
+import { fetchAdminDestinations } from '@/lib/destinationsClient';
 import {
   fetchAdminMedia,
   postAdminMedia,
@@ -15,6 +17,7 @@ import {
   uploadFileToPresignedUrl,
   type MediaAsset,
 } from '@/lib/mediaClient';
+import { fetchAdminRoutes } from '@/lib/routesClient';
 
 type ImageFieldPickerProps = {
   value: string;
@@ -53,6 +56,7 @@ export function ImageFieldPicker({
         action: 'create',
         type: 'image',
         publicUrl: presigned.publicUrl,
+        coverUrl: '',
         title: file.name.replace(/\.[^.]+$/, ''),
         altText: '',
         destinationSlugs: contextDestinationSlug ? [contextDestinationSlug] : [],
@@ -168,56 +172,85 @@ function MediaLibraryDialog({
 }: MediaLibraryDialogProps) {
   const [media, setMedia] = useState<MediaAsset[]>([]);
   const [error, setError] = useState('');
-  const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [destinationSlug, setDestinationSlug] = useState('');
+  const [routeSlug, setRouteSlug] = useState('');
   const [linkedOnly, setLinkedOnly] = useState(false);
+  const [destinations, setDestinations] = useState<{ value: string; label: string }[]>([]);
+  const [routes, setRoutes] = useState<{ value: string; label: string }[]>([]);
 
   const hasContext = Boolean(contextRouteSlug || contextDestinationSlug);
 
   useEffect(() => {
     if (!open) return;
     let active = true;
-    void fetchAdminMedia(token, { status: 'published' })
-      .then((items) => {
+    Promise.all([fetchAdminDestinations(token), fetchAdminRoutes(token)])
+      .then(([destList, routeList]) => {
         if (!active) return;
-        setMedia(items.filter((item) => item.type === 'image'));
-        setLoadedFor(token);
+        setDestinations(destList.map((item) => ({ value: item.slug, label: item.name })));
+        setRoutes(routeList.map((item) => ({ value: item.slug, label: item.title })));
       })
-      .catch((err) => {
-        if (!active) return;
-        setError(err instanceof Error ? err.message : '加载素材库失败。');
-        setLoadedFor(token);
+      .catch(() => {
+        // Filters stay empty; library still usable.
       });
     return () => {
       active = false;
     };
   }, [open, token]);
 
-  const loading = open && loadedFor !== token && !error;
+  async function loadLibrary() {
+    setLoading(true);
+    setError('');
+    try {
+      const effectiveRouteSlug = linkedOnly && contextRouteSlug ? contextRouteSlug : routeSlug || undefined;
+      const effectiveDestinationSlug =
+        linkedOnly && contextDestinationSlug ? contextDestinationSlug : destinationSlug || undefined;
+      const items = await fetchAdminMedia(token, {
+        status: 'published',
+        search: search.trim() || undefined,
+        routeSlug: effectiveRouteSlug,
+        destinationSlug: effectiveDestinationSlug,
+      });
+      setMedia(items.filter((item) => item.type === 'image'));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '加载素材库失败。');
+      setMedia([]);
+    } finally {
+      setLoading(false);
+    }
+  }
 
-  const visibleMedia = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return media.filter((item) => {
-      if (query && !item.title.toLowerCase().includes(query)) return false;
-      if (!linkedOnly) return true;
-      if (contextRouteSlug && item.routeSlugs.includes(contextRouteSlug)) return true;
-      if (contextDestinationSlug && item.destinationSlugs.includes(contextDestinationSlug)) {
-        return true;
-      }
-      return false;
-    });
-  }, [media, search, linkedOnly, contextRouteSlug, contextDestinationSlug]);
+  useEffect(() => {
+    if (!open) return;
+    void loadLibrary();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, token, linkedOnly, destinationSlug, routeSlug]);
 
   function handleOpenChange(next: boolean) {
     onOpenChange(next);
     if (!next) {
       setMedia([]);
       setError('');
-      setLoadedFor(null);
       setSearch('');
+      setDestinationSlug('');
+      setRouteSlug('');
       setLinkedOnly(false);
+      setLoading(false);
     }
   }
+
+  function handleLinkedOnlyChange(next: boolean) {
+    setLinkedOnly(next);
+    if (next) {
+      setDestinationSlug('');
+      setRouteSlug('');
+    }
+  }
+
+  const hasActiveFilters = Boolean(
+    search.trim() || destinationSlug || routeSlug || linkedOnly,
+  );
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -229,36 +262,37 @@ function MediaLibraryDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <Input
-            placeholder="按标题搜索"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            className="sm:max-w-xs"
-          />
-          {hasContext ? (
-            <label className="flex items-center gap-2 text-sm text-muted-foreground">
-              <input
-                type="checkbox"
-                checked={linkedOnly}
-                onChange={(event) => setLinkedOnly(event.target.checked)}
-              />
-              只看已关联
-              {contextRouteSlug ? '当前路线' : ''}
-              {contextDestinationSlug ? '当前目的地' : ''}
-            </label>
-          ) : null}
-        </div>
+        <MediaBrowseFilters
+          search={search}
+          onSearchChange={setSearch}
+          onSearchSubmit={() => void loadLibrary()}
+          destinationSlug={destinationSlug}
+          onDestinationChange={setDestinationSlug}
+          routeSlug={routeSlug}
+          onRouteChange={setRouteSlug}
+          destinations={destinations}
+          routes={routes}
+          disabled={loading}
+          associationSelectsDisabled={linkedOnly}
+          linkedOnly={linkedOnly}
+          onLinkedOnlyChange={hasContext ? handleLinkedOnlyChange : undefined}
+          linkedOnlyLabel={
+            hasContext
+              ? `只看已关联${contextRouteSlug ? '当前路线' : ''}${contextDestinationSlug ? '当前目的地' : ''}`
+              : undefined
+          }
+          searchLoading={loading}
+        />
 
         {loading && <p className="text-sm text-muted-foreground">加载中…</p>}
         {error && <p className="text-sm text-destructive">{error}</p>}
-        {!loading && !error && visibleMedia.length === 0 && (
+        {!loading && !error && media.length === 0 && (
           <p className="text-sm text-muted-foreground">
-            {search.trim() || linkedOnly ? '无匹配图片。' : '素材库暂无已发布的图片。'}
+            {hasActiveFilters ? '无匹配图片。' : '素材库暂无已发布的图片。'}
           </p>
         )}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {visibleMedia.map((item) => (
+          {media.map((item) => (
             <button
               key={item.id}
               type="button"
@@ -271,7 +305,7 @@ function MediaLibraryDialog({
                 className="aspect-[4/3] h-auto w-full object-cover"
               />
               <span className="block truncate px-2 py-1.5 text-xs text-muted-foreground">
-                {item.title || item.publicUrl}
+                {item.title || '未命名'}
               </span>
             </button>
           ))}

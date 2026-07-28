@@ -73,6 +73,7 @@ export type MediaAsset = {
   status: MediaAssetRow['status'];
   type: MediaAssetRow['type'];
   publicUrl: string;
+  coverUrl: string;
   title: string;
   altText: string;
   destinationSlugs: string[];
@@ -223,6 +224,7 @@ function mapMediaRow(row: Record<string, unknown>): MediaAsset {
     status: (row.status as MediaAssetRow['status']) ?? 'review',
     type: (row.type as MediaAssetRow['type']) ?? 'image',
     publicUrl: String(row.public_url ?? ''),
+    coverUrl: String(row.cover_url ?? ''),
     title: String(row.title ?? ''),
     altText: String(row.alt_text ?? ''),
     destinationSlugs: Array.isArray(row.destination_slugs) ? (row.destination_slugs as string[]) : [],
@@ -636,6 +638,10 @@ export async function listAdminMedia(options?: {
         ${search}::text IS NULL
         OR title ILIKE '%' || ${search} || '%'
         OR public_url ILIKE '%' || ${search} || '%'
+        OR EXISTS (
+          SELECT 1 FROM unnest(tags) AS tag
+          WHERE tag ILIKE '%' || ${search} || '%'
+        )
       )
       AND (${routeSlug}::text IS NULL OR ${routeSlug} = ANY(route_slugs))
       AND (${destinationSlug}::text IS NULL OR ${destinationSlug} = ANY(destination_slugs))
@@ -649,6 +655,7 @@ export type MediaInput = {
   id: string | null;
   type: MediaAssetRow['type'];
   publicUrl: string;
+  coverUrl: string | null;
   title: string;
   altText: string;
   destinationSlugs: string[];
@@ -662,6 +669,7 @@ const KNOWN_MEDIA_STATUSES: MediaAssetRow['status'][] = ['review', 'published', 
 
 export function parseMediaInput(body: Record<string, unknown>): { data: MediaInput } | { error: string } {
   const publicUrl = String(body.publicUrl || body.public_url || '').trim();
+  const coverRaw = String(body.coverUrl ?? body.cover_url ?? '').trim();
   const title = String(body.title || '').trim();
   const type = String(body.type || 'image').trim() as MediaAssetRow['type'];
   const status = String(body.status || 'published').trim() as MediaAssetRow['status'];
@@ -678,11 +686,24 @@ export function parseMediaInput(body: Record<string, unknown>): { data: MediaInp
   if (!KNOWN_MEDIA_TYPES.includes(type)) return { error: 'Media type is not valid.' };
   if (!KNOWN_MEDIA_STATUSES.includes(status)) return { error: 'Media status is not valid.' };
 
+  let coverUrl: string | null = null;
+  if (coverRaw) {
+    const normalizedCoverUrl = toSameOriginS3Path(coverRaw);
+    if (
+      !normalizedCoverUrl ||
+      (!/^https?:\/\//i.test(normalizedCoverUrl) && !/^\/s3\//i.test(normalizedCoverUrl))
+    ) {
+      return { error: 'Cover URL must be a valid http(s) or /s3/… URL.' };
+    }
+    coverUrl = normalizedCoverUrl;
+  }
+
   return {
     data: {
       id: idRaw || null,
       type,
       publicUrl: normalizedPublicUrl,
+      coverUrl,
       title,
       altText: String(body.altText || body.alt_text || '').trim(),
       destinationSlugs: asStringArray(body.destinationSlugs ?? body.destination_slugs).map((v) => v.toLowerCase()),
@@ -699,15 +720,16 @@ export async function upsertMedia(input: MediaInput): Promise<{ id: string }> {
 
   await sql`
     INSERT INTO media_assets (
-      id, status, type, public_url, title, alt_text, destination_slugs, route_slugs, tags
+      id, status, type, public_url, cover_url, title, alt_text, destination_slugs, route_slugs, tags
     ) VALUES (
-      ${id}, ${input.status}, ${input.type}, ${input.publicUrl}, ${input.title}, ${input.altText},
+      ${id}, ${input.status}, ${input.type}, ${input.publicUrl}, ${input.coverUrl}, ${input.title}, ${input.altText},
       ${input.destinationSlugs}, ${input.routeSlugs}, ${input.tags}
     )
     ON CONFLICT (id) DO UPDATE SET
       status = EXCLUDED.status,
       type = EXCLUDED.type,
       public_url = EXCLUDED.public_url,
+      cover_url = EXCLUDED.cover_url,
       title = EXCLUDED.title,
       alt_text = EXCLUDED.alt_text,
       destination_slugs = EXCLUDED.destination_slugs,

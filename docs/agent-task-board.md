@@ -20,6 +20,9 @@
 
 | Agent | Goal | Owns | May Touch | Must Not Touch | Status | Last Update |
 |---|---|---|---|---|---|---|
+| Auto (media-find-browse) | 找素材：tags 搜索 + 关联强提醒 + 选图器/库同套筛 | `contentQueries.ts`; `ImageFieldPicker.tsx`; `Admin.tsx`（MediaPanel）; `MediaBrowseFilters.tsx`; `mediaBrowseHints.ts` | progress/task-board; design spec | 类型筛；硬门槛关联；坏名硬拦；批量回填；新依赖；生产库 | done（build/lint；浏览器未验） | 2026-07-28 |
+| Auto (media-video-cover) | 素材视频浏览器抽帧 → cover_url + 审库卡优先封面 | `contentSchema.ts`; `contentQueries.ts`; `mediaClient.ts`; 新 `videoPoster.ts`; `Admin.tsx`（MediaPanel/MediaCardThumb） | progress/task-board | 选图器改封面；ffmpeg；批量回填；新依赖；生产库 | done（build/lint；上传未人工验） | 2026-07-28 |
+| Auto (admin-media-review-ux) | Admin 素材审库：默认待审页签+卡片网格+混合审核+空状态 | `Admin.tsx`（MediaPanel 列表/审库 UI 仅） | progress/task-board | 选图器；cover_url/抽帧管线；新依赖；生产库；驳回备注入库 | done（build/lint；浏览器未验） | 2026-07-28 |
 | Auto (form-required-toggle-jump) | 表单配置列表勾选必填 + Admin 路线/目的地缺项跳转 | `customTripForm.ts`; `custom-trip-form.ts`; `Admin.tsx`（CustomTripFormPanel 仅）; `RouteEditor.tsx`; `DestinationEditor.tsx` | progress/task-board; gotchas 一行 | Contact/Checkout 硬编码必填产品化；新依赖；生产库 | done（build/lint；浏览器未验） | 2026-07-28 |
 | Auto (traveler-stories-10) | 将供稿 docx 10 条入境游记与配图写入桌面 Home Traveler Stories | `Home.tsx`（travelerStories 仅）; `app/public/images/traveler-story-*.jpg` | `docs/agent-progress.md`; `docs/agent-task-board.md` | 编造姓名/评价；改 carousel 交互/审美；Hero/Navbar；新依赖 | done（build+lint 绿；浏览器圆点未人工点验） | 2026-07-28 |
 | Subagent-7 (desktop-home-7.20) | 实施桌面首屏第三个 Group Tours 按钮、桌面拼团路线页、4K 九寨沟 hero；游记供稿已移交 Auto | `Home.tsx`（hero section only）; 新桌面拼团页组件 | `App.tsx`（仅新路由）; 既有 departures/routes client；进度/任务板 | Traveler Stories 内容（已移交）；Navbar；Home 其他区；全局审美重做；新依赖 | review-needed（lint+3 tests+Vite+1280/390 绿；游记已移交） | 2026-07-28 |

@@ -6,6 +6,7 @@ export type MediaAsset = {
   status: MediaAssetStatus;
   type: MediaAssetType;
   publicUrl: string;
+  coverUrl: string;
   title: string;
   altText: string;
   destinationSlugs: string[];
@@ -103,7 +104,11 @@ export async function presignMediaUpload(
   };
 }
 
-export async function uploadFileToPresignedUrl(uploadUrl: string, file: File, contentType: string): Promise<void> {
+export async function uploadFileToPresignedUrl(
+  uploadUrl: string,
+  file: Blob,
+  contentType: string,
+): Promise<void> {
   const response = await fetch(uploadUrl, {
     method: 'PUT',
     headers: { 'content-type': contentType },

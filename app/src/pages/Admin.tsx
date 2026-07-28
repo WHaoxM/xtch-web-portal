@@ -23,6 +23,8 @@ import { InquiryDetail } from '@/components/admin/InquiryDetail';
 import { OrderDetail, type AdminOrderDetail } from '@/components/admin/OrderDetail';
 import { DestinationEditor } from '@/components/admin/DestinationEditor';
 import { FormConfigMobilePreview } from '@/components/admin/FormConfigMobilePreview';
+import { MediaBrowseFilters } from '@/components/admin/MediaBrowseFilters';
+import { looksLikeWeakMediaTitle, mediaHasAssociation } from '@/lib/mediaBrowseHints';
 import { RouteEditor } from '@/components/admin/RouteEditor';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -126,6 +128,7 @@ import {
   type MediaAssetStatus,
   type MediaAssetType,
 } from '@/lib/mediaClient';
+import { extractVideoPosterBlob } from '@/lib/videoPoster';
 import {
   fetchAdminInquiries,
   fetchAdminInquiry,
@@ -2476,6 +2479,7 @@ type MediaEditDraft = {
   id: string;
   type: MediaAssetType;
   publicUrl: string;
+  coverUrl: string;
   title: string;
   altText: string;
   destinationSlugs: string[];
@@ -2489,6 +2493,7 @@ function emptyMediaDraft(): MediaEditDraft {
     id: '',
     type: 'image',
     publicUrl: '',
+    coverUrl: '',
     title: '',
     altText: '',
     destinationSlugs: [],
@@ -2503,6 +2508,7 @@ function mediaToDraft(media: MediaAsset): MediaEditDraft {
     id: media.id,
     type: media.type,
     publicUrl: media.publicUrl,
+    coverUrl: media.coverUrl || '',
     title: media.title,
     altText: media.altText,
     destinationSlugs: [...media.destinationSlugs],
@@ -2565,6 +2571,97 @@ function MediaFilePreview({
     </div>
   );
 }
+
+function MediaCardThumb({
+  publicUrl,
+  coverUrl,
+  type,
+}: {
+  publicUrl: string;
+  coverUrl?: string;
+  type: MediaAssetType;
+}) {
+  const [coverFailed, setCoverFailed] = useState(false);
+  const [videoFailed, setVideoFailed] = useState(false);
+  const placeholderLabel = type === 'video' ? '视频' : '无法预览';
+  const resolvedCover = (coverUrl || '').trim();
+
+  if (!publicUrl.trim() && !resolvedCover) {
+    return (
+      <div className="flex aspect-video w-full items-center justify-center bg-muted text-sm text-muted-foreground">
+        {placeholderLabel}
+      </div>
+    );
+  }
+
+  if (type === 'image') {
+    if (videoFailed || !publicUrl.trim()) {
+      return (
+        <div className="flex aspect-video w-full items-center justify-center bg-muted text-sm text-muted-foreground">
+          {placeholderLabel}
+        </div>
+      );
+    }
+    return (
+      <img
+        src={publicUrl}
+        alt=""
+        className="aspect-video w-full object-cover"
+        onError={() => setVideoFailed(true)}
+      />
+    );
+  }
+
+  if (resolvedCover && !coverFailed) {
+    return (
+      <div className="relative aspect-video w-full overflow-hidden bg-muted">
+        <img
+          src={resolvedCover}
+          alt=""
+          className="h-full w-full object-cover"
+          onError={() => setCoverFailed(true)}
+        />
+        <span className="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white">
+          视频
+        </span>
+      </div>
+    );
+  }
+
+  if (videoFailed || !publicUrl.trim()) {
+    return (
+      <div className="relative flex aspect-video w-full items-center justify-center bg-muted text-sm text-muted-foreground">
+        {placeholderLabel}
+        <span className="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white">
+          视频
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative aspect-video w-full overflow-hidden bg-muted">
+      <video
+        src={`${publicUrl}#t=0.1`}
+        preload="metadata"
+        muted
+        playsInline
+        className="pointer-events-none h-full w-full object-cover"
+        onError={() => setVideoFailed(true)}
+      />
+      <span className="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white">
+        视频
+      </span>
+    </div>
+  );
+}
+
+const MEDIA_LIST_TABS: { value: string; label: string }[] = [
+  { value: 'review', label: '待审' },
+  { value: 'published', label: '已发布' },
+  { value: 'rejected', label: '已驳回' },
+  { value: '', label: '全部' },
+];
 
 type CategoryEditDraft = {
   id: string | null;
@@ -3034,13 +3131,21 @@ function MediaPanel({
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
+  const [filterDestinationSlug, setFilterDestinationSlug] = useState('');
+  const [filterRouteSlug, setFilterRouteSlug] = useState('');
+  const [statusFilter, setStatusFilter] = useState(initialStatusFilter || 'review');
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [editing, setEditing] = useState<MediaEditDraft | null>(null);
   const [isCreate, setIsCreate] = useState(false);
   const [destinations, setDestinations] = useState<Destination[]>([]);
   const [routes, setRoutes] = useState<RouteRecord[]>([]);
+  const [rejectTarget, setRejectTarget] = useState<MediaAsset | null>(null);
+  const [rejectNote, setRejectNote] = useState('');
+  const [assocConfirm, setAssocConfirm] = useState<null | {
+    kind: 'save' | 'saveAsPublished' | 'rowPublish';
+    item?: MediaAsset;
+  }>(null);
 
   async function loadMedia() {
     setLoading(true);
@@ -3050,6 +3155,8 @@ function MediaPanel({
         await fetchAdminMedia(token, {
           status: statusFilter || undefined,
           search: search.trim() || undefined,
+          destinationSlug: filterDestinationSlug || undefined,
+          routeSlug: filterRouteSlug || undefined,
         }),
       );
     } catch (err) {
@@ -3060,9 +3167,9 @@ function MediaPanel({
   }
 
   useEffect(() => {
-    loadMedia();
+    void loadMedia();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, statusFilter, filterDestinationSlug, filterRouteSlug]);
 
   useEffect(() => {
     let active = true;
@@ -3080,7 +3187,7 @@ function MediaPanel({
     };
   }, [token]);
 
-  async function saveMedia() {
+  async function commitSaveMedia() {
     if (!editing) return;
     setBusy(true);
     setError('');
@@ -3091,6 +3198,7 @@ function MediaPanel({
         id: editing.id || undefined,
         type: editing.type,
         publicUrl: editing.publicUrl,
+        coverUrl: editing.coverUrl,
         title: editing.title,
         altText: editing.altText,
         destinationSlugs: editing.destinationSlugs,
@@ -3109,6 +3217,15 @@ function MediaPanel({
     }
   }
 
+  function saveMedia() {
+    if (!editing) return;
+    if (!mediaHasAssociation(editing)) {
+      setAssocConfirm({ kind: 'save' });
+      return;
+    }
+    void commitSaveMedia();
+  }
+
   async function archiveMediaRow(id: string) {
     setBusy(true);
     setError('');
@@ -3124,7 +3241,7 @@ function MediaPanel({
     }
   }
 
-  async function setMediaRowStatus(item: MediaAsset, nextStatus: 'published' | 'rejected') {
+  async function commitMediaRowStatus(item: MediaAsset, nextStatus: 'published' | 'rejected') {
     setBusy(true);
     setError('');
     setStatus('');
@@ -3134,6 +3251,7 @@ function MediaPanel({
         id: item.id,
         type: item.type,
         publicUrl: item.publicUrl,
+        coverUrl: item.coverUrl || '',
         title: item.title,
         altText: item.altText,
         destinationSlugs: item.destinationSlugs,
@@ -3148,6 +3266,32 @@ function MediaPanel({
     } finally {
       setBusy(false);
     }
+  }
+
+  function requestPublishMediaRow(item: MediaAsset) {
+    if (!mediaHasAssociation(item)) {
+      setAssocConfirm({ kind: 'rowPublish', item });
+      return;
+    }
+    void commitMediaRowStatus(item, 'published');
+  }
+
+  function openRejectDialog(item: MediaAsset) {
+    setRejectNote('');
+    setRejectTarget(item);
+  }
+
+  async function confirmReject() {
+    if (!rejectTarget) return;
+    const target = rejectTarget;
+    setRejectTarget(null);
+    setRejectNote('');
+    await commitMediaRowStatus(target, 'rejected');
+  }
+
+  function startCreate() {
+    setIsCreate(true);
+    setEditing(emptyMediaDraft());
   }
 
   function toggleDraftSlug(
@@ -3166,7 +3310,7 @@ function MediaPanel({
     });
   }
 
-  async function saveEditingAsStatus(nextStatus: 'published' | 'rejected') {
+  async function commitSaveEditingAsStatus(nextStatus: 'published' | 'rejected') {
     if (!editing) return;
     setBusy(true);
     setError('');
@@ -3177,6 +3321,7 @@ function MediaPanel({
         id: editing.id,
         type: editing.type,
         publicUrl: editing.publicUrl,
+        coverUrl: editing.coverUrl,
         title: editing.title,
         altText: editing.altText,
         destinationSlugs: editing.destinationSlugs,
@@ -3195,6 +3340,42 @@ function MediaPanel({
     }
   }
 
+  function saveEditingAsStatus(nextStatus: 'published' | 'rejected') {
+    if (!editing) return;
+    if (nextStatus === 'published' && !mediaHasAssociation(editing)) {
+      setAssocConfirm({ kind: 'saveAsPublished' });
+      return;
+    }
+    void commitSaveEditingAsStatus(nextStatus);
+  }
+
+  async function confirmAssociationContinue() {
+    const pending = assocConfirm;
+    setAssocConfirm(null);
+    if (!pending) return;
+    if (pending.kind === 'save') {
+      await commitSaveMedia();
+      return;
+    }
+    if (pending.kind === 'saveAsPublished') {
+      await commitSaveEditingAsStatus('published');
+      return;
+    }
+    if (pending.kind === 'rowPublish' && pending.item) {
+      await commitMediaRowStatus(pending.item, 'published');
+    }
+  }
+
+  async function uploadPosterBlob(blob: Blob, baseName: string): Promise<string> {
+    const filename = `${baseName.replace(/\.[^.]+$/, '') || 'poster'}-cover.jpg`;
+    const presigned = await presignMediaUpload(token, {
+      filename,
+      contentType: 'image/jpeg',
+    });
+    await uploadFileToPresignedUrl(presigned.uploadUrl, blob, presigned.contentType);
+    return presigned.publicUrl;
+  }
+
   async function uploadSelectedFile(file: File) {
     if (!editing) return;
     setUploading(true);
@@ -3202,24 +3383,60 @@ function MediaPanel({
     setStatus('');
     try {
       const contentType = file.type || 'application/octet-stream';
+      const isVideo = contentType.startsWith('video/');
       const presigned = await presignMediaUpload(token, {
         filename: file.name,
         contentType,
       });
       await uploadFileToPresignedUrl(presigned.uploadUrl, file, presigned.contentType);
+
+      let coverUrl = '';
+      let posterNote = '';
+      if (isVideo) {
+        try {
+          const posterBlob = await extractVideoPosterBlob(file);
+          coverUrl = await uploadPosterBlob(posterBlob, file.name);
+        } catch {
+          posterNote = '视频已上传，但自动抽封面失败；仍可保存，列表将回退首帧或占位。';
+        }
+      }
+
       setEditing((current) =>
         current
           ? {
               ...current,
               publicUrl: presigned.publicUrl,
-              type: contentType.startsWith('video/') ? 'video' : 'image',
+              coverUrl: isVideo ? coverUrl : '',
+              type: isVideo ? 'video' : 'image',
               title: current.title || file.name.replace(/\.[^.]+$/, ''),
             }
           : current,
       );
-      setStatus('文件已上传，下方已生成预览；仍需保存，素材才会写入数据库。');
+      setStatus(
+        posterNote ||
+          (coverUrl
+            ? '文件与封面已上传，下方已生成预览；仍需保存，素材才会写入数据库。'
+            : '文件已上传，下方已生成预览；仍需保存，素材才会写入数据库。'),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : '上传文件失败。');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function regenerateCoverFromUrl() {
+    if (!editing?.publicUrl.trim() || editing.type !== 'video') return;
+    setUploading(true);
+    setError('');
+    setStatus('');
+    try {
+      const posterBlob = await extractVideoPosterBlob(editing.publicUrl, { crossOrigin: true });
+      const coverUrl = await uploadPosterBlob(posterBlob, editing.title || 'video');
+      setEditing((current) => (current ? { ...current, coverUrl } : current));
+      setStatus('封面已重新生成；仍需保存才会写入数据库。');
+    } catch {
+      setError('无法从当前视频 URL 抽帧（常见原因：跨域）。请重新上传本地视频文件以生成封面。');
     } finally {
       setUploading(false);
     }
@@ -3255,33 +3472,57 @@ function MediaPanel({
                     publicUrl={editing.publicUrl}
                     type={editing.type}
                   />
-                  <label
-                    className={
-                      busy || uploading
-                        ? 'inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground opacity-50 pointer-events-none'
-                        : 'inline-flex h-10 cursor-pointer items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90'
-                    }
-                  >
-                    <input
-                      type="file"
-                      accept="image/*,video/mp4,video/webm,application/pdf"
-                      className="hidden"
-                      disabled={busy || uploading}
-                      onChange={(event) => {
-                        const file = event.target.files?.[0];
-                        event.target.value = '';
-                        if (file) {
-                          void uploadSelectedFile(file);
-                        }
-                      }}
-                    />
-                    {uploading
-                      ? '上传中…'
-                      : editing.publicUrl.trim()
-                        ? '替换文件'
-                        : '上传本地文件'}
-                  </label>
-                  <FieldHint>上传后仍需保存，素材才会写入数据库。</FieldHint>
+                  {editing.type === 'video' && editing.coverUrl.trim() ? (
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">封面预览</p>
+                      <img
+                        src={editing.coverUrl}
+                        alt="视频封面"
+                        className="h-32 w-full max-w-xs rounded-md border border-input object-cover"
+                      />
+                    </div>
+                  ) : null}
+                  <div className="flex flex-wrap gap-2">
+                    <label
+                      className={
+                        busy || uploading
+                          ? 'inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground opacity-50 pointer-events-none'
+                          : 'inline-flex h-10 cursor-pointer items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90'
+                      }
+                    >
+                      <input
+                        type="file"
+                        accept="image/*,video/mp4,video/webm,application/pdf"
+                        className="hidden"
+                        disabled={busy || uploading}
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          event.target.value = '';
+                          if (file) {
+                            void uploadSelectedFile(file);
+                          }
+                        }}
+                      />
+                      {uploading
+                        ? '上传中…'
+                        : editing.publicUrl.trim()
+                          ? '替换文件'
+                          : '上传本地文件'}
+                    </label>
+                    {editing.type === 'video' && editing.publicUrl.trim() ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={busy || uploading}
+                        onClick={() => void regenerateCoverFromUrl()}
+                      >
+                        重新生成封面
+                      </Button>
+                    ) : null}
+                  </div>
+                  <FieldHint>
+                    上传视频会尽量自动抽封面。上传后仍需保存，素材才会写入数据库。
+                  </FieldHint>
                 </div>
                 <details className="space-y-2 text-sm md:col-span-2" open={!isCreate}>
                   <summary className="cursor-pointer text-muted-foreground">
@@ -3329,6 +3570,11 @@ function MediaPanel({
                       setEditing((current) => (current ? { ...current, title: event.target.value } : current))
                     }
                   />
+                  {looksLikeWeakMediaTitle(editing.title) ? (
+                    <p className="text-xs text-amber-800">
+                      建议改成「地点 + 主题」，方便以后搜索（例如 Daocheng autumn lake）。
+                    </p>
+                  ) : null}
                 </label>
                 <label className="space-y-2 text-sm">
                   <span>标签（逗号分隔）</span>
@@ -3459,86 +3705,123 @@ function MediaPanel({
     );
   }
 
+  const hasBrowseFilters = Boolean(
+    search.trim() || filterDestinationSlug || filterRouteSlug,
+  );
+  const showReviewEmpty =
+    !loading &&
+    media.length === 0 &&
+    statusFilter === 'review' &&
+    !hasBrowseFilters;
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          素材库负责入库与待审。待审 = 尚未正式可用；在路线/目的地选图器上传的图会直接可用，不会进待审。关联只方便筛选，不会自动换封面。
+          本页先审待审素材。配图请去路线/目的地里的选图器；关联不会自动换封面。
         </p>
-        <Button
-          variant="outline"
-          disabled={busy || loading}
-          onClick={() => {
-            setIsCreate(true);
-            setEditing(emptyMediaDraft());
-          }}
-        >
+        <Button variant="outline" disabled={busy || loading} onClick={startCreate}>
           新建素材
         </Button>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-        <Input
-          placeholder="搜索标题或 URL"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') void loadMedia();
-          }}
-          className="sm:max-w-xs"
-        />
-        <select
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm sm:max-w-[10rem]"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option value="">全部状态</option>
-          {MEDIA_STATUSES.map((value) => (
-            <option key={value} value={value}>
-              {MEDIA_STATUS_LABELS[value]}
-            </option>
-          ))}
-        </select>
-        <Button onClick={() => void loadMedia()} disabled={loading || busy}>
-          {loading ? '加载中...' : '搜索'}
-        </Button>
+      <div
+        className="flex flex-wrap gap-1 border-b border-border"
+        role="tablist"
+        aria-label="素材状态"
+      >
+        {MEDIA_LIST_TABS.map((tab) => {
+          const active = statusFilter === tab.value;
+          return (
+            <button
+              key={tab.label}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              disabled={loading || busy}
+              className={cn(
+                'px-3 py-2 text-sm font-medium transition-colors',
+                active
+                  ? 'border-b-2 border-primary text-foreground'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+              onClick={() => setStatusFilter(tab.value)}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
+
+      <MediaBrowseFilters
+        search={search}
+        onSearchChange={setSearch}
+        onSearchSubmit={() => void loadMedia()}
+        destinationSlug={filterDestinationSlug}
+        onDestinationChange={setFilterDestinationSlug}
+        routeSlug={filterRouteSlug}
+        onRouteChange={setFilterRouteSlug}
+        destinations={destinations.map((item) => ({ value: item.slug, label: item.name }))}
+        routes={routes.map((item) => ({ value: item.slug, label: item.title }))}
+        disabled={loading || busy}
+        searchLoading={loading}
+      />
 
       {error && <p className="text-destructive">{error}</p>}
       {status && <p className="text-sm text-green-700">{status}</p>}
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>标题</TableHead>
-                <TableHead>类型</TableHead>
-                <TableHead>关联</TableHead>
-                <TableHead>状态</TableHead>
-                <TableHead>操作</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {media.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">
-                    <div>{item.title}</div>
-                    <div className="max-w-[240px] truncate font-mono text-xs text-muted-foreground">
-                      {item.publicUrl}
-                    </div>
-                  </TableCell>
-                  <TableCell>{MEDIA_TYPE_LABELS[item.type]}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {[...item.destinationSlugs, ...item.routeSlugs].join(', ') || '-'}
-                  </TableCell>
-                  <TableCell>
+      {showReviewEmpty ? (
+        <div className="flex flex-col items-center gap-4 rounded-md border border-dashed border-input px-6 py-16 text-center">
+          <p className="text-sm text-muted-foreground">暂无待审素材</p>
+          <div className="flex flex-wrap justify-center gap-2">
+            <Button variant="outline" disabled={busy} onClick={() => setStatusFilter('')}>
+              查看全部素材
+            </Button>
+            <Button disabled={busy} onClick={startCreate}>
+              新建素材
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {media.map((item) => (
+            <article
+              key={item.id}
+              className="flex flex-col overflow-hidden rounded-md border border-border bg-card"
+            >
+              <MediaCardThumb
+                publicUrl={item.publicUrl}
+                coverUrl={item.coverUrl}
+                type={item.type}
+              />
+              <div className="flex flex-1 flex-col gap-3 p-3">
+                <div className="space-y-1">
+                  <h3 className="line-clamp-2 text-sm font-medium leading-snug">{item.title}</h3>
+                  <div className="flex flex-wrap gap-1.5">
+                    <Badge variant="secondary">{MEDIA_TYPE_LABELS[item.type]}</Badge>
                     <Badge variant={item.status === 'published' ? 'default' : 'secondary'}>
                       {MEDIA_STATUS_LABELS[item.status]}
                     </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-2">
+                  </div>
+                </div>
+                <div className="mt-auto flex flex-wrap gap-2">
+                  {item.status === 'review' ? (
+                    <>
+                      <Button
+                        size="sm"
+                        disabled={busy}
+                        onClick={() => requestPublishMediaRow(item)}
+                      >
+                        通过
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy}
+                        onClick={() => openRejectDialog(item)}
+                      >
+                        驳回
+                      </Button>
                       <Button
                         size="sm"
                         variant="outline"
@@ -3550,25 +3833,20 @@ function MediaPanel({
                       >
                         编辑
                       </Button>
-                      {item.status === 'review' ? (
-                        <>
-                          <Button
-                            size="sm"
-                            disabled={busy}
-                            onClick={() => void setMediaRowStatus(item, 'published')}
-                          >
-                            通过
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={busy}
-                            onClick={() => void setMediaRowStatus(item, 'rejected')}
-                          >
-                            驳回
-                          </Button>
-                        </>
-                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy}
+                        onClick={() => {
+                          setIsCreate(false);
+                          setEditing(mediaToDraft(item));
+                        }}
+                      >
+                        编辑
+                      </Button>
                       <Button
                         size="sm"
                         variant="outline"
@@ -3577,21 +3855,103 @@ function MediaPanel({
                       >
                         归档
                       </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {media.length === 0 && !loading && (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
-                    {search.trim() || statusFilter ? '无匹配结果' : '暂无素材。'}
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                    </>
+                  )}
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+
+      {!showReviewEmpty && media.length === 0 && !loading && (
+        <p className="py-8 text-center text-sm text-muted-foreground">
+          {hasBrowseFilters || statusFilter ? '无匹配结果' : '暂无素材。'}
+        </p>
+      )}
+
+      <Dialog
+        open={assocConfirm !== null}
+        onOpenChange={(open) => {
+          if (!open) setAssocConfirm(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>尚未关联目的地或路线</DialogTitle>
+            <DialogDescription>
+              没有关联时，选图器和素材库按目的地/路线筛选会很难找到它。建议先勾选关联；也可以仍要继续。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={() => {
+                const pending = assocConfirm;
+                setAssocConfirm(null);
+                if (pending?.kind === 'rowPublish' && pending.item) {
+                  setIsCreate(false);
+                  setEditing(mediaToDraft(pending.item));
+                }
+              }}
+            >
+              去勾选关联
+            </Button>
+            <Button type="button" disabled={busy} onClick={() => void confirmAssociationContinue()}>
+              仍要继续
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={rejectTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRejectTarget(null);
+            setRejectNote('');
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>确定驳回？</DialogTitle>
+            <DialogDescription>
+              驳回后该素材不会出现在选图器中。备注本版仅供确认时参考，不会入库。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <label className="text-sm" htmlFor="media-reject-note">
+              备注（可选）
+            </label>
+            <Textarea
+              id="media-reject-note"
+              value={rejectNote}
+              placeholder="例如：画质不足、与产品无关…"
+              onChange={(event) => setRejectNote(event.target.value)}
+              rows={3}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={() => {
+                setRejectTarget(null);
+                setRejectNote('');
+              }}
+            >
+              取消
+            </Button>
+            <Button type="button" disabled={busy || !rejectTarget} onClick={() => void confirmReject()}>
+              驳回
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
