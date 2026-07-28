@@ -540,6 +540,27 @@ export async function setCustomTripFieldEnabled(id: string, enabled: boolean) {
   return { field: all.find((item) => item.id === id) };
 }
 
+export async function setCustomTripFieldRequired(id: string, required: boolean) {
+  if (shouldUseMemoryFormStorage()) {
+    const fields = getMemoryFields();
+    const field = fields.find((item) => item.id === id);
+    if (!field) return { error: 'Field not found.' };
+    field.required = required;
+    return { field };
+  }
+
+  await ensureCustomTripFormTables();
+  const result = await sql`
+    UPDATE custom_trip_form_fields
+    SET required = ${required}, updated_at = NOW()
+    WHERE id = ${id}
+    RETURNING id
+  `;
+  if (!result.rows.length) return { error: 'Field not found.' };
+  const all = await listCustomTripFormFields({ includeDisabled: true });
+  return { field: all.find((item) => item.id === id) };
+}
+
 export async function reorderCustomTripFields(orderedIds: string[]) {
   if (shouldUseMemoryFormStorage()) {
     const fields = getMemoryFields();

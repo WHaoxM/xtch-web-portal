@@ -2,7 +2,27 @@
 
 ## Status
 
-**review-needed（7.20 整合验证）** — 6 个领域均已完成代码或清单交付；自动补团与表单已有完整命令验证，桌面 Group Tours 有数据测试和双视口冒烟。支付邮件与性别头像因当前命令执行器无退出状态仍需统一复跑；性别头像另需 320/375/390 浏览器验收。游记扩至 10 条继续等待用户提供 7 份真实内容与图片。
+**done（表单必填勾选与跳转收口）** — Admin「表单配置」列表可直接勾选必填；路线/目的地编辑保存失败跳到首个缺项；旅客询盘偏好字段沿用既有跳转。`build`/`lint` 绿。浏览器勾选与跳转未人工验。
+
+### Progress note（表单必填勾选与跳转，2026-07-28）
+
+- 目标：缺必填可跳转；管理端可自行勾选偏好字段必填。
+- 已改：`app/api/lib/customTripForm.ts`、`app/api/admin/custom-trip-form.ts`（`set-required`）；`Admin.tsx` 列表勾选；`RouteEditor`/`DestinationEditor` 校验失败滚动聚焦。
+- 未改：Contact/Checkout 姓名邮箱等硬编码必填；班期编辑器仍为单条错误文案。
+- 验证：build、lint 通过；浏览器未验。
+- 下一步：若要把 Contact/Checkout 联系人字段也做成 Admin 可开关，需产品确认。
+
+**done（游记 10 条供稿落地）** — 用户 docx 10 文 + 10 图已写入 `Home.tsx` travelerStories；主图/头像 `traveler-story-01..10.jpg`；polaroid 用同目的地站内实景。`npm run build` + `npm run lint` 绿。开放：Sophie&Max 配图为两名女性，需业务确认；浏览器圆点切换未人工点验。
+
+### Progress note（游记 10 条供稿落地，2026-07-28）
+
+- 来源：`docs/桌面端内容/10位入境游客的中国旅行故事.docx`；图文顺序 Emma/成都 → … → Neal/九寨沟。
+- 替换原 3 条无来源示意文案；英文据供稿改写，引语优先原话，无原话仅用可核对事实。
+- 已改：`app/src/pages/Home.tsx`；新增 `app/public/images/traveler-story-01.jpg` … `10.jpg`。
+- 验证：图片路径存在；build；lint。未验：桌面/移动圆点切换与长文折行观感。
+- 临时解包/提取脚本已清理；原 docx 保留。
+
+**review-needed（7.20 整合验证）** — 6 个领域均已完成代码或清单交付；自动补团与表单已有完整命令验证，桌面 Group Tours 有数据测试和双视口冒烟。支付邮件与性别头像因当前命令执行器无退出状态仍需统一复跑；性别头像另需 320/375/390 浏览器验收。游记供稿已到达并开始落地（见上）。
 
 ### Progress note（7.20 用户决策与实施分配，2026-07-21）
 

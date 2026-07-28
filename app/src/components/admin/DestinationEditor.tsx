@@ -14,7 +14,10 @@ import {
   type DestinationEditDraft,
 } from '@/lib/destinationDraft';
 import { postAdminDestination } from '@/lib/destinationsClient';
+import { focusFirstFieldError } from '@/lib/formErrors';
 import { slugify, slugifyOrFallback } from '@/lib/slugify';
+
+const DESTINATION_FIELD_ERROR_ORDER = ['name', 'description', 'image', 'slug'] as const;
 
 function FieldHint({ children }: { children: ReactNode }) {
   return <p className="text-xs text-muted-foreground">{children}</p>;
@@ -116,6 +119,11 @@ export function DestinationEditor({
       setFieldErrors(errors as Record<string, string>);
       setError(status === 'published' ? '上架前请补全必填项。' : '请先修正标出的字段。');
       if (errors.slug) setAdvancedOpen(true);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          focusFirstFieldError([...DESTINATION_FIELD_ERROR_ORDER], errors as Record<string, string>);
+        });
+      });
       return;
     }
 
@@ -158,7 +166,7 @@ export function DestinationEditor({
 
         <FormSection title="快速填写" description="名称、简介、主图与列表顺序会同步到卡片预览。">
           <div className="grid gap-4 md:grid-cols-2">
-            <label className="space-y-2 text-sm md:col-span-2">
+            <label className="space-y-2 text-sm md:col-span-2" data-field-error="name">
               <span>名称</span>
               <Input
                 value={draft.name}
@@ -172,7 +180,7 @@ export function DestinationEditor({
                 <FieldHint>标识：{draft.slug}（创建后不可改）</FieldHint>
               )}
             </label>
-            <label className="space-y-2 text-sm md:col-span-2">
+            <label className="space-y-2 text-sm md:col-span-2" data-field-error="description">
               <span>简介</span>
               <Textarea
                 value={draft.description}
@@ -183,7 +191,7 @@ export function DestinationEditor({
                 <p className="text-xs text-destructive">{fieldErrors.description}</p>
               ) : null}
             </label>
-            <div className="space-y-2 text-sm md:col-span-2">
+            <div className="space-y-2 text-sm md:col-span-2" data-field-error="image">
               <span>主图</span>
               <ImageFieldPicker
                 value={draft.image}
@@ -284,7 +292,7 @@ export function DestinationEditor({
           {advancedOpen ? (
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               {isCreate ? (
-                <label className="space-y-2 text-sm">
+                <label className="space-y-2 text-sm" data-field-error="slug">
                   <span>标识（slug）</span>
                   <Input
                     value={draft.slug}

@@ -1577,6 +1577,25 @@ function CustomTripFormPanel({ token }: { token: string }) {
     }
   }
 
+  async function setRequired(field: CustomTripFormField, required: boolean) {
+    setBusy(true);
+    setError('');
+    setStatus('');
+    try {
+      await postAdminCustomTripForm(token, {
+        action: 'set-required',
+        id: field.id,
+        required,
+      });
+      setStatus(`「${field.label || field.fieldKey}」已设为${required ? '必填' : '选填'}。`);
+      await loadFields();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '更新必填状态失败。');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function moveField(index: number, direction: -1 | 1) {
     const target = index + direction;
     if (target < 0 || target >= fields.length) return;
@@ -1917,7 +1936,7 @@ function CustomTripFormPanel({ token }: { token: string }) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="max-w-3xl text-sm text-muted-foreground">
-          配置询盘偏好字段。完整定制按「基础信息 / 更多偏好」分组；勾选「路线私人」会出现在基于路线的短表单。停用只影响新表单。可用「整表预览」查看旅客侧已启用字段。
+          配置询盘偏好字段。完整定制按「基础信息 / 更多偏好」分组；勾选「路线私人」会出现在基于路线的短表单。列表可直接勾选「必填」；旅客提交缺项时会跳转到对应字段。停用只影响新表单。可用「整表预览」查看旅客侧已启用字段。
         </p>
         <div className="flex shrink-0 flex-wrap gap-2">
           <Button
@@ -1962,7 +1981,17 @@ function CustomTripFormPanel({ token }: { token: string }) {
                   <TableCell>{CUSTOM_TRIP_GROUP_LABELS[field.formGroup]}</TableCell>
                   <TableCell>{field.useOnRoutePrivate ? '是' : '否'}</TableCell>
                   <TableCell>{CUSTOM_TRIP_CONTROL_LABELS[field.controlType]}</TableCell>
-                  <TableCell>{field.required ? '是' : '否'}</TableCell>
+                  <TableCell>
+                    <label className="inline-flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={field.required}
+                        disabled={busy}
+                        onChange={(event) => setRequired(field, event.target.checked)}
+                      />
+                      <span>{field.required ? '必填' : '选填'}</span>
+                    </label>
+                  </TableCell>
                   <TableCell>
                     <Badge variant={field.enabled ? 'default' : 'secondary'}>
                       {field.enabled ? '已启用' : '已停用'}

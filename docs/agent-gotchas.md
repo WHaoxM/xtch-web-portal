@@ -65,6 +65,7 @@
 | 公网前端 `VITE_*` 要打进构建 | 用 `npm run build:win11-home` 或 `build:cloud-vps`（输出到 `app/dist/<target>/`），再 `npm run deploy:serve`；只改 runtime env 不会更新已构建的 Supabase/redirect |
 | 询盘黄条 / Complete the anti-spam | 生产缺 `VITE_TURNSTILE_SITE_KEY`（编译期）或未 rebuild。填 `env/win11-home/.env` 的 site+secret 后必须 `build:win11-home` 再重启 `deploy:serve`；只改 `.env` 不重建则黄条仍在。公网勿用 Cloudflare always-pass 测试 key；Turnstile 通过后还要齐 `RESEND_API_KEY` / `INQUIRY_FROM_EMAIL` / `INQUIRY_TO_EMAIL` 否则 502 |
 | 勿用本地 `npm run build` 喂 deploy:serve | **已隔离：** `build` → `app/dist/local/`；`build:win11-home` → `app/dist/win11-home/`；`deploy:serve` 只读 `dist/<target>/` 且校验 `.xtch-build-target`。本地 build 再也盖不掉生产包 |
+| Vite `Failed to run dependency scan` / `@emotion/is-prop-valid` 指向 `dist/win11-home/assets/…` | `npm run dev` 的 `outDir` 是 `dist/local`；Vite 默认会扫根下所有 HTML，只忽略当前 outDir，仍会扫到其他 target 的 dist。已用 `optimizeDeps.entries: ['index.html']` 限定入口。勿为此乱装 `@emotion/is-prop-valid`（motion 的 optional peer，缺了只影响 styled(motion) 场景） |
 | 新增 API 后须重启 deploy:serve | `localApiRoutes` 在进程启动时加载；未重启会 JSON `Not found.`（如 `/api/admin/auth-otp`） |
 | Agent/脚本重定向输出别落在 `app/` 根 | 写到仓库根 `tmp/`（gitignore）；勿再生成 `app/out.txt` / `app/err.txt` / `app/build-out.txt` |
 | 直连 GitHub `443` 失败 | 本机 v2rayN/xray 常见 SOCKS `127.0.0.1:10808`；临时用 `git -c http.proxy=socks5://127.0.0.1:10808 -c https.proxy=socks5://127.0.0.1:10808 …`，勿默写进 global config；经代理会明显变慢 |
@@ -82,7 +83,7 @@
 | Admin 素材待审与选图上传混淆 / 关联又变 slug 逗号串 | 选图器上传 → `published`（立刻封面）；素材页新建 → 默认 `review`，列表「通过/驳回」；关联用目的地/路线名称勾选，≠ 自动换封面；工作台「待审」只计库内入库 |
 | Admin 分类又露出手填 key / 中文显示名 | 运营只填英文显示名+排序+启用；新建 key 由 `slugify`/`slugifyOrFallback` 自动生成并隐藏；编辑 key 仅「高级」只读；CJK 保存/启用拦截；停用不删已勾选内容上的 key |
 | 路线展示标签必须对齐筛选分类 | `routes.category` 只由 `themes[0]`→`categories.label` 推导（读列表与 `upsertRoute` 强制）；Admin 不可手填；无 themes 则角标不显示。勿再恢复独立「分类文案」手填 |
-| Admin 表单配置又手填 fieldKey / 无旅客预览 | 用 `FormConfigMobilePreview`（完整定制｜路线私人）+ `formFieldDraft`；新建 fieldKey 由 label 转 **snake_case**（非 hyphen slug）自动生成并藏进高级；编辑草稿合并预览带「未保存」角标；列表「整表预览」仅已启用已保存；CJK 拦 label/description；勿做拖拽构建器 |
+| Admin 表单配置又手填 fieldKey / 无旅客预览 | 用 `FormConfigMobilePreview`（完整定制｜路线私人）+ `formFieldDraft`；新建 fieldKey 由 label 转 **snake_case**（非 hyphen slug）自动生成并藏进高级；编辑草稿合并预览带「未保存」角标；列表「整表预览」仅已启用已保存；CJK 拦 label/description；列表可直接勾选必填（`set-required`），勿只依赖编辑页；勿做拖拽构建器 |
 | Admin 工作台四卡顺序/文案散落 | 紧急序固定：取消申请 → 待跟进询盘 → 未上架路线 → 待确认素材；文案在 `dashboardOpsCopy`（取消说明复用 `orderOpsCopy`）；有数醒目、零淡化；勿改 `dashboard.ts` 计数或增删卡 |
 
 ## 添加标准
