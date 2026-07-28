@@ -33,6 +33,7 @@
 | 主站手机竖滑发涩 | 全页裁切用 `overflow-x: clip`（勿用会建 scrollport 的 `hidden`）；横滑轨加 `touch-action: pan-x pan-y` + `overscroll-behavior-x: contain`；≤900px 关闭 `html { scroll-behavior: smooth }` |
 | Tailwind `py-18` / `md:py-18` | Tailwind **v3** 无 spacing `18`，类会被丢掉；用 `16`/`20`/`24`。Home Real Moments 曾用无效 `py-18` + `margin-top:-72px` 盖住 Curated trust bar |
 | 跟团游英文产品名 | 旅客可见英文用 **Social Tours / social tour**；URL `/group-tours`、API `group-tour` / `group_tour_inquiry` 与 CSS class 名保持不变 |
+| 拼团支付暂关 | Mini-App 确认页走 `group_tour_inquiry` 邮件，勿再接 Stripe CTA；后端 checkout/webhook 勿删。绿泡泡须先表单发信再开 WhatsApp |
 | `AGENTS.md` 不是知识库 | 详细内容放入对应 `docs/` 文件 |
 | 本机 `docker` CLI（`docker ps` 等）在这个 shell 环境里可能一直挂起不返回，即使 Docker Desktop 里真的有容器在跑（可能是 shell 会话拿不到桌面会话的 named pipe） | 不要死等 `docker ps`；改用直连 `pg`/`fetch` 测 `POSTGRES_URL` 指向的端口（如 `localhost:5432`）是否能连通，能连通就说明数据库可用，不用管 `docker` CLI 卡不卡 |
 | PowerShell（本项目终端默认）不支持 `&&` 链接命令（会报 `token '&&' is not a valid statement separator`） | 用 `;` 分隔，或用 Shell 工具的 `working_directory` 参数代替 `cd xxx &&` |

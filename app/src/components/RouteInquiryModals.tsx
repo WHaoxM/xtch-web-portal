@@ -748,7 +748,7 @@ export function GroupTourInquiryModal({
             disabled={submitting}
             className="min-h-[52px] w-full rounded-[6px] bg-[#ef4f43] px-6 text-[16px] font-semibold text-white transition-colors hover:bg-[#d84338] disabled:cursor-not-allowed disabled:opacity-65"
           >
-            {submitting ? 'Sending inquiry...' : 'Send Social Tour Inquiry'}
+            {submitting ? 'Sending request...' : 'Confirm request'}
           </button>
         </form>
       </DialogContent>

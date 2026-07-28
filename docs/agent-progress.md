@@ -2,14 +2,16 @@
 
 ## Status
 
-**in-progress（7.28 移动体验）** — Home 返回网站、主站滑动、窄屏自适应、跟团游英文→社交游。
+**in-progress（隐藏支付→确认发邮件）** — Mini-App 拼团 Confirm+询盘；绿泡泡短/长表后 WhatsApp；桌面支付话术清理。Stripe 后端保留。
 
-### Progress note（7.28 移动体验，2026-07-28）
+### Progress note（隐藏支付→确认发邮件，2026-07-28）
 
-- 目标：`docs/problem/7.28.md` 体验四条。
-- 已读：mobile-ios 设计合同、chinaTripsMobile Home/Me、index.css 900px 断点、Home/GroupTours 文案。
-- 计划改：`ChinaTripsMobile.tsx`+css；`index.css` 滑动/窄屏；旅客侧 Group→Social 文案；progress/task-board/gotchas/mobile doc。
-- 验证计划：`build`/`lint`；320/375/390 溢出与 Home 出口目视。
+- 目标：7.28 业务三条；计划见 hide_pay_email_flow。
+- 已读：ChinaTripsMobile checkout/FAB、inquiryClient、RouteInquiryModals、CONTEXT/mobile-ios 支付条款。
+- 计划改：`ChinaTripsMobile.tsx`（确认→group_tour_inquiry + Turnstile；WhatsApp 门闩表单）；相关支付话术；CONTEXT/mobile-ios 一行。
+- 验证计划：`build`/`lint`；无旅客可见 Pay full amount。
+
+**done（7.28 移动体验）** — Home 返回网站、主站滑动、窄屏自适应、跟团游英文→社交游（与 hide-pay-email 协调移交 ChinaTripsMobile）。
 
 **done（Admin 快捷密码登录）** — env 单组邮箱+密码 + `aq1.` HMAC（12h）；Admin SignIn：Google→密码→OTP。本地 `env/local/.env` 已写凭据（gitignore）。`build`/`lint` 绿。浏览器点验待做。
 

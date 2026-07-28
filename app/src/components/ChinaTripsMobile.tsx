@@ -23,6 +23,13 @@ import {
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { TurnstileWidget } from '@/components/TurnstileWidget';
 import {
@@ -44,8 +51,6 @@ import {
 import {
   clearCheckoutCancelDraft,
   consumeCheckoutCancelDraft,
-  createFixedDepartureCheckoutSession,
-  saveCheckoutCancelDraft,
 } from '@/lib/checkoutClient';
 import { endDateFromDuration, normalizeDateOnly } from '@/lib/dateOnly';
 import { LinkOrderToAccount } from '@/components/LinkOrderToAccount';
@@ -125,7 +130,32 @@ type MobileView =
   | 'bookingConfirmed'
   | 'myOrders';
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
-type CheckoutStatus = 'idle' | 'loading' | 'error';
+type CheckoutStatus = 'idle' | 'loading' | 'error' | 'success';
+
+const INQUIRY_SUBMITTED_STORAGE_KEY = 'xtch_inquiry_submitted';
+
+function markInquirySubmitted() {
+  try {
+    localStorage.setItem(INQUIRY_SUBMITTED_STORAGE_KEY, '1');
+  } catch {
+    // Ignore private-mode / storage failures.
+  }
+}
+
+function hasInquirySubmittedFlag() {
+  try {
+    return localStorage.getItem(INQUIRY_SUBMITTED_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function openWhatsAppAfterInquiry() {
+  const text = encodeURIComponent('I just sent a request from the website.');
+  const base = brand.whatsappHref;
+  const href = base.includes('?') ? `${base}&text=${text}` : `${base}?text=${text}`;
+  window.open(href, '_blank', 'noopener,noreferrer');
+}
 type BookingConfirmedStatus = 'loading' | 'ready' | 'error';
 type MyOrdersStatus = 'loading' | 'ready' | 'error';
 type AuthStatus = 'idle' | 'loading' | 'message' | 'error';
@@ -562,8 +592,8 @@ function GroupTourReserveCard({
             <h2 id="grouptour-title">Join a social tour</h2>
             {!loading ? (
               <p>
-                Pick a guaranteed fixed departure, choose your adult seats, and pay the full amount to confirm your
-                booking.
+                Pick a guaranteed fixed departure, choose your adult seats, and confirm your request. We reply by
+                email within 24 hours with seats and next steps.
               </p>
             ) : null}
           </>
@@ -1464,7 +1494,7 @@ function RouteDetailView({
                 Social tour
               </span>
               <b>Join a social tour</b>
-              <small>Full payment · guaranteed fixed departure</small>
+              <small>Confirm request · guaranteed fixed departure</small>
             </button>
             <button type="button" className="iosapp-route-booking-option" onClick={onOpenCustom}>
               <span>
@@ -2580,7 +2610,7 @@ function MeTab({
   return (
     <motion.div variants={tabPanelVariants} initial="initial" animate="animate" exit="exit">
       <motion.div variants={fadeUpItem}>
-        <AppHeader title="Me" subtitle="Requests and deposits" />
+        <AppHeader title="Me" subtitle="Requests and bookings" />
       </motion.div>
       {!isSignedIn ? (
         <motion.section className="iosapp-account-card" variants={fadeUpItem}>
@@ -2589,7 +2619,7 @@ function MeTab({
               <UserRound size={25} />
             </span>
             <h2>Sign in to manage your trip</h2>
-            <p>View reserve requests, deposits, and planner messages from one account.</p>
+            <p>View reserve requests, bookings, and planner messages from one account.</p>
           </div>
           <SignInOptions onSignIn={onSignIn} />
           <Link to="/" className="iosapp-settings-row iosapp-settings-row-link">
@@ -2617,7 +2647,7 @@ function MeTab({
             </span>
             <span>
               <strong>My Orders</strong>
-              <small>View your bookings and deposits</small>
+              <small>View your bookings and requests</small>
             </span>
             <ChevronRight size={18} />
           </motion.button>
@@ -2896,8 +2926,8 @@ function GroupRequestView({
           <h1>{scopedRoute ? scopedRoute.title : 'Social tour departures'}</h1>
           <p>
             {scopedRoute
-              ? 'Fixed-price, guaranteed departures for this route. Full payment confirms your booking.'
-              : 'Fixed-price, guaranteed departures. Full payment confirms your booking.'}
+              ? 'Fixed-price, guaranteed departures for this route. Confirm your request and we will reply by email within 24 hours.'
+              : 'Fixed-price, guaranteed departures. Confirm your request and we will reply by email within 24 hours.'}
           </p>
         </header>
 
@@ -3243,7 +3273,7 @@ function SignInView({
           <p>
             {authStep === 'code'
               ? 'Enter the 6-digit code from your email to continue.'
-              : 'Verify your email before deposit payment, then return anytime to manage requests and receipts.'}
+              : 'Verify your email to manage requests and receipts anytime.'}
           </p>
         </section>
         {authStep === 'email' ? (
@@ -3356,9 +3386,12 @@ function ReserveReviewView({
   checkoutStatus,
   checkoutError,
   cancelNotice,
+  turnstileResetSignal,
+  onTurnstileToken,
   onDismissCancelNotice,
   onBack,
   onSubmitCheckout,
+  onDone,
 }: {
   selectedDestinationName: string;
   selectedRouteTitle: string;
@@ -3367,9 +3400,12 @@ function ReserveReviewView({
   checkoutStatus: CheckoutStatus;
   checkoutError: string;
   cancelNotice: string;
+  turnstileResetSignal: number;
+  onTurnstileToken: (token: string) => void;
   onDismissCancelNotice: () => void;
   onBack: () => void;
   onSubmitCheckout: () => void;
+  onDone: () => void;
 }) {
   const isSubmittingCheckout = checkoutStatus === 'loading';
   const currency = selectedDeparture?.currency || 'USD';
@@ -3389,9 +3425,36 @@ function ReserveReviewView({
     ? `${selectedDeparture.spotsLeft} of ${selectedDeparture.capacity} left`
     : null;
 
+  if (checkoutStatus === 'success') {
+    return (
+      <div className="china-trips-mobile-page iosapp-page">
+        <BackBar title="Request sent" onBack={onDone} />
+        <main className="iosapp-screen">
+          <section className="iosapp-form-section iosapp-checkout-review iosapp-booking-confirmed">
+            <header className="iosapp-checkout-hero">
+              <span className="iosapp-success-badge">
+                <BadgeCheck size={18} aria-hidden="true" />
+                Request received
+              </span>
+              <h1>{selectedRouteTitle || 'Social tour request'}</h1>
+              <p>{dateLabel}</p>
+            </header>
+            <p className="iosapp-checkout-note">
+              Thank you. We received your booking request and will reply within 24 hours with seat availability and
+              next steps. This does not lock seats or take payment yet.
+            </p>
+            <Button type="button" variant="ghost" className="iosapp-primary-button" onClick={onDone}>
+              Back to China Trips
+            </Button>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="china-trips-mobile-page iosapp-page">
-      <BackBar title="Book" onBack={onBack} />
+      <BackBar title="Confirm" onBack={onBack} />
       <main className="iosapp-screen">
         {cancelNotice && (
           <div className="iosapp-checkout-cancel-notice" role="status">
@@ -3405,7 +3468,7 @@ function ReserveReviewView({
         <section className="iosapp-form-section iosapp-checkout-review">
           <header className="iosapp-checkout-hero">
             <span className="iosapp-kicker">{selectedDestinationName || 'Social tour'}</span>
-            <h1>{selectedRouteTitle || 'Confirm booking'}</h1>
+            <h1>{selectedRouteTitle || 'Confirm request'}</h1>
             <p>{dateLabel}</p>
             {(selectedDeparture?.status || spotsLabel) && (
               <div className="iosapp-checkout-meta">
@@ -3444,8 +3507,8 @@ function ReserveReviewView({
             )}
           </div>
 
-          <div className="iosapp-review-group" aria-label="Payment summary">
-            <h2>Payment</h2>
+          <div className="iosapp-review-group" aria-label="Request summary">
+            <h2>Request summary</h2>
             <div className="iosapp-review-row">
               <span>Price per adult</span>
               <b className="iosapp-review-money">
@@ -3453,19 +3516,23 @@ function ReserveReviewView({
               </b>
             </div>
             <div className="iosapp-review-row iosapp-review-total">
-              <span>Total due today</span>
+              <span>Listed total</span>
               <b className="iosapp-review-money">
                 ${totalPriceDollars} {currency}
               </b>
             </div>
             <p className="iosapp-checkout-note">{cancellationSummary}</p>
+            <p className="iosapp-checkout-note">
+              Confirming sends your request by email. Seats are not held until we confirm availability with you.
+            </p>
           </div>
 
-          <div className="iosapp-stripe-trust">
-            <ShieldCheck size={18} aria-hidden="true" />
-            <p>
-              Secure Stripe Checkout - card details stay with Stripe. Syncing Travel never stores them.
-            </p>
+          <div
+            className={cx('iosapp-turnstile-row')}
+            data-field-error="turnstile"
+            data-error-scroll-only
+          >
+            <TurnstileWidget onTokenChange={onTurnstileToken} resetSignal={turnstileResetSignal} />
           </div>
         </section>
 
@@ -3482,7 +3549,7 @@ function ReserveReviewView({
           disabled={isSubmittingCheckout}
           onClick={onSubmitCheckout}
         >
-          {isSubmittingCheckout ? 'Opening Stripe Checkout...' : 'Pay full amount'}
+          {isSubmittingCheckout ? 'Sending request...' : 'Confirm request'}
         </Button>
       </main>
     </div>
@@ -3650,17 +3717,295 @@ function TabBar({ activeTab, onSelect }: { activeTab: MobileTab; onSelect: (tab:
   );
 }
 
+type WhatsAppFabStep = 'closed' | 'gate' | 'short' | 'long';
+
 function WhatsAppShortcut() {
+  const [step, setStep] = useState<WhatsAppFabStep>('closed');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [travelMonth, setTravelMonth] = useState('');
+  const [travelers, setTravelers] = useState('');
+  const [message, setMessage] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [formError, setFormError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const [turnstileResetSignal, setTurnstileResetSignal] = useState(0);
+
+  const open = step !== 'closed';
+  const isLong = step === 'long';
+
+  const resetForm = () => {
+    setName('');
+    setEmail('');
+    setTravelMonth('');
+    setTravelers('');
+    setMessage('');
+    setFieldErrors({});
+    setFormError('');
+    setSubmitting(false);
+    setTurnstileToken('');
+    setTurnstileResetSignal((value) => value + 1);
+  };
+
+  const closeAll = () => {
+    setStep('closed');
+    resetForm();
+  };
+
+  const openFab = () => {
+    resetForm();
+    setStep('gate');
+  };
+
+  const chooseGate = (alreadySubmitted: boolean) => {
+    resetForm();
+    setStep(alreadySubmitted ? 'short' : 'long');
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const honeypot = String(new FormData(formElement).get('companyWebsite') ?? '').trim();
+    const nextErrors: FieldErrors = {};
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim().toLowerCase();
+
+    if (!trimmedName) nextErrors.name = 'Enter your full name.';
+    if (!trimmedEmail) nextErrors.email = 'Enter your email address.';
+    else if (!isValidEmail(trimmedEmail)) nextErrors.email = 'Enter a valid email address.';
+    if (!turnstileToken) nextErrors.turnstile = 'Complete the anti-spam check.';
+
+    const fieldOrder = isLong
+      ? ['name', 'email', 'travelMonth', 'travelers', 'message', 'turnstile']
+      : ['name', 'email', 'message', 'turnstile'];
+
+    setFieldErrors(nextErrors);
+    setFormError('');
+    if (Object.keys(nextErrors).length) {
+      requestAnimationFrame(() => {
+        focusFirstFieldError(fieldOrder, nextErrors, formElement);
+      });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await submitInquiry({
+        type: 'quick_contact',
+        name: trimmedName,
+        email: trimmedEmail,
+        travelMonth: isLong ? travelMonth.trim() : undefined,
+        travelers: isLong ? travelers.trim() : undefined,
+        message: message.trim(),
+        sourcePath: `${window.location.pathname}${window.location.search}${window.location.hash}`,
+        turnstileToken,
+        honeypot,
+      });
+      markInquirySubmitted();
+      closeAll();
+      openWhatsAppAfterInquiry();
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'We could not submit your request. Please try again.');
+      setSubmitting(false);
+      setTurnstileToken('');
+      setTurnstileResetSignal((value) => value + 1);
+    }
+  };
+
   return (
-    <a
-      href={brand.whatsappHref}
-      target="_blank"
-      rel="noreferrer"
-      className="iosapp-whatsapp-fab"
-      aria-label="Chat with Syncing Travel on WhatsApp"
-    >
-      <MessageCircle size={20} />
-    </a>
+    <>
+      <button
+        type="button"
+        className="iosapp-whatsapp-fab"
+        aria-label="Contact Syncing Travel on WhatsApp"
+        onClick={openFab}
+      >
+        <MessageCircle size={20} />
+      </button>
+
+      <Dialog
+        open={open}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) closeAll();
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto rounded-[14px] sm:max-w-[420px]">
+          {step === 'gate' ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>Before we open WhatsApp</DialogTitle>
+                <DialogDescription>
+                  Have you already submitted a request on our site? We will ask for a short follow-up if you have, or
+                  a fuller form if this is your first message.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex flex-col gap-3 pt-2">
+                <Button
+                  type="button"
+                  className="min-h-[48px] w-full"
+                  onClick={() => chooseGate(true)}
+                >
+                  Yes — I already submitted a form
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-[48px] w-full"
+                  onClick={() => chooseGate(false)}
+                >
+                  No — this is my first request
+                </Button>
+                {hasInquirySubmittedFlag() ? (
+                  <p className="text-center text-[12px] text-muted-foreground">
+                    This device previously sent a request, so the short form may be enough.
+                  </p>
+                ) : null}
+              </div>
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle>{isLong ? 'Send a request' : 'Quick follow-up'}</DialogTitle>
+                <DialogDescription>
+                  {isLong
+                    ? 'Share a few travel basics. After we receive your email, WhatsApp will open so you can chat with us.'
+                    : 'Leave a short note. After we receive your email, WhatsApp will open so you can chat with us.'}
+                </DialogDescription>
+              </DialogHeader>
+
+              <form className="space-y-4" onSubmit={handleSubmit} noValidate>
+                <input
+                  type="text"
+                  name="companyWebsite"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  className="hidden"
+                  aria-hidden="true"
+                />
+
+                <div data-field-error="name">
+                  <label htmlFor="wa-fab-name" className="mb-1.5 block text-[14px] font-medium">
+                    Name
+                  </label>
+                  <Input
+                    id="wa-fab-name"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    aria-invalid={Boolean(fieldErrors.name)}
+                    aria-describedby={fieldErrors.name ? fieldErrorId('name') : undefined}
+                    placeholder="Your name"
+                    autoComplete="name"
+                  />
+                  {fieldErrors.name ? (
+                    <p id={fieldErrorId('name')} className="mt-1.5 text-[13px] text-red-600" role="alert">
+                      {fieldErrors.name}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div data-field-error="email">
+                  <label htmlFor="wa-fab-email" className="mb-1.5 block text-[14px] font-medium">
+                    Email
+                  </label>
+                  <Input
+                    id="wa-fab-email"
+                    type="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    aria-invalid={Boolean(fieldErrors.email)}
+                    aria-describedby={fieldErrors.email ? fieldErrorId('email') : undefined}
+                    placeholder="you@example.com"
+                    autoComplete="email"
+                  />
+                  {fieldErrors.email ? (
+                    <p id={fieldErrorId('email')} className="mt-1.5 text-[13px] text-red-600" role="alert">
+                      {fieldErrors.email}
+                    </p>
+                  ) : null}
+                </div>
+
+                {isLong ? (
+                  <>
+                    <div data-field-error="travelMonth">
+                      <label htmlFor="wa-fab-month" className="mb-1.5 block text-[14px] font-medium">
+                        Preferred travel month
+                      </label>
+                      <Input
+                        id="wa-fab-month"
+                        value={travelMonth}
+                        onChange={(event) => setTravelMonth(event.target.value)}
+                        placeholder="e.g. October 2026"
+                      />
+                    </div>
+                    <div data-field-error="travelers">
+                      <label htmlFor="wa-fab-travelers" className="mb-1.5 block text-[14px] font-medium">
+                        Travelers
+                      </label>
+                      <Input
+                        id="wa-fab-travelers"
+                        value={travelers}
+                        onChange={(event) => setTravelers(event.target.value)}
+                        placeholder="e.g. 2 adults"
+                      />
+                    </div>
+                  </>
+                ) : null}
+
+                <div data-field-error="message">
+                  <label htmlFor="wa-fab-message" className="mb-1.5 block text-[14px] font-medium">
+                    Message
+                  </label>
+                  <textarea
+                    id="wa-fab-message"
+                    value={message}
+                    onChange={(event) => setMessage(event.target.value)}
+                    rows={isLong ? 4 : 3}
+                    placeholder={isLong ? 'Tell us what you want to see or ask.' : 'Anything we should know before we chat?'}
+                    className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-[15px] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                  />
+                </div>
+
+                <div
+                  data-field-error="turnstile"
+                  data-error-scroll-only
+                  aria-invalid={Boolean(fieldErrors.turnstile)}
+                  aria-describedby={fieldErrors.turnstile ? fieldErrorId('turnstile') : undefined}
+                >
+                  <TurnstileWidget onTokenChange={setTurnstileToken} resetSignal={turnstileResetSignal} />
+                  {fieldErrors.turnstile ? (
+                    <p id={fieldErrorId('turnstile')} className="mt-1.5 text-[13px] text-red-600" role="alert">
+                      {fieldErrors.turnstile}
+                    </p>
+                  ) : null}
+                </div>
+
+                {formError ? (
+                  <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700" role="alert">
+                    {formError}
+                  </p>
+                ) : null}
+
+                <div className="flex flex-col gap-2">
+                  <Button type="submit" className="min-h-[48px] w-full" disabled={submitting}>
+                    {submitting ? 'Sending...' : 'Send and open WhatsApp'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="min-h-[44px] w-full"
+                    disabled={submitting}
+                    onClick={() => setStep('gate')}
+                  >
+                    Back
+                  </Button>
+                </div>
+              </form>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -3829,6 +4174,8 @@ export default function ChinaTripsMobile() {
   const [checkoutError, setCheckoutError] = useState('');
   const [checkoutEditErrors, setCheckoutEditErrors] = useState<FieldErrors>({});
   const [checkoutCancelNotice, setCheckoutCancelNotice] = useState('');
+  const [checkoutTurnstileToken, setCheckoutTurnstileToken] = useState('');
+  const [checkoutTurnstileResetSignal, setCheckoutTurnstileResetSignal] = useState(0);
   const [bookingOrder, setBookingOrder] = useState<SafeOrderSummary | null>(null);
   const [bookingStatus, setBookingStatus] = useState<BookingConfirmedStatus>('loading');
   const [bookingError, setBookingError] = useState('');
@@ -4007,7 +4354,7 @@ export default function ChinaTripsMobile() {
     if (restored) {
       setDraft(normalizeGroupDraft(restored));
       setCheckoutCancelNotice(
-        'Payment was cancelled. Your booking details were restored — you can try again when ready.',
+        'Checkout was cancelled. Your booking details were restored — you can confirm your request when ready.',
       );
       setCheckoutStatus('idle');
       setCheckoutError('');
@@ -4016,7 +4363,7 @@ export default function ChinaTripsMobile() {
     }
 
     setCheckoutCancelNotice(
-      'Payment was cancelled. Please review your trip details and try again.',
+      'Checkout was cancelled. Please review your trip details and try again.',
     );
     setActiveView('groupRequest');
   }, [searchParams, setSearchParams]);
@@ -4060,7 +4407,7 @@ export default function ChinaTripsMobile() {
     } else {
       setActiveView('groupRequest');
       setCheckoutStatus('error');
-      setCheckoutError('Sign-in is complete. Please choose your departure again before payment.');
+      setCheckoutError('Sign-in is complete. Please choose your departure again before confirming.');
     }
 
     setPostSignInCheckoutDraft(null);
@@ -4561,6 +4908,7 @@ export default function ChinaTripsMobile() {
       setCustomMessage('Request sent. We will reply within 24 hours with realistic route ideas and next steps.');
       setCustomTurnstileToken('');
       setCustomTurnstileResetSignal((value) => value + 1);
+      markInquirySubmitted();
     } catch (error) {
       setCustomStatus('error');
       setCustomFormError(error instanceof Error ? error.message : 'We could not submit your request. Please try again.');
@@ -4670,6 +5018,7 @@ export default function ChinaTripsMobile() {
       );
       setRoutePrivateTurnstileToken('');
       setRoutePrivateTurnstileResetSignal((value) => value + 1);
+      markInquirySubmitted();
     } catch (error) {
       setRoutePrivateStatus('error');
       setRoutePrivateFormError(
@@ -4937,49 +5286,73 @@ export default function ChinaTripsMobile() {
     }
     if (!selectedDeparture) return;
 
+    if (!checkoutTurnstileToken) {
+      setCheckoutStatus('error');
+      setCheckoutError('Please complete the anti-spam check.');
+      return;
+    }
+
     setCheckoutEditErrors({});
     setCheckoutStatus('loading');
     setCheckoutError('');
     setCheckoutCancelNotice('');
 
-    const authSession = readStoredAuthSession();
     const travelers = draft.travelers.map((traveler) => ({
       name: traveler.name.trim(),
       gender: traveler.gender,
     }));
+    const leadName = travelers[0]?.name || draft.name.trim();
+    const currency = selectedDeparture.currency || 'USD';
+    const unitPriceDollars = (selectedDeparture.adultPriceCents / 100).toFixed(2);
+    const totalPriceDollars = (
+      (selectedDeparture.adultPriceCents * draft.adultQuantity) /
+      100
+    ).toFixed(2);
+    const dateLabel = formatDepartureDateRange(selectedDeparture);
+    const travelerLines = travelers
+      .map((traveler, index) => `Traveler ${index + 1}: ${traveler.name} (${traveler.gender})`)
+      .join('\n');
+    const message = [
+      'Social tour booking request (confirm by email — no online payment).',
+      `Departure ID: ${selectedDeparture.id}`,
+      `Route: ${selectedRoute?.title || selectedDeparture.routeSlug}`,
+      `Dates: ${dateLabel}`,
+      `Adults: ${draft.adultQuantity}`,
+      `Listed price per adult: $${unitPriceDollars} ${currency}`,
+      `Listed total: $${totalPriceDollars} ${currency}`,
+      travelerLines,
+      draft.phone.trim() ? `Phone: ${draft.phone.trim()}` : '',
+      draft.notes.trim() ? `Notes: ${draft.notes.trim()}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
 
     try {
-      saveCheckoutCancelDraft({
-        destinationSlug: draft.destinationSlug,
-        routeSlug: draft.routeSlug,
-        departureId: draft.departureId,
-        dateRange: draft.dateRange,
-        adultQuantity: draft.adultQuantity,
-        travelers,
-        name: travelers[0]?.name || draft.name.trim(),
+      await submitInquiry({
+        type: 'group_tour_inquiry',
+        name: leadName,
         email: checkoutEmail,
-        phoneCountry: draft.phoneCountry,
-        phoneNational: draft.phoneNational,
-        phone: draft.phone.trim(),
-        notes: draft.notes.trim(),
-      });
-
-      const result = await createFixedDepartureCheckoutSession({
-        departureId: selectedDeparture.id,
-        adultQuantity: draft.adultQuantity,
-        name: travelers[0]?.name || draft.name.trim(),
-        email: checkoutEmail,
-        travelers,
         phone: draft.phone.trim() || undefined,
-        notes: draft.notes.trim(),
-        accessToken: authSession?.accessToken,
+        requestedTour: selectedRoute?.title || selectedDeparture.routeSlug,
+        travelMonth: dateLabel,
+        travelers: String(draft.adultQuantity),
+        message,
+        sourcePath: `${window.location.pathname}${window.location.search}${window.location.hash}`,
+        turnstileToken: checkoutTurnstileToken,
       });
 
-      window.location.assign(result.checkoutUrl!);
-    } catch (error) {
+      markInquirySubmitted();
       clearCheckoutCancelDraft();
+      setCheckoutTurnstileToken('');
+      setCheckoutTurnstileResetSignal((value) => value + 1);
+      setCheckoutStatus('success');
+    } catch (error) {
       setCheckoutStatus('error');
-      setCheckoutError(error instanceof Error ? error.message : 'We could not open Stripe Checkout. Please try again.');
+      setCheckoutError(
+        error instanceof Error ? error.message : 'We could not submit your request. Please try again.',
+      );
+      setCheckoutTurnstileToken('');
+      setCheckoutTurnstileResetSignal((value) => value + 1);
     }
   };
 
@@ -5115,13 +5488,24 @@ export default function ChinaTripsMobile() {
           checkoutStatus={checkoutStatus}
           checkoutError={checkoutError}
           cancelNotice={checkoutCancelNotice}
+          turnstileResetSignal={checkoutTurnstileResetSignal}
+          onTurnstileToken={setCheckoutTurnstileToken}
           onDismissCancelNotice={() => setCheckoutCancelNotice('')}
           onBack={() => {
             clearCheckoutCancelDraft();
             setCheckoutCancelNotice('');
+            setCheckoutStatus('idle');
+            setCheckoutError('');
             setActiveView('groupRequest');
           }}
-          onSubmitCheckout={submitCheckout}
+          onSubmitCheckout={() => void submitCheckout()}
+          onDone={() => {
+            setCheckoutStatus('idle');
+            setCheckoutError('');
+            setCheckoutCancelNotice('');
+            setActiveTab('home');
+            setActiveView('tabs');
+          }}
         />
       </motion.div>
     );

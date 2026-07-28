@@ -4675,6 +4675,9 @@ span.iosapp-provider-mark {
   color: #fff;
   padding: 0;
   text-decoration: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
   transform: translateZ(0);
   animation: iosapp-whatsapp-pulse 2400ms ease-in-out infinite;
 }

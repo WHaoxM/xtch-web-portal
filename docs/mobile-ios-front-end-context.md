@@ -10,8 +10,9 @@ This file is the working design contract for `app/src/components/ChinaTripsMobil
 - Top-level tabs: Home, Places, Routes, Custom, Me.
 - Custom private trip planning is the primary Home-screen business goal.
 - Group tour reserve is a supporting path, not the primary Home-screen story and not a top-level tab. It appears on Home and can be reviewed from Me.
-- Reserve flow: choose destination first, then choose an existing route, then verify email/sign in, then continue to Stripe Checkout for **full payment** on a guaranteed fixed departure (not a `$100` deposit).
-- Final balance is confirmed at checkout for sellable fixed departures; do not use deposit-only language on route booking CTAs.
+- Reserve flow: choose destination first, then choose an existing route / sellable departure, fill traveler details, then **Confirm request** which submits `group_tour_inquiry` email (no Stripe in UI). Stripe Checkout code remains for a later restore.
+- Do not use deposit-only or “Pay full amount” language on route booking CTAs while payment is hidden.
+- WhatsApp green FAB: gate (“already submitted a form?”) → short or long `quick_contact` form → on success open WhatsApp (optional prefilled text). Do not deep-link WhatsApp before the form succeeds.
 - Route selection is structured only. Do not allow arbitrary custom route text in the group tour reserve flow.
 - Route detail booking card has two CTAs:
   - **Join a social tour**: open `groupRequest` filtered to that route’s sellable departures. If none exist, open the route-based private short form with a short explanation.
@@ -77,13 +78,12 @@ Reference URLs:
 
 ## Checkout Rules
 
+- Temporary (2026-07): confirmation sheet submits **`group_tour_inquiry`** (email), not Stripe. Keep Turnstile on the confirm sheet. Primary CTA: `Confirm request` / loading `Sending request...`. Success shows in-sheet “Request received” (no payment).
 - Use a full-screen iOS grouped form visual language: **one** confirmation sheet (`iosapp-checkout-review`), not stacked marketing cards with nested white blocks.
 - Hero anchors the trip: destination kicker + route title + date range; availability/spots as compact meta under the hero — not as key-value rows.
-- Below the hero: Travelers rows, then Payment rows. Emphasize **Total due today** (larger type / tabular nums). Cancellation/refund copy is a footnote under total, never a right-column value that wraps against a short label.
-- Stripe trust is one compact row inside the same sheet, not a separate card.
-- Do not collect card fields locally. The app should communicate that card details are entered on Stripe Checkout.
-- Primary CTA text: `Pay full amount` (guaranteed fixed departure = full payment, not deposit-only language).
-- On the group tour booking form, every adult must provide a full name and self-report exactly `male` or `female`; never infer gender from a name. These values travel in the checkout payload and are stored only in the private order traveler snapshot. Checkout cancel/auth draft recovery must preserve both fields and keep the existing indexed error focus/ARIA behavior.
+- Below the hero: Travelers rows, then **Request summary** (listed price / listed total). Do not show Stripe trust or “Total due today” while payment is hidden.
+- Stripe Checkout APIs remain in the repo for restore; do not collect card fields locally.
+- On the group tour booking form, every adult must provide a full name and self-report exactly `male` or `female`; never infer gender from a name. Keep indexed error focus/ARIA behavior on the departure form.
 - The public joined roster is aggregate-only: expose counts for `male`, `female`, `unknown`, and `total`, never traveler names, emails, order numbers, or a per-traveler array. Count only orders in `confirmed` or `cancellation_requested`; exclude pending-payment orders and active inventory holds. Historical traveler snapshots without gender contribute to `unknown` and must never be backfilled or guessed.
 - Roster `total` means confirmed travelers and is intentionally different from `capacity - available_seats`, because availability also subtracts unexpired checkout holds. Keep the remaining-seat label and explain this distinction in UI copy.
 - Anonymous roster avatars use one stable color per reported gender and gray for `unknown`. Color is never the only signal: include a visible text legend with counts and an aggregate `aria-label`. Show this roster **only** for `group-tour` or `fixed-departure`, not private/customizable-only routes or route-private inquiry.
