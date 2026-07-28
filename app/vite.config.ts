@@ -128,6 +128,13 @@ export default defineConfig(({ mode }) => {
       outDir,
       emptyOutDir: true,
     },
+    // Default crawl is all *.html under root, ignoring only *current* build.outDir.
+    // Other target dirs (dist/win11-home, dist/cloud-vps) and any legacy flat
+    // dist/index.html would still be scanned; their bundles may contain
+    // motion's optional require("@emotion/is-prop-valid") and fail the scan.
+    optimizeDeps: {
+      entries: ['index.html'],
+    },
     server: {
       port: 3000,
       strictPort: true,

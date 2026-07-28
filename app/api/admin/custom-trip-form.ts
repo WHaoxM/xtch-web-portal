@@ -5,6 +5,7 @@ import {
   listCustomTripFormFields,
   reorderCustomTripFields,
   setCustomTripFieldEnabled,
+  setCustomTripFieldRequired,
   shouldUseMemoryFormStorage,
   upsertCustomTripField,
   type FormControlType,
@@ -109,6 +110,29 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
         actorType: 'admin',
         actorEmail: admin.email,
         action: enabled ? 'admin_custom_form_field_enable' : 'admin_custom_form_field_disable',
+        targetType: 'custom_trip_form_field',
+        targetId: id,
+        ipHash: hashIp(getClientIp(req)),
+        userAgent: headerValue(req.headers['user-agent']),
+      });
+
+      res.status(200).json({ ok: true, field: result.field });
+      return;
+    }
+
+    if (action === 'set-required') {
+      const id = String(body.id || '');
+      const required = Boolean(body.required);
+      const result = await setCustomTripFieldRequired(id, required);
+      if (result.error || !result.field) {
+        res.status(400).json({ ok: false, error: result.error || 'Could not update field.' });
+        return;
+      }
+
+      await writeAuditLog({
+        actorType: 'admin',
+        actorEmail: admin.email,
+        action: required ? 'admin_custom_form_field_require' : 'admin_custom_form_field_optional',
         targetType: 'custom_trip_form_field',
         targetId: id,
         ipHash: hashIp(getClientIp(req)),

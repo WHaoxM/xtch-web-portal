@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { Category } from '@/lib/categoriesClient';
 import type { Destination } from '@/lib/destinationsClient';
+import { focusFirstFieldError } from '@/lib/formErrors';
 import { postAdminRoute } from '@/lib/routesClient';
 import {
   applyPrimaryTypeDefaults,
@@ -27,6 +28,16 @@ import {
   type RouteEditDraft,
 } from '@/lib/routeDraft';
 import { SLUG_PATTERN, slugify, slugifyOrFallback } from '@/lib/slugify';
+
+const ROUTE_FIELD_ERROR_ORDER = [
+  'title',
+  'durationDays',
+  'summary',
+  'priceDisplay',
+  'heroImage',
+  'destinationSlugs',
+  'slug',
+] as const;
 
 function FieldHint({ children }: { children: ReactNode }) {
   return <p className="text-xs text-muted-foreground">{children}</p>;
@@ -177,6 +188,15 @@ export function RouteEditor({
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors as Record<string, string>);
       setError(status === 'published' ? '上架前请补全必填项。' : '请先修正标出的字段。');
+      if (errors.slug) {
+        setEditorMode('full');
+        setFullTab('advanced');
+      }
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          focusFirstFieldError([...ROUTE_FIELD_ERROR_ORDER], errors as Record<string, string>);
+        });
+      });
       return;
     }
 
@@ -212,7 +232,7 @@ export function RouteEditor({
   const quickFields = (
     <FormSection title="快速填写" description="门面信息会同步到移动端列表卡与详情预览。">
       <div className="grid gap-4 md:grid-cols-2">
-        <label className="space-y-2 text-sm md:col-span-2">
+        <label className="space-y-2 text-sm md:col-span-2" data-field-error="title">
           <span>标题</span>
           <Input
             value={draft.title}
@@ -240,7 +260,7 @@ export function RouteEditor({
             onChange={(event) => patchDraft({ subtitle: event.target.value })}
           />
         </label>
-        <label className="space-y-2 text-sm md:col-span-2">
+        <label className="space-y-2 text-sm md:col-span-2" data-field-error="summary">
           <span>摘要</span>
           <Textarea
             value={draft.summary}
@@ -248,7 +268,7 @@ export function RouteEditor({
           />
           {fieldErrors.summary ? <p className="text-xs text-destructive">{fieldErrors.summary}</p> : null}
         </label>
-        <label className="space-y-2 text-sm">
+        <label className="space-y-2 text-sm" data-field-error="durationDays">
           <span>行程天数</span>
           <Input
             type="number"
@@ -278,7 +298,7 @@ export function RouteEditor({
             ))}
           </select>
         </label>
-        <label className="space-y-2 text-sm md:col-span-2">
+        <label className="space-y-2 text-sm md:col-span-2" data-field-error="priceDisplay">
           <span>价格展示文案</span>
           <Input
             value={draft.priceDisplay}
@@ -288,7 +308,7 @@ export function RouteEditor({
             <p className="text-xs text-destructive">{fieldErrors.priceDisplay}</p>
           ) : null}
         </label>
-        <div className="space-y-2 text-sm md:col-span-2">
+        <div className="space-y-2 text-sm md:col-span-2" data-field-error="heroImage">
           <span>主图</span>
           <ImageFieldPicker
             value={draft.heroImage}
@@ -299,7 +319,7 @@ export function RouteEditor({
           />
           {fieldErrors.heroImage ? <p className="text-xs text-destructive">{fieldErrors.heroImage}</p> : null}
         </div>
-        <div className="space-y-2 text-sm md:col-span-2">
+        <div className="space-y-2 text-sm md:col-span-2" data-field-error="destinationSlugs">
           <span>关联目的地</span>
           <div className="flex flex-wrap gap-3 rounded-md border border-input p-3">
             {destinations.length === 0 ? (
@@ -570,7 +590,7 @@ export function RouteEditor({
       <TabsContent value="advanced" className="space-y-4 pt-4">
         <FormSection title="高级" description="标识、价格模式与兼容字段。">
           <div className="grid gap-4 md:grid-cols-2">
-            <label className="space-y-2 text-sm">
+            <label className="space-y-2 text-sm" data-field-error="slug">
               <span>标识（slug）</span>
               <Input
                 value={draft.slug}
