@@ -10,6 +10,8 @@ import {
   consumeAuthRedirectSession,
   ensureFreshSession,
   resolvePostAuthReturnPath,
+  fetchAdminQuickLoginEnabled,
+  signInAdminPassword,
   type AuthSession,
 } from '../lib/authClient';
 import {
@@ -309,11 +311,27 @@ function inquirySourceSummary(inquiry: {
 
 function SignInView({ onSignedIn }: { onSignedIn: (session: AuthSession) => void }) {
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [otpCode, setOtpCode] = useState('');
+  const [mode, setMode] = useState<'password' | 'otp'>('password');
   const [step, setStep] = useState<'email' | 'code'>('email');
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
   const [error, setError] = useState('');
   const [resendIn, setResendIn] = useState(0);
+  const [quickLoginEnabled, setQuickLoginEnabled] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchAdminQuickLoginEnabled().then((enabled) => {
+      if (!cancelled) {
+        setQuickLoginEnabled(enabled);
+        if (!enabled) setMode('otp');
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -326,6 +344,19 @@ function SignInView({ onSignedIn }: { onSignedIn: (session: AuthSession) => void
       await signInWithOAuth('google', 'account', { returnPath: '/admin' });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign-in failed.');
+    }
+  };
+
+  const handlePasswordSignIn = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setStatus('loading');
+    setError('');
+    try {
+      const session = await signInAdminPassword(email, password);
+      onSignedIn(session);
+    } catch (err) {
+      setStatus('error');
+      setError(err instanceof Error ? err.message : 'Invalid email or password.');
     }
   };
 
@@ -401,7 +432,43 @@ function SignInView({ onSignedIn }: { onSignedIn: (session: AuthSession) => void
             Continue with Google
           </Button>
           <hr className="border-border" />
-          {step === 'email' ? (
+
+          {quickLoginEnabled && mode === 'password' ? (
+            <form onSubmit={handlePasswordSignIn} className="space-y-3">
+              <Input
+                type="email"
+                placeholder="Admin email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="username"
+              />
+              <Input
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+              />
+              <Button type="submit" className="w-full" disabled={status === 'loading'}>
+                {status === 'loading' ? 'Signing in...' : 'Sign in with password'}
+              </Button>
+              <button
+                type="button"
+                className="w-full text-sm underline text-muted-foreground"
+                onClick={() => {
+                  setMode('otp');
+                  setStep('email');
+                  setPassword('');
+                  setError('');
+                  setStatus('idle');
+                }}
+              >
+                Use sign-in code instead
+              </button>
+            </form>
+          ) : step === 'email' ? (
             <form onSubmit={handleSendCode} className="space-y-3">
               <Input
                 type="email"
@@ -414,6 +481,19 @@ function SignInView({ onSignedIn }: { onSignedIn: (session: AuthSession) => void
               <Button type="submit" className="w-full" disabled={status === 'loading'}>
                 {status === 'loading' ? 'Sending...' : 'Send sign-in code'}
               </Button>
+              {quickLoginEnabled ? (
+                <button
+                  type="button"
+                  className="w-full text-sm underline text-muted-foreground"
+                  onClick={() => {
+                    setMode('password');
+                    setError('');
+                    setStatus('idle');
+                  }}
+                >
+                  Use password instead
+                </button>
+              ) : null}
             </form>
           ) : (
             <form onSubmit={handleVerifyCode} className="space-y-3">
@@ -454,8 +534,24 @@ function SignInView({ onSignedIn }: { onSignedIn: (session: AuthSession) => void
                   {resendIn > 0 ? `Resend in ${resendIn}s` : 'Resend code'}
                 </button>
               </div>
+              {quickLoginEnabled ? (
+                <button
+                  type="button"
+                  className="w-full text-sm underline text-muted-foreground"
+                  onClick={() => {
+                    setMode('password');
+                    setStep('email');
+                    setOtpCode('');
+                    setError('');
+                    setStatus('idle');
+                  }}
+                >
+                  Use password instead
+                </button>
+              ) : null}
             </form>
           )}
+
           {error && <p className="text-sm text-destructive">{error}</p>}
         </CardContent>
       </Card>

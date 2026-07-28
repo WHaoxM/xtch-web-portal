@@ -51,6 +51,7 @@
 | 公网部署勿把 5432/9000 暴露 | `docker-compose.yml` 端口须绑 `127.0.0.1`；只放行 80/443；Compose **无默认密码**（根 `.env` 必填）。见 `docs/ops/shared/compose-credentials.md` |
 | 公网 deploy 禁止 auth/checkout bypass | `env/win11-home/.env` / `env/cloud-vps/.env` 不得设 `DEV_CHECKOUT_BYPASS` / `DEV_AUTH_BYPASS_*`；`npm run deploy:serve` 会拒绝启动 |
 | Admin 双名单 + 角色 | 服务端 `resolveAdminRole`：`ADMIN_TECH_EMAIL_ALLOWLIST` / `ADMIN_OPS_EMAIL_ALLOWLIST`；两边都有 → tech；旧 `ADMIN_EMAIL_ALLOWLIST` 仅在新名单皆空时兼容为全部 tech。bypass 邮箱也必须落在名单内。**非名单账号**：`/api/admin/me` 403 后前端只渲染独立 Access denied 页，不展示侧栏/工作台壳 |
+| Admin 快捷密码登录 | `ADMIN_QUICK_LOGIN_EMAIL` + `ADMIN_QUICK_LOGIN_PASSWORD`（gitignore 的 `env/<target>/.env`）；邮箱须在名单内。签发 `aq1.` HMAC token（12h）。改密码后旧会话失效。**勿把真实口令写进 `.env.example` 或提交 git**；弱口令勿用于公网 |
 | 公网 deploy 拒启空/占位 Admin 名单（G1） | `win11-home` / `cloud-vps`：名单全空或仅 `you@example.com` 时 `deploy:serve` `process.exit(1)`；不影响 Vite `local` |
 | 自建 MinIO 签名用本机、浏览器走同域 `/s3` | `S3_ENDPOINT=http://127.0.0.1:9000`；上传签名 URL 跟请求 Host 改写；**入库的 `public_url`/`hero_image`/`image` 用相对 `/s3/<bucket>/…`**（勿存 `http://127.0.0.1:3000/s3/...`，否则 ngrok/LAN 裂图）。历史绝对路径跑迁移 `010_relative_s3_public_urls` |
 | 生产多入口（域名/公网IP/局域网） | `deploy:serve` 默认 `SELFHOST_HOST=0.0.0.0`；`VITE_AUTH_REDIRECT_URL` 宜留空；Supabase/Google 须白名单每个会用的 origin |

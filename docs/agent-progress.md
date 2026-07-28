@@ -2,6 +2,29 @@
 
 ## Status
 
+**done（Admin 快捷密码登录）** — env 单组邮箱+密码 + `aq1.` HMAC（12h）；Admin SignIn：Google→密码→OTP。本地 `env/local/.env` 已写凭据（gitignore）。`build`/`lint` 绿。浏览器点验待做。
+
+### Progress note（Admin 快捷密码登录，2026-07-28）
+
+- Spec：`docs/superpowers/specs/2026-07-28-admin-quick-password-login-design.md`（Approved）。
+- 已改：`adminQuickLogin.ts`；`auth-password.ts`；`adminAuth.ts`；`localApiRoutes.ts`；`authClient.ts`；`Admin.tsx` SignIn；env examples 注释；`agent-gotchas` 一行。
+- 本地：`ADMIN_QUICK_LOGIN_*` 已写入 gitignore 的 `env/local/.env`；邮箱已入 tech allowlist。
+- 验证：`npm run build`、`npm run lint`。未验：重启 Vite 后浏览器密码登录；公网 target 需另配 env。
+- 风险：本地弱口令勿用于公网生产。
+- 下一步：公网 target 另配强口令后 rebuild；浏览器点验登录。
+
+**done（cloud-vps 生产内容迁移）** — 本机 `xtch_prod` → VPS：12 目的地 / 20 路线 / 627 素材 / 7 班期 / 111 行程日；MinIO `prod/` 约 860MB（630 对象）。公网 `/api/routes` 非空，样例 `/s3/...` 200。
+
+### Progress note（cloud-vps 内容迁移，2026-07-28）
+
+- SSH：`xtch-vps` → `103.201.130.12`；仓库 `/opt/xtch-web-portal`；服务已 active。
+- 导出：`data/content-backups/cloud-sync-2026-07-28`（本机保留）；VPS 上导入后已删临时包。
+- 对象：SSH `-R 19000` 隧道 + `mc mirror` Win11 MinIO → VPS MinIO（非 scp 大目录）。
+- Env：VPS 补 `S3_PUBLIC_BASE_URL=https://www.xuntingtravel.com/s3/xtch-prod`；重启 `xtch-app`。
+- 验证：本机/公网 API 20 routes、12 destinations；media 与 hero `/s3/...` HTTP 200；departures=7。
+- 未迁：订单/询盘等业务 PII 全量（本机 inquiries=1 未强制同步）；表单配置仍用 VPS 既有 seed。
+- 下一步：浏览器硬刷新官网目视封面；可选加固 VPS DB 口令（导入日志曾显示弱口令形态，属既有配置）。
+
 **done（找素材筛选关联）** — tags 搜索；关联强提醒可跳过；标题软提示；选图器与素材库同套目的地/路线/标题·标签筛。`build`/`lint` 绿。浏览器点验未人工完成。
 
 ### Progress note（找素材筛选关联，2026-07-28）

@@ -29,6 +29,8 @@ type AuthSessionListener = (session: AuthSession | null) => void;
 
 /** Legacy key — migrated once into Supabase JS storage, then removed. */
 export const AUTH_SESSION_STORAGE_KEY = 'syncing_travel_auth_session';
+/** Admin env password quick-login session (HMAC aq1. token; not Supabase). */
+const ADMIN_QUICK_SESSION_KEY = 'syncing_travel_admin_quick_session';
 const authIntentStorageKey = 'syncing_travel_auth_intent';
 const authReturnPathKey = 'syncing_travel_auth_return_path';
 const authFocusMeKey = 'syncing_travel_auth_focus_me';
@@ -37,6 +39,7 @@ export const TRAVELER_DEFAULT_RETURN_PATH = '/china-trips';
 /** Survives OAuth opens in a new tab (sessionStorage does not). */
 const RETURN_PATH_TTL_MS = 2 * 60 * 60 * 1000;
 const REFRESH_SKEW_MS = 60_000;
+const ADMIN_QUICK_TOKEN_PREFIX = 'aq1.';
 
 type StoredReturnPath = {
   path: string;
@@ -129,10 +132,49 @@ function readSdkSessionFromStorage(): AuthSession | null {
   return null;
 }
 
+function readQuickLoginSession(): AuthSession | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(ADMIN_QUICK_SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as AuthSession;
+    if (!parsed.accessToken?.startsWith(ADMIN_QUICK_TOKEN_PREFIX) || !parsed.user?.email) {
+      window.localStorage.removeItem(ADMIN_QUICK_SESSION_KEY);
+      return null;
+    }
+    if (parsed.expiresAt && parsed.expiresAt < Date.now()) {
+      window.localStorage.removeItem(ADMIN_QUICK_SESSION_KEY);
+      return null;
+    }
+    return parsed;
+  } catch {
+    window.localStorage.removeItem(ADMIN_QUICK_SESSION_KEY);
+    return null;
+  }
+}
+
+function writeQuickLoginSession(session: AuthSession) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(ADMIN_QUICK_SESSION_KEY, JSON.stringify(session));
+  setMemorySession(session);
+}
+
+function clearQuickLoginSession() {
+  if (typeof window === 'undefined') return;
+  window.localStorage.removeItem(ADMIN_QUICK_SESSION_KEY);
+}
+
 async function migrateLegacySession() {
   if (typeof window === 'undefined') return;
   const legacy = readLegacyStoredSession();
   if (!legacy) return;
+
+  // Quick-login tokens may have been stored under the legacy key during early tests.
+  if (legacy.accessToken.startsWith(ADMIN_QUICK_TOKEN_PREFIX)) {
+    writeQuickLoginSession(legacy);
+    window.localStorage.removeItem(AUTH_SESSION_STORAGE_KEY);
+    return;
+  }
 
   const client = getSupabaseClient();
   if (client && legacy.refreshToken) {
@@ -153,8 +195,9 @@ function ensureAuthBootstrap() {
   if (typeof window === 'undefined' || authBootstrapped) return;
   authBootstrapped = true;
 
+  const quick = readQuickLoginSession();
   if (!memorySession) {
-    memorySession = readSdkSessionFromStorage() || readLegacyStoredSession();
+    memorySession = quick || readSdkSessionFromStorage() || readLegacyStoredSession();
   }
 
   migratePromise = migrateLegacySession().finally(() => {
@@ -165,10 +208,12 @@ function ensureAuthBootstrap() {
   if (!client) return;
 
   void client.auth.getSession().then(({ data }) => {
+    if (readQuickLoginSession()) return;
     setMemorySession(toAuthSession(data.session));
   });
 
   client.auth.onAuthStateChange((_event, session) => {
+    if (readQuickLoginSession()) return;
     setMemorySession(toAuthSession(session));
   });
 }
@@ -188,6 +233,12 @@ export function readStoredAuthSession() {
   const bypass = bypassSession();
   if (bypass) return bypass;
 
+  const quick = readQuickLoginSession();
+  if (quick) {
+    setMemorySession(quick);
+    return quick;
+  }
+
   ensureAuthBootstrap();
   return memorySession;
 }
@@ -204,6 +255,12 @@ export async function getAccessToken(): Promise<string | null> {
 export async function ensureFreshSession(): Promise<AuthSession | null> {
   const bypass = bypassSession();
   if (bypass) return bypass;
+
+  const quick = readQuickLoginSession();
+  if (quick) {
+    setMemorySession(quick);
+    return quick;
+  }
 
   ensureAuthBootstrap();
   if (migratePromise) await migratePromise;
@@ -242,6 +299,7 @@ export async function ensureFreshSession(): Promise<AuthSession | null> {
 export function clearStoredAuthSession() {
   if (typeof window === 'undefined') return;
   window.localStorage.removeItem(AUTH_SESSION_STORAGE_KEY);
+  clearQuickLoginSession();
   setMemorySession(null);
   const client = getSupabaseClient();
   if (client) {
@@ -393,6 +451,59 @@ export async function sendEmailOtp(email: string, intent: AuthIntent) {
 /** @deprecated Use sendEmailOtp — kept briefly for any stray imports. */
 export async function sendEmailMagicLink(email: string, intent: AuthIntent) {
   return sendEmailOtp(email, intent);
+}
+
+/** Whether Admin env password quick-login is configured on the API server. */
+export async function fetchAdminQuickLoginEnabled(): Promise<boolean> {
+  try {
+    const response = await fetch('/api/admin/auth-password', {
+      method: 'GET',
+      headers: { accept: 'application/json' },
+    });
+    const result = (await response.json().catch(() => null)) as {
+      ok?: boolean;
+      enabled?: boolean;
+    } | null;
+    return Boolean(response.ok && result?.ok && result.enabled);
+  } catch {
+    return false;
+  }
+}
+
+/** Admin env email+password quick login → aq1. HMAC session (not Supabase). */
+export async function signInAdminPassword(email: string, password: string): Promise<AuthSession> {
+  const response = await fetch('/api/admin/auth-password', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify({
+      email: email.trim(),
+      password,
+    }),
+  });
+  const result = (await response.json().catch(() => null)) as {
+    ok?: boolean;
+    accessToken?: string;
+    email?: string;
+    expiresAt?: number;
+    error?: string;
+  } | null;
+
+  if (!response.ok || !result?.ok || !result.accessToken || !result.email) {
+    throw new Error(result?.error || 'Invalid email or password.');
+  }
+
+  const session: AuthSession = {
+    accessToken: result.accessToken,
+    expiresAt: result.expiresAt,
+    user: {
+      id: `admin-quick:${result.email.toLowerCase()}`,
+      email: result.email,
+      provider: 'email',
+    },
+  };
+  writeQuickLoginSession(session);
+  setPendingReturnPath('/admin');
+  return session;
 }
 
 /** Admin-only OTP: server checks allowlist before calling Supabase. */

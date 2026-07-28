@@ -14,6 +14,7 @@ export const localApiRoutes: Record<string, string> = {
   '/api/admin/me': '/api/admin/me.ts',
   '/api/admin/auth-otp': '/api/admin/auth-otp.ts',
   '/api/admin/auth-magic-link': '/api/admin/auth-magic-link.ts',
+  '/api/admin/auth-password': '/api/admin/auth-password.ts',
 
   '/api/admin/orders': '/api/admin/orders.ts',
   '/api/admin/dashboard': '/api/admin/dashboard.ts',

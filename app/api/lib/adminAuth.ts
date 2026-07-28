@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { resolveAdminRole, type AdminRole } from './adminAllowlist';
+import { isAdminQuickLoginToken, verifyAdminQuickLoginToken } from './adminQuickLogin';
 
 type VercelRequestLike = {
   headers: Record<string, string | string[] | undefined>;
@@ -31,6 +32,22 @@ export async function requireAdminAuth(req: VercelRequestLike): Promise<AdminAut
       };
     }
     return { ok: true, email: bypassEmail, role };
+  }
+
+  if (isAdminQuickLoginToken(token)) {
+    const verified = verifyAdminQuickLoginToken(token);
+    if (!verified.ok) {
+      return { ok: false, error: 'Invalid or expired admin session.', status: 401 };
+    }
+    const role = resolveAdminRole(verified.email);
+    if (!role) {
+      return {
+        ok: false,
+        error: 'You are not authorized to access admin features.',
+        status: 403,
+      };
+    }
+    return { ok: true, email: verified.email, role };
   }
 
   const supabaseUrl = process.env.VITE_SUPABASE_URL;
