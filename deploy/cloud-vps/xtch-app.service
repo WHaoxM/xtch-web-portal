@@ -59,7 +59,8 @@ CapabilityBoundingSet=
 AmbientCapabilities=
 PrivateDevices=true
 # Allow loopback + outbound (Stripe/Resend/Supabase); deny raw sockets.
-RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+# AF_NETLINK is required: Node os.networkInterfaces() crashes without it under this unit.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 # Writable: system home (npm cache). Repo is read-only via ProtectSystem=strict.
 ReadWritePaths=/var/lib/xtch
 # Explicit read access to the application tree (ProtectSystem=strict still allows reads;
