@@ -342,7 +342,7 @@ export default function RouteDetail() {
                 onClick={() => setGroupModalOpen(true)}
                 className="mt-7 inline-flex min-h-[56px] w-full items-center justify-center rounded-[8px] bg-[#ef4f43] px-5 text-[20px] font-semibold text-white"
               >
-                Social tour inquiry
+                Book a social tour
               </button>
               <button
                 type="button"
@@ -354,7 +354,7 @@ export default function RouteDetail() {
               <div className="mt-8 space-y-5 text-left text-[16px] leading-7 text-[#6b7378]">
                 <p className="flex gap-4">
                   <Users className="mt-1 shrink-0" size={24} />
-                  Social tour departures are offered on selected dates.
+                  Pick a published departure and pay the full adult price to confirm your seat.
                 </p>
                 <p className="flex gap-4">
                   <CalendarDays className="mt-1 shrink-0" size={22} />

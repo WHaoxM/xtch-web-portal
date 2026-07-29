@@ -10,8 +10,8 @@ This file is the working design contract for `app/src/components/ChinaTripsMobil
 - Top-level tabs: Home, Places, Routes, Custom, Me.
 - Custom private trip planning is the primary Home-screen business goal.
 - Group tour reserve is a supporting path, not the primary Home-screen story and not a top-level tab. It appears on Home and can be reviewed from Me.
-- Reserve flow: choose destination first, then choose an existing route / sellable departure, fill traveler details, then **Confirm request** which submits `group_tour_inquiry` email (no Stripe in UI). Stripe Checkout code remains for a later restore.
-- Do not use deposit-only or “Pay full amount” language on route booking CTAs while payment is hidden.
+- Reserve flow: choose destination first, then choose an existing route / sellable departure, fill traveler details, then **Pay full amount** via Stripe Checkout. Custom tab and route-private short form use the same payment-entry shell (form → confirm → Pay); amount/product still TBD, with email inquiry as fallback on confirm.
+- Route booking CTAs for sellable social tours may use full-payment language (`Pay full amount` / `Total due today`). Do not use deposit-only wording.
 - WhatsApp green FAB: gate (“already submitted a form?”) → short or long `quick_contact` form → on success open WhatsApp (optional prefilled text). Do not deep-link WhatsApp before the form succeeds.
 - Route selection is structured only. Do not allow arbitrary custom route text in the group tour reserve flow.
 - Route detail booking card has two CTAs:
@@ -78,11 +78,11 @@ Reference URLs:
 
 ## Checkout Rules
 
-- Temporary (2026-07): confirmation sheet submits **`group_tour_inquiry`** (email), not Stripe. Keep Turnstile on the confirm sheet. Primary CTA: `Confirm request` / loading `Sending request...`. Success shows in-sheet “Request received” (no payment).
+- Confirmation sheet opens **Stripe Checkout** via `createFixedDepartureCheckoutSession` (`POST /api/checkout-session`). Primary CTA: `Pay full amount` / loading `Opening Stripe Checkout...`.
 - Use a full-screen iOS grouped form visual language: **one** confirmation sheet (`iosapp-checkout-review`), not stacked marketing cards with nested white blocks.
 - Hero anchors the trip: destination kicker + route title + date range; availability/spots as compact meta under the hero — not as key-value rows.
-- Below the hero: Travelers rows, then **Request summary** (listed price / listed total). Do not show Stripe trust or “Total due today” while payment is hidden.
-- Stripe Checkout APIs remain in the repo for restore; do not collect card fields locally.
+- Below the hero: Travelers rows, then **Payment** summary (`Total due today`) plus Stripe trust copy.
+- Do not collect card fields locally; redirect to hosted Stripe Checkout.
 - On the group tour booking form, every adult must provide a full name and self-report exactly `male` or `female`; never infer gender from a name. Keep indexed error focus/ARIA behavior on the departure form.
 - The public joined roster is aggregate-only: expose counts for `male`, `female`, `unknown`, and `total`, never traveler names, emails, order numbers, or a per-traveler array. Count only orders in `confirmed` or `cancellation_requested`; exclude pending-payment orders and active inventory holds. Historical traveler snapshots without gender contribute to `unknown` and must never be backfilled or guessed.
 - Roster `total` means confirmed travelers and is intentionally different from `capacity - available_seats`, because availability also subtracts unexpired checkout holds. Keep the remaining-seat label and explain this distinction in UI copy.
