@@ -51,6 +51,8 @@ import {
 import {
   clearCheckoutCancelDraft,
   consumeCheckoutCancelDraft,
+  createFixedDepartureCheckoutSession,
+  saveCheckoutCancelDraft,
 } from '@/lib/checkoutClient';
 import { endDateFromDuration, normalizeDateOnly } from '@/lib/dateOnly';
 import { LinkOrderToAccount } from '@/components/LinkOrderToAccount';
@@ -123,6 +125,8 @@ type MobileView =
   | 'groupRequest'
   | 'signIn'
   | 'reserveReview'
+  | 'customReview'
+  | 'routePrivateReview'
   | 'placeDetail'
   | 'routeDetail'
   | 'routePrivateRequest'
@@ -1494,7 +1498,7 @@ function RouteDetailView({
                 Social tour
               </span>
               <b>Join a social tour</b>
-              <small>Confirm request · guaranteed fixed departure</small>
+              <small>Pay full amount · guaranteed fixed departure</small>
             </button>
             <button type="button" className="iosapp-route-booking-option" onClick={onOpenCustom}>
               <span>
@@ -1568,7 +1572,6 @@ function RoutePrivateRequestView({
   formError,
   message,
   hint,
-  turnstileResetSignal,
   preferenceFields,
   preferences,
   configLoading,
@@ -1578,7 +1581,6 @@ function RoutePrivateRequestView({
   onDatesFlexibleChange,
   onPhoneChange,
   onPreferenceChange,
-  onTurnstileToken,
   onSubmit,
 }: {
   tour: (typeof routeTours)[number];
@@ -1588,7 +1590,6 @@ function RoutePrivateRequestView({
   formError: string;
   message: string;
   hint: string;
-  turnstileResetSignal: number;
   preferenceFields: CustomTripFormField[];
   preferences: CustomPreferences;
   configLoading: boolean;
@@ -1598,7 +1599,6 @@ function RoutePrivateRequestView({
   onDatesFlexibleChange: (flexible: boolean) => void;
   onPhoneChange: (countryCode: string, nationalNumber: string) => void;
   onPreferenceChange: (fieldKey: string, value: unknown) => void;
-  onTurnstileToken: (token: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   const isSubmitting = status === 'loading';
@@ -1622,7 +1622,7 @@ function RoutePrivateRequestView({
         <header className="iosapp-flow-intro">
           <span className="iosapp-kicker">Based on this route</span>
           <h1>Private trip based on this route</h1>
-          <p>Share your dates and group size. A planner will customize this itinerary for you.</p>
+          <p>Share your dates and group size. Continue to the shared payment entry next.</p>
         </header>
 
         <section className="iosapp-grouped-card iosapp-custom-intro" aria-label="Selected route">
@@ -1756,16 +1756,6 @@ function RoutePrivateRequestView({
               onCountryChange={(code) => onPhoneChange(code, draft.phoneNational)}
               onNationalChange={(value) => onPhoneChange(draft.phoneCountry, value)}
             />
-            <div
-              className={cx('iosapp-turnstile-row', fieldErrors.turnstile && 'is-invalid')}
-              data-field-error="turnstile"
-              data-error-scroll-only
-              aria-invalid={Boolean(fieldErrors.turnstile)}
-              aria-describedby={fieldErrors.turnstile ? fieldErrorId('turnstile') : undefined}
-            >
-              <TurnstileWidget onTokenChange={onTurnstileToken} resetSignal={turnstileResetSignal} />
-              <FieldHint id={fieldErrorId('turnstile')} message={fieldErrors.turnstile} />
-            </div>
           </section>
 
           {formError && (
@@ -1781,7 +1771,7 @@ function RoutePrivateRequestView({
             className="iosapp-primary-button"
             disabled={isSubmitting || configLoading || Boolean(configError)}
           >
-            {isSubmitting ? 'Sending request...' : 'Send private trip request'}
+            Continue to payment
           </Button>
         </form>
       </main>
@@ -2258,7 +2248,6 @@ function CustomTab({
   fieldErrors,
   formError,
   message,
-  turnstileResetSignal,
   preferenceFields,
   preferences,
   moreOpen,
@@ -2269,7 +2258,6 @@ function CustomTab({
   onToggleChoice,
   onPreferenceChange,
   onMoreOpenChange,
-  onTurnstileToken,
   onSubmit,
 }: {
   draft: CustomTripDraft;
@@ -2277,7 +2265,6 @@ function CustomTab({
   fieldErrors: FieldErrors;
   formError: string;
   message: string;
-  turnstileResetSignal: number;
   preferenceFields: CustomTripFormField[];
   preferences: CustomPreferences;
   moreOpen: boolean;
@@ -2288,7 +2275,6 @@ function CustomTab({
   onToggleChoice: (field: CustomChoiceField, value: string) => void;
   onPreferenceChange: (fieldKey: string, value: unknown) => void;
   onMoreOpenChange: (open: boolean) => void;
-  onTurnstileToken: (token: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   const isSubmitting = status === 'loading';
@@ -2313,7 +2299,7 @@ function CustomTab({
       <motion.section className="iosapp-grouped-card iosapp-custom-intro" variants={fadeUpItem}>
         <span className="iosapp-kicker">Private custom trip</span>
         <h2>Tell us what you want to build</h2>
-        <p>Share rough dates, places, pace, hotel style, and contact details. A China-based planner will reply with next steps.</p>
+        <p>Share rough dates, places, pace, hotel style, and contact details. Continue to the shared payment entry next.</p>
       </motion.section>
 
       <motion.form className="iosapp-form iosapp-custom-form" onSubmit={onSubmit} noValidate variants={fadeUpItem}>
@@ -2498,16 +2484,6 @@ function CustomTab({
               placeholder="Kids, seniors, food needs, guide language, must-see places, or anything you are unsure about"
             />
           </label>
-          <div
-            className={cx('iosapp-turnstile-row', fieldErrors.turnstile && 'is-invalid')}
-            data-field-error="turnstile"
-            data-error-scroll-only
-            aria-invalid={Boolean(fieldErrors.turnstile)}
-            aria-describedby={fieldErrors.turnstile ? fieldErrorId('turnstile') : undefined}
-          >
-            <TurnstileWidget onTokenChange={onTurnstileToken} resetSignal={turnstileResetSignal} />
-            <FieldHint id={fieldErrorId('turnstile')} message={fieldErrors.turnstile} />
-          </div>
         </section>
 
         {formError && (
@@ -2523,7 +2499,7 @@ function CustomTab({
           className="iosapp-primary-button"
           disabled={isSubmitting || configLoading || Boolean(configError)}
         >
-          {isSubmitting ? 'Sending request...' : 'Send private trip request'}
+          Continue to payment
         </Button>
       </motion.form>
     </motion.div>
@@ -2926,8 +2902,8 @@ function GroupRequestView({
           <h1>{scopedRoute ? scopedRoute.title : 'Social tour departures'}</h1>
           <p>
             {scopedRoute
-              ? 'Fixed-price, guaranteed departures for this route. Confirm your request and we will reply by email within 24 hours.'
-              : 'Fixed-price, guaranteed departures. Confirm your request and we will reply by email within 24 hours.'}
+              ? 'Fixed-price, guaranteed departures for this route. Full payment confirms your booking.'
+              : 'Fixed-price, guaranteed departures. Full payment confirms your booking.'}
           </p>
         </header>
 
@@ -3386,12 +3362,9 @@ function ReserveReviewView({
   checkoutStatus,
   checkoutError,
   cancelNotice,
-  turnstileResetSignal,
-  onTurnstileToken,
   onDismissCancelNotice,
   onBack,
   onSubmitCheckout,
-  onDone,
 }: {
   selectedDestinationName: string;
   selectedRouteTitle: string;
@@ -3400,12 +3373,9 @@ function ReserveReviewView({
   checkoutStatus: CheckoutStatus;
   checkoutError: string;
   cancelNotice: string;
-  turnstileResetSignal: number;
-  onTurnstileToken: (token: string) => void;
   onDismissCancelNotice: () => void;
   onBack: () => void;
   onSubmitCheckout: () => void;
-  onDone: () => void;
 }) {
   const isSubmittingCheckout = checkoutStatus === 'loading';
   const currency = selectedDeparture?.currency || 'USD';
@@ -3425,36 +3395,9 @@ function ReserveReviewView({
     ? `${selectedDeparture.spotsLeft} of ${selectedDeparture.capacity} left`
     : null;
 
-  if (checkoutStatus === 'success') {
-    return (
-      <div className="china-trips-mobile-page iosapp-page">
-        <BackBar title="Request sent" onBack={onDone} />
-        <main className="iosapp-screen">
-          <section className="iosapp-form-section iosapp-checkout-review iosapp-booking-confirmed">
-            <header className="iosapp-checkout-hero">
-              <span className="iosapp-success-badge">
-                <BadgeCheck size={18} aria-hidden="true" />
-                Request received
-              </span>
-              <h1>{selectedRouteTitle || 'Social tour request'}</h1>
-              <p>{dateLabel}</p>
-            </header>
-            <p className="iosapp-checkout-note">
-              Thank you. We received your booking request and will reply within 24 hours with seat availability and
-              next steps. This does not lock seats or take payment yet.
-            </p>
-            <Button type="button" variant="ghost" className="iosapp-primary-button" onClick={onDone}>
-              Back to China Trips
-            </Button>
-          </section>
-        </main>
-      </div>
-    );
-  }
-
   return (
     <div className="china-trips-mobile-page iosapp-page">
-      <BackBar title="Confirm" onBack={onBack} />
+      <BackBar title="Book" onBack={onBack} />
       <main className="iosapp-screen">
         {cancelNotice && (
           <div className="iosapp-checkout-cancel-notice" role="status">
@@ -3468,7 +3411,7 @@ function ReserveReviewView({
         <section className="iosapp-form-section iosapp-checkout-review">
           <header className="iosapp-checkout-hero">
             <span className="iosapp-kicker">{selectedDestinationName || 'Social tour'}</span>
-            <h1>{selectedRouteTitle || 'Confirm request'}</h1>
+            <h1>{selectedRouteTitle || 'Confirm booking'}</h1>
             <p>{dateLabel}</p>
             {(selectedDeparture?.status || spotsLabel) && (
               <div className="iosapp-checkout-meta">
@@ -3507,8 +3450,8 @@ function ReserveReviewView({
             )}
           </div>
 
-          <div className="iosapp-review-group" aria-label="Request summary">
-            <h2>Request summary</h2>
+          <div className="iosapp-review-group" aria-label="Payment summary">
+            <h2>Payment</h2>
             <div className="iosapp-review-row">
               <span>Price per adult</span>
               <b className="iosapp-review-money">
@@ -3516,23 +3459,19 @@ function ReserveReviewView({
               </b>
             </div>
             <div className="iosapp-review-row iosapp-review-total">
-              <span>Listed total</span>
+              <span>Total due today</span>
               <b className="iosapp-review-money">
                 ${totalPriceDollars} {currency}
               </b>
             </div>
             <p className="iosapp-checkout-note">{cancellationSummary}</p>
-            <p className="iosapp-checkout-note">
-              Confirming sends your request by email. Seats are not held until we confirm availability with you.
-            </p>
           </div>
 
-          <div
-            className={cx('iosapp-turnstile-row')}
-            data-field-error="turnstile"
-            data-error-scroll-only
-          >
-            <TurnstileWidget onTokenChange={onTurnstileToken} resetSignal={turnstileResetSignal} />
+          <div className="iosapp-stripe-trust">
+            <ShieldCheck size={18} aria-hidden="true" />
+            <p>
+              Secure Stripe Checkout - card details stay with Stripe. Syncing Travel never stores them.
+            </p>
           </div>
         </section>
 
@@ -3549,8 +3488,137 @@ function ReserveReviewView({
           disabled={isSubmittingCheckout}
           onClick={onSubmitCheckout}
         >
-          {isSubmittingCheckout ? 'Sending request...' : 'Confirm request'}
+          {isSubmittingCheckout ? 'Opening Stripe Checkout...' : 'Pay full amount'}
         </Button>
+      </main>
+    </div>
+  );
+}
+
+const PLANNING_PAYMENT_PENDING_NOTE =
+  'Online payment for private/custom trips is not configured yet. Confirm the amount/product next, or send a planning request by email below.';
+
+function PlanningCheckoutReviewView({
+  kicker,
+  title,
+  subtitle,
+  rows,
+  payStatus,
+  payError,
+  emailStatus,
+  emailError,
+  emailMessage,
+  turnstileResetSignal,
+  onTurnstileToken,
+  onBack,
+  onPay,
+  onSendEmailRequest,
+}: {
+  kicker: string;
+  title: string;
+  subtitle: string;
+  rows: Array<{ label: string; value: string }>;
+  payStatus: CheckoutStatus;
+  payError: string;
+  emailStatus: CustomSubmitStatus;
+  emailError: string;
+  emailMessage: string;
+  turnstileResetSignal: number;
+  onTurnstileToken: (token: string) => void;
+  onBack: () => void;
+  onPay: () => void;
+  onSendEmailRequest: () => void;
+}) {
+  const paying = payStatus === 'loading';
+  const sendingEmail = emailStatus === 'loading';
+  const emailDone = emailStatus === 'success';
+
+  return (
+    <div className="china-trips-mobile-page iosapp-page">
+      <BackBar title="Book" onBack={onBack} />
+      <main className="iosapp-screen">
+        <section className="iosapp-form-section iosapp-checkout-review">
+          <header className="iosapp-checkout-hero">
+            <span className="iosapp-kicker">{kicker}</span>
+            <h1>{title}</h1>
+            <p>{subtitle}</p>
+          </header>
+
+          <div className="iosapp-review-group" aria-label="Trip details">
+            <h2>Request details</h2>
+            {rows.map((row) => (
+              <div className="iosapp-review-row" key={row.label}>
+                <span>{row.label}</span>
+                <b className="iosapp-review-value">{row.value}</b>
+              </div>
+            ))}
+          </div>
+
+          <div className="iosapp-review-group" aria-label="Payment summary">
+            <h2>Payment</h2>
+            <div className="iosapp-review-row iosapp-review-total">
+              <span>Total due today</span>
+              <b className="iosapp-review-money">To be confirmed</b>
+            </div>
+            <p className="iosapp-checkout-note">
+              This is the shared payment entry for private and custom trips. The payable amount will be
+              wired once the product is set.
+            </p>
+          </div>
+
+          <div className="iosapp-stripe-trust">
+            <ShieldCheck size={18} aria-hidden="true" />
+            <p>
+              Secure Stripe Checkout - card details stay with Stripe. Syncing Travel never stores them.
+            </p>
+          </div>
+        </section>
+
+        {(payError || emailError) && (
+          <p className="iosapp-checkout-error" role="alert">
+            {payError || emailError}
+          </p>
+        )}
+        {emailMessage && <p className="iosapp-form-message">{emailMessage}</p>}
+
+        {!emailDone && (
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              className="iosapp-primary-button"
+              disabled={paying || sendingEmail}
+              onClick={onPay}
+            >
+              {paying ? 'Opening Stripe Checkout...' : 'Pay full amount'}
+            </Button>
+
+            <div className="iosapp-form-section" style={{ marginTop: 16 }}>
+              <h2>Or send a planning request</h2>
+              <p className="iosapp-checkout-note">
+                Until the payment product is configured, you can still email this request to a planner.
+              </p>
+              <div className="iosapp-turnstile-row" data-field-error="turnstile" data-error-scroll-only>
+                <TurnstileWidget onTokenChange={onTurnstileToken} resetSignal={turnstileResetSignal} />
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                className="iosapp-secondary-button"
+                disabled={paying || sendingEmail}
+                onClick={onSendEmailRequest}
+              >
+                {sendingEmail ? 'Sending request...' : 'Send request by email'}
+              </Button>
+            </div>
+          </>
+        )}
+
+        {emailDone && (
+          <Button type="button" variant="ghost" className="iosapp-primary-button" onClick={onBack}>
+            Back
+          </Button>
+        )}
       </main>
     </div>
   );
@@ -4020,7 +4088,6 @@ function TabContent({
   customFieldErrors,
   customFormError,
   customMessage,
-  customTurnstileResetSignal,
   onQueryChange,
   onSearch,
   onOpenCustom,
@@ -4036,7 +4103,6 @@ function TabContent({
   onCustomFieldChange,
   onCustomPhoneChange,
   onCustomToggleChoice,
-  onCustomTurnstileToken,
   onCustomSubmit,
   preferenceFields,
   preferences,
@@ -4056,7 +4122,6 @@ function TabContent({
   customFieldErrors: FieldErrors;
   customFormError: string;
   customMessage: string;
-  customTurnstileResetSignal: number;
   onQueryChange: (value: string) => void;
   onSearch: (event: FormEvent<HTMLFormElement>) => void;
   onOpenCustom: () => void;
@@ -4072,7 +4137,6 @@ function TabContent({
   onCustomFieldChange: (field: CustomTextField, value: string) => void;
   onCustomPhoneChange: (countryCode: string, nationalNumber: string) => void;
   onCustomToggleChoice: (field: CustomChoiceField, value: string) => void;
-  onCustomTurnstileToken: (token: string) => void;
   onCustomSubmit: (event: FormEvent<HTMLFormElement>) => void;
   preferenceFields: CustomTripFormField[];
   preferences: CustomPreferences;
@@ -4092,7 +4156,6 @@ function TabContent({
         fieldErrors={customFieldErrors}
         formError={customFormError}
         message={customMessage}
-        turnstileResetSignal={customTurnstileResetSignal}
         preferenceFields={preferenceFields}
         preferences={preferences}
         moreOpen={moreOpen}
@@ -4103,7 +4166,6 @@ function TabContent({
         onToggleChoice={onCustomToggleChoice}
         onPreferenceChange={onPreferenceChange}
         onMoreOpenChange={onMoreOpenChange}
-        onTurnstileToken={onCustomTurnstileToken}
         onSubmit={onCustomSubmit}
       />
     );
@@ -4153,6 +4215,8 @@ export default function ChinaTripsMobile() {
   const [customMessage, setCustomMessage] = useState('');
   const [customTurnstileToken, setCustomTurnstileToken] = useState('');
   const [customTurnstileResetSignal, setCustomTurnstileResetSignal] = useState(0);
+  const [customPayStatus, setCustomPayStatus] = useState<CheckoutStatus>('idle');
+  const [customPayError, setCustomPayError] = useState('');
   const [routePrivateDraft, setRoutePrivateDraft] = useState<RoutePrivateDraft>(initialRoutePrivateDraft);
   const [routePrivateStatus, setRoutePrivateStatus] = useState<CustomSubmitStatus>('idle');
   const [routePrivateFieldErrors, setRoutePrivateFieldErrors] = useState<FieldErrors>({});
@@ -4161,6 +4225,8 @@ export default function ChinaTripsMobile() {
   const [routePrivateHint, setRoutePrivateHint] = useState('');
   const [routePrivateTurnstileToken, setRoutePrivateTurnstileToken] = useState('');
   const [routePrivateTurnstileResetSignal, setRoutePrivateTurnstileResetSignal] = useState(0);
+  const [routePrivatePayStatus, setRoutePrivatePayStatus] = useState<CheckoutStatus>('idle');
+  const [routePrivatePayError, setRoutePrivatePayError] = useState('');
   const [routePrivatePreferences, setRoutePrivatePreferences] = useState<CustomPreferences>({});
   const [preferenceFields, setPreferenceFields] = useState<CustomTripFormField[]>([]);
   const [preferences, setPreferences] = useState<CustomPreferences>({});
@@ -4174,8 +4240,6 @@ export default function ChinaTripsMobile() {
   const [checkoutError, setCheckoutError] = useState('');
   const [checkoutEditErrors, setCheckoutEditErrors] = useState<FieldErrors>({});
   const [checkoutCancelNotice, setCheckoutCancelNotice] = useState('');
-  const [checkoutTurnstileToken, setCheckoutTurnstileToken] = useState('');
-  const [checkoutTurnstileResetSignal, setCheckoutTurnstileResetSignal] = useState(0);
   const [bookingOrder, setBookingOrder] = useState<SafeOrderSummary | null>(null);
   const [bookingStatus, setBookingStatus] = useState<BookingConfirmedStatus>('loading');
   const [bookingError, setBookingError] = useState('');
@@ -4828,11 +4892,10 @@ export default function ChinaTripsMobile() {
     setActiveView('searchResults');
   };
 
-  const submitCustomTrip = async (event: FormEvent<HTMLFormElement>) => {
+  const continueCustomTrip = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formElement = event.currentTarget;
 
-    const honeypot = String(new FormData(formElement).get('companyWebsite') ?? '').trim();
     const nextErrors: FieldErrors = {};
     const email = customDraft.email.trim().toLowerCase();
     const hasDestination = customDraft.destinations.length > 0 || Boolean(customDraft.otherDestination.trim());
@@ -4846,28 +4909,27 @@ export default function ChinaTripsMobile() {
     else if (!isValidEmail(email)) nextErrors.email = 'Enter a valid email address.';
     const phoneError = validateOptionalPhoneInput(customDraft.phoneCountry, customDraft.phoneNational);
     if (phoneError) nextErrors.phone = phoneError;
-    if (!customTurnstileToken) nextErrors.turnstile = 'Complete the anti-spam check.';
 
     const preferenceKeys = [
       ...preferenceFieldsByGroup(preferenceFields, 'basic').map((field) => field.fieldKey),
       ...preferenceFieldsByGroup(preferenceFields, 'more').map((field) => field.fieldKey),
     ];
-    const fieldOrder = [
-      'destinations',
-      'timing',
-      ...preferenceKeys,
-      'name',
-      'email',
-      'phone',
-      'turnstile',
-    ];
+    const fieldOrder = ['destinations', 'timing', ...preferenceKeys, 'name', 'email', 'phone'];
 
     setCustomFieldErrors(nextErrors);
     setCustomFormError('');
+    setCustomPayError('');
+    setCustomPayStatus('idle');
+    setCustomStatus('idle');
+    setCustomMessage('');
     if (Object.keys(nextErrors).length) {
-      setCustomStatus('error');
-      setCustomMessage('');
-      if (Object.keys(nextErrors).some((key) => preferenceKeys.includes(key) && preferenceFieldsByGroup(preferenceFields, 'more').some((field) => field.fieldKey === key))) {
+      if (
+        Object.keys(nextErrors).some(
+          (key) =>
+            preferenceKeys.includes(key) &&
+            preferenceFieldsByGroup(preferenceFields, 'more').some((field) => field.fieldKey === key),
+        )
+      ) {
         setMoreOpen(true);
       }
       requestAnimationFrame(() => {
@@ -4876,8 +4938,21 @@ export default function ChinaTripsMobile() {
       return;
     }
 
+    setActiveView('customReview');
+  };
+
+  const submitCustomTripInquiry = async () => {
+    const email = customDraft.email.trim().toLowerCase();
+    if (!customTurnstileToken) {
+      setCustomStatus('error');
+      setCustomFormError('Complete the anti-spam check.');
+      return;
+    }
+
     setCustomStatus('loading');
     setCustomMessage('');
+    setCustomFormError('');
+    setCustomPayError('');
 
     try {
       await submitInquiry({
@@ -4896,7 +4971,7 @@ export default function ChinaTripsMobile() {
         customPreferences: preferences,
         sourcePath: `${window.location.pathname}${window.location.hash}`,
         turnstileToken: customTurnstileToken,
-        honeypot,
+        honeypot: '',
       });
 
       setCustomDraft(initialCustomDraft);
@@ -4912,16 +4987,22 @@ export default function ChinaTripsMobile() {
     } catch (error) {
       setCustomStatus('error');
       setCustomFormError(error instanceof Error ? error.message : 'We could not submit your request. Please try again.');
+      setCustomTurnstileToken('');
+      setCustomTurnstileResetSignal((value) => value + 1);
     }
   };
 
-  const submitRoutePrivate = async (event: FormEvent<HTMLFormElement>) => {
+  const attemptCustomPayment = () => {
+    setCustomPayStatus('error');
+    setCustomPayError(PLANNING_PAYMENT_PENDING_NOTE);
+  };
+
+  const continueRoutePrivate = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formElement = event.currentTarget;
     const tour = selectedRouteDetail;
     if (!tour) return;
 
-    const honeypot = String(new FormData(formElement).get('companyWebsite') ?? '').trim();
     const nextErrors: FieldErrors = {};
     const email = routePrivateDraft.email.trim().toLowerCase();
     const routePrivateFields = preferenceFieldsForRoutePrivate(preferenceFields);
@@ -4943,25 +5024,37 @@ export default function ChinaTripsMobile() {
       routePrivateDraft.phoneNational,
     );
     if (phoneError) nextErrors.phone = phoneError;
-    if (!routePrivateTurnstileToken) nextErrors.turnstile = 'Complete the anti-spam check.';
 
     const preferenceKeys = routePrivateFields.map((field) => field.fieldKey);
-    const fieldOrder = ['timing', ...preferenceKeys, 'name', 'email', 'phone', 'turnstile'];
+    const fieldOrder = ['timing', ...preferenceKeys, 'name', 'email', 'phone'];
 
     setRoutePrivateFieldErrors(nextErrors);
     setRoutePrivateFormError('');
+    setRoutePrivatePayError('');
+    setRoutePrivatePayStatus('idle');
+    setRoutePrivateStatus('idle');
+    setRoutePrivateMessage('');
     if (Object.keys(nextErrors).length) {
-      setRoutePrivateStatus('error');
-      setRoutePrivateMessage('');
       requestAnimationFrame(() => {
         focusFirstFieldError(fieldOrder, nextErrors, formElement);
       });
       return;
     }
 
-    setRoutePrivateStatus('loading');
-    setRoutePrivateMessage('');
+    setActiveView('routePrivateReview');
+  };
 
+  const submitRoutePrivateInquiry = async () => {
+    const tour = selectedRouteDetail;
+    if (!tour) return;
+    const email = routePrivateDraft.email.trim().toLowerCase();
+    if (!routePrivateTurnstileToken) {
+      setRoutePrivateStatus('error');
+      setRoutePrivateFormError('Complete the anti-spam check.');
+      return;
+    }
+
+    const routePrivateFields = preferenceFieldsForRoutePrivate(preferenceFields);
     const basicPreferences: CustomPreferences = {};
     for (const field of routePrivateFields) {
       basicPreferences[field.fieldKey] = routePrivatePreferences[field.fieldKey];
@@ -4989,6 +5082,11 @@ export default function ChinaTripsMobile() {
     const userMessage = routePrivateDraft.message.trim();
     const combinedMessage = [dateNote, userMessage].filter(Boolean).join('\n\n');
 
+    setRoutePrivateStatus('loading');
+    setRoutePrivateMessage('');
+    setRoutePrivateFormError('');
+    setRoutePrivatePayError('');
+
     try {
       await submitInquiry({
         type: 'route_private',
@@ -5004,7 +5102,7 @@ export default function ChinaTripsMobile() {
         requestedTour: tour.slug,
         sourcePath: `${window.location.pathname}${window.location.hash}`,
         turnstileToken: routePrivateTurnstileToken,
-        honeypot,
+        honeypot: '',
       });
 
       setRoutePrivateDraft(initialRoutePrivateDraft);
@@ -5024,7 +5122,14 @@ export default function ChinaTripsMobile() {
       setRoutePrivateFormError(
         error instanceof Error ? error.message : 'We could not submit your request. Please try again.',
       );
+      setRoutePrivateTurnstileToken('');
+      setRoutePrivateTurnstileResetSignal((value) => value + 1);
     }
+  };
+
+  const attemptRoutePrivatePayment = () => {
+    setRoutePrivatePayStatus('error');
+    setRoutePrivatePayError(PLANNING_PAYMENT_PENDING_NOTE);
   };
 
   const beginSignIn = (intent: AuthIntent) => {
@@ -5286,73 +5391,51 @@ export default function ChinaTripsMobile() {
     }
     if (!selectedDeparture) return;
 
-    if (!checkoutTurnstileToken) {
-      setCheckoutStatus('error');
-      setCheckoutError('Please complete the anti-spam check.');
-      return;
-    }
-
     setCheckoutEditErrors({});
     setCheckoutStatus('loading');
     setCheckoutError('');
     setCheckoutCancelNotice('');
 
+    const authSession = readStoredAuthSession();
     const travelers = draft.travelers.map((traveler) => ({
       name: traveler.name.trim(),
       gender: traveler.gender,
     }));
-    const leadName = travelers[0]?.name || draft.name.trim();
-    const currency = selectedDeparture.currency || 'USD';
-    const unitPriceDollars = (selectedDeparture.adultPriceCents / 100).toFixed(2);
-    const totalPriceDollars = (
-      (selectedDeparture.adultPriceCents * draft.adultQuantity) /
-      100
-    ).toFixed(2);
-    const dateLabel = formatDepartureDateRange(selectedDeparture);
-    const travelerLines = travelers
-      .map((traveler, index) => `Traveler ${index + 1}: ${traveler.name} (${traveler.gender})`)
-      .join('\n');
-    const message = [
-      'Social tour booking request (confirm by email — no online payment).',
-      `Departure ID: ${selectedDeparture.id}`,
-      `Route: ${selectedRoute?.title || selectedDeparture.routeSlug}`,
-      `Dates: ${dateLabel}`,
-      `Adults: ${draft.adultQuantity}`,
-      `Listed price per adult: $${unitPriceDollars} ${currency}`,
-      `Listed total: $${totalPriceDollars} ${currency}`,
-      travelerLines,
-      draft.phone.trim() ? `Phone: ${draft.phone.trim()}` : '',
-      draft.notes.trim() ? `Notes: ${draft.notes.trim()}` : '',
-    ]
-      .filter(Boolean)
-      .join('\n');
 
     try {
-      await submitInquiry({
-        type: 'group_tour_inquiry',
-        name: leadName,
+      saveCheckoutCancelDraft({
+        destinationSlug: draft.destinationSlug,
+        routeSlug: draft.routeSlug,
+        departureId: draft.departureId,
+        dateRange: draft.dateRange,
+        adultQuantity: draft.adultQuantity,
+        travelers,
+        name: travelers[0]?.name || draft.name.trim(),
         email: checkoutEmail,
-        phone: draft.phone.trim() || undefined,
-        requestedTour: selectedRoute?.title || selectedDeparture.routeSlug,
-        travelMonth: dateLabel,
-        travelers: String(draft.adultQuantity),
-        message,
-        sourcePath: `${window.location.pathname}${window.location.search}${window.location.hash}`,
-        turnstileToken: checkoutTurnstileToken,
+        phoneCountry: draft.phoneCountry,
+        phoneNational: draft.phoneNational,
+        phone: draft.phone.trim(),
+        notes: draft.notes.trim(),
       });
 
-      markInquirySubmitted();
-      clearCheckoutCancelDraft();
-      setCheckoutTurnstileToken('');
-      setCheckoutTurnstileResetSignal((value) => value + 1);
-      setCheckoutStatus('success');
+      const result = await createFixedDepartureCheckoutSession({
+        departureId: selectedDeparture.id,
+        adultQuantity: draft.adultQuantity,
+        name: travelers[0]?.name || draft.name.trim(),
+        email: checkoutEmail,
+        travelers,
+        phone: draft.phone.trim() || undefined,
+        notes: draft.notes.trim(),
+        accessToken: authSession?.accessToken,
+      });
+
+      window.location.assign(result.checkoutUrl!);
     } catch (error) {
+      clearCheckoutCancelDraft();
       setCheckoutStatus('error');
       setCheckoutError(
-        error instanceof Error ? error.message : 'We could not submit your request. Please try again.',
+        error instanceof Error ? error.message : 'We could not open Stripe Checkout. Please try again.',
       );
-      setCheckoutTurnstileToken('');
-      setCheckoutTurnstileResetSignal((value) => value + 1);
     }
   };
 
@@ -5488,8 +5571,6 @@ export default function ChinaTripsMobile() {
           checkoutStatus={checkoutStatus}
           checkoutError={checkoutError}
           cancelNotice={checkoutCancelNotice}
-          turnstileResetSignal={checkoutTurnstileResetSignal}
-          onTurnstileToken={setCheckoutTurnstileToken}
           onDismissCancelNotice={() => setCheckoutCancelNotice('')}
           onBack={() => {
             clearCheckoutCancelDraft();
@@ -5499,13 +5580,6 @@ export default function ChinaTripsMobile() {
             setActiveView('groupRequest');
           }}
           onSubmitCheckout={() => void submitCheckout()}
-          onDone={() => {
-            setCheckoutStatus('idle');
-            setCheckoutError('');
-            setCheckoutCancelNotice('');
-            setActiveTab('home');
-            setActiveView('tabs');
-          }}
         />
       </motion.div>
     );
@@ -5596,7 +5670,6 @@ export default function ChinaTripsMobile() {
           formError={routePrivateFormError}
           message={routePrivateMessage}
           hint={routePrivateHint}
-          turnstileResetSignal={routePrivateTurnstileResetSignal}
           preferenceFields={preferenceFields}
           preferences={routePrivatePreferences}
           configLoading={preferenceConfigLoading}
@@ -5606,8 +5679,92 @@ export default function ChinaTripsMobile() {
           onDatesFlexibleChange={updateRoutePrivateDatesFlexible}
           onPhoneChange={updateRoutePrivatePhone}
           onPreferenceChange={updateRoutePrivatePreference}
+          onSubmit={continueRoutePrivate}
+        />
+      </motion.div>
+    );
+  } else if (activeView === 'customReview') {
+    view = (
+      <motion.div key="customReview" variants={pageVariants} initial="initial" animate="animate" exit="exit">
+        <PlanningCheckoutReviewView
+          kicker="Private custom trip"
+          title="Confirm request"
+          subtitle="Review your planning details, then continue through the shared payment entry."
+          rows={[
+            {
+              label: 'Places',
+              value:
+                [...customDraft.destinations, customDraft.otherDestination.trim()].filter(Boolean).join(' · ') ||
+                'Not set',
+            },
+            { label: 'Dates', value: customDraft.travelMonth.trim() || 'Flexible / not set' },
+            { label: 'Travelers', value: customDraft.travelers || 'Not set' },
+            { label: 'Trip length', value: customDraft.tripLength || 'Not set' },
+            { label: 'Name', value: customDraft.name.trim() || 'Missing name' },
+            { label: 'Email', value: customDraft.email.trim() || 'Missing email' },
+            ...(customDraft.phone.trim()
+              ? [{ label: 'Phone', value: customDraft.phone.trim() }]
+              : []),
+          ]}
+          payStatus={customPayStatus}
+          payError={customPayError}
+          emailStatus={customStatus}
+          emailError={customFormError}
+          emailMessage={customMessage}
+          turnstileResetSignal={customTurnstileResetSignal}
+          onTurnstileToken={setCustomTurnstileToken}
+          onBack={() => {
+            setCustomPayStatus('idle');
+            setCustomPayError('');
+            setActiveTab('custom');
+            setActiveView('tabs');
+          }}
+          onPay={attemptCustomPayment}
+          onSendEmailRequest={() => void submitCustomTripInquiry()}
+        />
+      </motion.div>
+    );
+  } else if (activeView === 'routePrivateReview' && selectedRouteDetail) {
+    view = (
+      <motion.div
+        key="routePrivateReview"
+        variants={pageVariants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+      >
+        <PlanningCheckoutReviewView
+          kicker="Private trip"
+          title={selectedRouteDetail.title}
+          subtitle="Review your private-trip details, then continue through the shared payment entry."
+          rows={[
+            {
+              label: 'Dates',
+              value: routePrivateDraft.datesFlexible
+                ? 'Flexible'
+                : routePrivateDraft.travelMonth.trim() || 'Not set',
+            },
+            { label: 'Travelers', value: routePrivateDraft.travelers || 'Not set' },
+            { label: 'Name', value: routePrivateDraft.name.trim() || 'Missing name' },
+            { label: 'Email', value: routePrivateDraft.email.trim() || 'Missing email' },
+            ...(routePrivateDraft.phone.trim()
+              ? [{ label: 'Phone', value: routePrivateDraft.phone.trim() }]
+              : []),
+          ]}
+          payStatus={routePrivatePayStatus}
+          payError={routePrivatePayError}
+          emailStatus={routePrivateStatus}
+          emailError={routePrivateFormError}
+          emailMessage={routePrivateMessage}
+          turnstileResetSignal={routePrivateTurnstileResetSignal}
           onTurnstileToken={setRoutePrivateTurnstileToken}
-          onSubmit={(event) => void submitRoutePrivate(event)}
+          onBack={() => {
+            setRoutePrivatePayStatus('idle');
+            setRoutePrivatePayError('');
+            setActiveView('routePrivateRequest');
+          }}
+          onPay={attemptRoutePrivatePayment}
+          onSendEmailRequest={() => void submitRoutePrivateInquiry()}
         />
       </motion.div>
     );
@@ -5644,7 +5801,6 @@ export default function ChinaTripsMobile() {
               customFieldErrors={customFieldErrors}
               customFormError={customFormError}
               customMessage={customMessage}
-              customTurnstileResetSignal={customTurnstileResetSignal}
               onQueryChange={setQuery}
               onSearch={submitSearch}
               onOpenCustom={openCustomTab}
@@ -5660,8 +5816,7 @@ export default function ChinaTripsMobile() {
               onCustomFieldChange={updateCustomDraft}
               onCustomPhoneChange={updateCustomPhone}
               onCustomToggleChoice={toggleCustomChoice}
-              onCustomTurnstileToken={setCustomTurnstileToken}
-              onCustomSubmit={submitCustomTrip}
+              onCustomSubmit={continueCustomTrip}
               preferenceFields={preferenceFields}
               preferences={preferences}
               moreOpen={moreOpen}

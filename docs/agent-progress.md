@@ -2,6 +2,33 @@
 
 ## Status
 
+**done（定制/私定支付壳）** — 移动端 Custom + route-private：表单→确认页→Pay full amount（金额待定）；邮件询盘后备。`lint`/`tsc` 绿。
+
+### Progress note（定制/私定支付壳，2026-07-29）
+
+- 目标：选项 3 — 先统一支付入口壳，金额/商品稍后定。
+- 已改：`ChinaTripsMobile.tsx`（`PlanningCheckoutReviewView`、`customReview`/`routePrivateReview`）；CONTEXT/mobile-ios/gotchas/7.28。
+- 验证：lint + tsc。未验：浏览器点验 Continue → Pay / 邮件后备。
+- 下一步：用户给定金额/商品后接 Stripe。
+
+**done（恢复统一 Stripe 支付入口）** — Mini-App + 桌面 Social Tours → `Pay full amount` → `/api/checkout-session`。`build`/`lint` 绿。
+
+### Progress note（恢复 Stripe 支付，2026-07-29）
+
+- 目标：固定班期重新走统一支付入口，便于审核；私定/定制仍询盘。
+- 已改：`ChinaTripsMobile.tsx`；`RouteInquiryModals.tsx`；GroupTours/RouteDetail 文案；CONTEXT/mobile-ios/gotchas/7.28。
+- 验证：`npm run build`、`npm run lint`。未验：浏览器 Stripe test / `DEV_CHECKOUT_BYPASS` 全链路。
+- 下一步：本地配 Stripe test key 或 bypass 后点验 Pay → Checkout → 成功回流。
+
+**done（桌面 Social Tours 对齐移动端）** — 选班期→旅客名单→确认流（现已接 Stripe）。`build`/`lint` 曾绿。
+
+### Progress note（桌面 Social Tours 对齐，2026-07-28）
+
+- 目标：桌面与 Mini-App 同深度 confirm-by-email（非轻量月份询价）。
+- 已改：`RouteInquiryModals.tsx`（GroupTourInquiryModal 两步）；`GroupTours.tsx`（Request this departure）；`RouteDetail.tsx` 文案；`CONTEXT.md`；task-board/gotchas。
+- 验证：`npm run build`、`npm run lint` 通过。未验：浏览器真实提交（Turnstile+Resend）。
+- 下一步：浏览器 `/group-tours` 与 `/tours/:slug` 点验两步流。
+
 **in-progress（隐藏支付→确认发邮件）** — Mini-App 拼团 Confirm+询盘；绿泡泡短/长表后 WhatsApp；桌面支付话术清理。Stripe 后端保留。
 
 ### Progress note（隐藏支付→确认发邮件，2026-07-28）

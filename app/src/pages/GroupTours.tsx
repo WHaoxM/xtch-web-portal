@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   UsersRound,
 } from 'lucide-react';
+import { GroupTourInquiryModal } from '@/components/RouteInquiryModals';
 import { getRouteTourBySlug } from '@/lib/contentStore';
 import {
   departureAvailability,
@@ -20,11 +21,19 @@ import { formatOrderDateRange } from '@/lib/orderClient';
 
 type LoadState = 'loading' | 'ready' | 'error';
 
+type InquiryTarget = {
+  slug: string;
+  title: string;
+  duration: string;
+  departureId: string;
+};
+
 export default function GroupTours() {
   const [departures, setDepartures] = useState<PublicDeparture[]>([]);
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [error, setError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
+  const [inquiryTarget, setInquiryTarget] = useState<InquiryTarget | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -69,8 +78,8 @@ export default function GroupTours() {
               Ready to Join
             </h1>
             <p className="mt-6 max-w-2xl text-[16px] leading-8 text-white/88 md:text-[18px]">
-              Browse published routes with real departure dates, live seat availability, and fixed
-              adult prices.
+              Browse published routes with real departure dates and fixed adult prices. Book a
+              departure here with full payment through secure Stripe Checkout.
             </p>
           </div>
         </div>
@@ -178,7 +187,18 @@ export default function GroupTours() {
 
                         <div className="divide-y divide-[#E2E9E7]">
                           {group.departures.map((departure) => (
-                            <DepartureRow key={departure.publicId} departure={departure} />
+                            <DepartureRow
+                              key={departure.publicId}
+                              departure={departure}
+                              onRequest={() =>
+                                setInquiryTarget({
+                                  slug: group.routeSlug,
+                                  title: group.routeTitle,
+                                  duration: route?.duration || '',
+                                  departureId: departure.publicId,
+                                })
+                              }
+                            />
                           ))}
                         </div>
                       </div>
@@ -190,11 +210,32 @@ export default function GroupTours() {
           ) : null}
         </div>
       </section>
+
+      {inquiryTarget ? (
+        <GroupTourInquiryModal
+          open
+          onOpenChange={(open) => {
+            if (!open) setInquiryTarget(null);
+          }}
+          tour={{
+            slug: inquiryTarget.slug,
+            title: inquiryTarget.title,
+            duration: inquiryTarget.duration,
+          }}
+          initialDepartureId={inquiryTarget.departureId}
+        />
+      ) : null}
     </div>
   );
 }
 
-function DepartureRow({ departure }: { departure: PublicDeparture }) {
+function DepartureRow({
+  departure,
+  onRequest,
+}: {
+  departure: PublicDeparture;
+  onRequest: () => void;
+}) {
   const availability = departureAvailability(departure);
 
   return (
@@ -231,23 +272,34 @@ function DepartureRow({ departure }: { departure: PublicDeparture }) {
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-2 lg:max-w-[180px] lg:justify-end">
-        {departure.guaranteed ? (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E4F3ED] px-3 py-1.5 text-[12px] font-semibold text-[#176B5C]">
-            <ShieldCheck size={14} aria-hidden="true" />
-            Guaranteed
+      <div className="flex flex-col items-start gap-2 lg:max-w-[200px] lg:items-end">
+        <div className="flex flex-wrap gap-2 lg:justify-end">
+          {departure.guaranteed ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E4F3ED] px-3 py-1.5 text-[12px] font-semibold text-[#176B5C]">
+              <ShieldCheck size={14} aria-hidden="true" />
+              Guaranteed
+            </span>
+          ) : null}
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold ${
+              availability.bookable
+                ? 'bg-[#EDF6FF] text-[#245D83]'
+                : 'bg-[#F1F2F2] text-[#68757A]'
+            }`}
+          >
+            {availability.bookable ? <CheckCircle2 size={14} aria-hidden="true" /> : null}
+            {availability.label}
           </span>
+        </div>
+        {availability.bookable ? (
+          <button
+            type="button"
+            onClick={onRequest}
+            className="inline-flex min-h-10 items-center justify-center rounded-lg bg-[#ef4f43] px-4 text-[13px] font-semibold text-white transition-colors hover:bg-[#d84338] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ef4f43]"
+          >
+            Book this departure
+          </button>
         ) : null}
-        <span
-          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold ${
-            availability.bookable
-              ? 'bg-[#EDF6FF] text-[#245D83]'
-              : 'bg-[#F1F2F2] text-[#68757A]'
-          }`}
-        >
-          {availability.bookable ? <CheckCircle2 size={14} aria-hidden="true" /> : null}
-          {availability.label}
-        </span>
       </div>
     </div>
   );
