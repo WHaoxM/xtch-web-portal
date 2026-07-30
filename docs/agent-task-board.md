@@ -20,7 +20,9 @@
 
 | Agent | Goal | Owns | May Touch | Must Not Touch | Status | Last Update |
 |---|---|---|---|---|---|---|
-| Auto (prod-cd-gate) | main push→自动 lint+migrate+build+restart | `deploy-from-main.sh`；`check-target-env.ts`；`.github/workflows/deploy-cloud-vps.yml`；ops/gotchas | package.json env:check | 未配 secrets 时勿指望已自动上线 | done（策略已开；真机待配） | 2026-07-30 |
+| Auto (fix-prerender-spa-shell) | prerender 干净 SPA 壳 + 等正确 canonical，修 tour 16 CD 失败 | `app/scripts/prerender.mjs`；shells Seo（seoReady 顺序）；gotchas/progress/task-board | — | 改路线内容事实；跳过失败路由 | done（Actions 绿） | 2026-07-30 |
+| Auto (fix-deploy-playwright) | CD build 前装 Playwright Chromium，修 prerender 失败 | `deploy/cloud-vps/deploy-from-main.sh`；ops/gotchas/progress/task-board | — | 改业务代码；VPS 手工装依赖以外的软件 | done（PR #6） | 2026-07-30 |
+| Auto (prod-cd-gate) | main push→自动 lint+migrate+build+restart | `deploy-from-main.sh`；`check-target-env.ts`；`.github/workflows/deploy-cloud-vps.yml`；ops/gotchas | package.json env:check | 未配 secrets 时勿指望已自动上线 | done（真机已绿） | 2026-07-30 |
 | Auto (me-signed-in-identity) | 已登录 Me：去假 Contact info；身份区+列表疏密；未登录不动 | `ChinaTripsMobile` MeTab；`chinaTripsMobile.css`；mobile-ios/progress/task-board | — | 未登录态；改邮箱产品；教学式认领文案 | done（待用户看） | 2026-07-30 |
 | Auto (checkout-review-polish) | 移动结账确认卡：疏密/层级/Contact 分组/底栏 CTA | `ChinaTripsMobile.tsx` CheckoutReview；`chinaTripsMobile.css` checkout-review；progress/task-board；mobile-ios checkout 一行 | PlanningCheckoutReview 共用类 | 改支付逻辑/文案事实；新依赖；桌面 CustomTrip 大改；换品牌色 | done（lint 绿；性别 pill 已修） | 2026-07-30 |
 | Auto (local-refresh-images) | 本地刷新慢：Vite `/images` 缓存头 + 折下图 lazy | `app/vite.config.ts`；`Home.tsx`/`Destinations.tsx` 折下 `<img>`；mobile list 卡 `<img>`；gotchas/progress/task-board | china-trips-mobile 列表组件 | 改视觉布局/压缩原图；关 inspect 插件；生产 Caddy | done（lint；浏览器瀑布待用户硬刷） | 2026-07-30 |

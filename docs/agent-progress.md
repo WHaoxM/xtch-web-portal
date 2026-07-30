@@ -2,6 +2,14 @@
 
 ## Status
 
+**done（fix-prerender-spa-shell）** — Deploy cloud-vps Actions success（run Å36129700\）。prerender 干净 SPA 壳 + 等正确 canonical。
+
+### Progress note（fix-prerender-spa-shell，2026-07-30）
+
+- 已合 main；shell Seo 已同步 seoReady 顺序。
+
+**done（fix-deploy-playwright）** — CD build 前 px playwright install chromium\；已合 main（PR #6）。
+
 **done（prod-cd-configure）** — VPS `103.201.130.12`：用户 `deploy`、脏缓存迁出、xtch home→`/var/lib/xtch`；GitHub Environment `production` 已设 `VPS_HOST/USER/SSH_KEY/PORT`。Workflow 仍在本地未进 `main`，需合并后才会自动跑。
 
 ### Progress note（prod-cd-configure，2026-07-30）

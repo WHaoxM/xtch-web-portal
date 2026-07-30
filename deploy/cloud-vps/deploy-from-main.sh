@@ -13,7 +13,7 @@
 #   XTCH_REPO_DIR=/opt/xtch-web-portal
 #   XTCH_BRANCH=main
 #   XTCH_HEALTH_URL=http://127.0.0.1:3080/
-#   XTCH_DIST_BACKUP=/var/lib/xtch/dist-backup/cloud-vps
+#   XTCH_DIST_BACKUP=$HOME/xtch-dist-backup/cloud-vps
 #
 # See docs/ops/cloud-vps.md § 自动发布.
 
@@ -23,7 +23,7 @@ XTCH_REPO_DIR="${XTCH_REPO_DIR:-/opt/xtch-web-portal}"
 XTCH_BRANCH="${XTCH_BRANCH:-main}"
 XTCH_HEALTH_URL="${XTCH_HEALTH_URL:-http://127.0.0.1:3080/}"
 XTCH_API_HEALTH_URL="${XTCH_API_HEALTH_URL:-http://127.0.0.1:3080/api/routes}"
-XTCH_DIST_BACKUP="${XTCH_DIST_BACKUP:-/var/lib/xtch/dist-backup/cloud-vps}"
+XTCH_DIST_BACKUP="${XTCH_DIST_BACKUP:-$HOME/xtch-dist-backup/cloud-vps}"
 XTCH_SERVICE="${XTCH_SERVICE:-xtch-app}"
 
 WITH_MIGRATE=0
@@ -120,6 +120,10 @@ if [[ -d "$DIST_DIR" ]]; then
   rm -rf "$XTCH_DIST_BACKUP"
   mv "${XTCH_DIST_BACKUP}.tmp" "$XTCH_DIST_BACKUP"
 fi
+
+# build:cloud-vps ends with Playwright prerender; browsers are not in npm ci.
+log "Ensure Playwright Chromium (prerender)"
+npx playwright install chromium
 
 log "build:cloud-vps"
 npm run build:cloud-vps

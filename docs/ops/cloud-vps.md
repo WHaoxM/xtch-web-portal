@@ -182,8 +182,7 @@ sudo systemctl restart xtch-app
 | 拉代码 | `git fetch` + `ff-only` 到 `main`；脏工作树直接失败 |
 | 校验 | `npm ci`；`check-target-env cloud-vps`；默认 lint |
 | 适配 | **默认** `db:migrate:cloud-vps` |
-| 重建 | `build:cloud-vps`；先前 `dist/cloud-vps` 备份到 `/var/lib/xtch/dist-backup/` |
-| 发布 | `grant-xtch-read-access` + `systemctl restart`；健康检查失败则还原 dist 再重启 |
+| 重建 | `npx playwright install chromium`（prerender 浏览器）→ `build:cloud-vps`；先前 `dist/cloud-vps` 备份到 `$HOME/xtch-dist-backup/` || 发布 | `grant-xtch-read-access` + `systemctl restart`；健康检查失败则还原 dist 再重启 |
 
 仓库文件：
 

@@ -1,1 +1,1 @@
-﻿export { default } from '@/shells/desktop/components/Seo';
+export { default } from '@/shells/desktop/components/Seo';

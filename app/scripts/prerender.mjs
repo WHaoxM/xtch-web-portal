@@ -91,8 +91,7 @@ function assertPrerenderHtml(route, html) {
   }
 }
 
-function startStaticServer(distRoot, snapshot) {
-  const spaIndex = path.join(distRoot, 'index.html');
+function startStaticServer(distRoot, snapshot, spaIndex) {
   return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
       const url = new URL(req.url || '/', 'http://127.0.0.1');
@@ -165,7 +164,13 @@ async function main() {
     process.exit(1);
   }
 
-  const { server, port } = await startStaticServer(distRoot, snapshot);
+  // Keep a pristine Vite SPA shell. Writing `/` into index.html must not feed later
+  // routes a document that already has data-seo-ready / homepage canonical.
+  const builtIndex = path.join(distRoot, 'index.html');
+  const spaIndex = path.join(distRoot, '.prerender-spa-index.html');
+  fs.copyFileSync(builtIndex, spaIndex);
+
+  const { server, port } = await startStaticServer(distRoot, snapshot, spaIndex);
   const origin = `http://127.0.0.1:${port}`;
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
@@ -176,11 +181,16 @@ async function main() {
   try {
     for (const route of ROUTES) {
       const url = `${origin}${route}`;
+      const canonical = expectedCanonical(route);
       try {
         await page.goto(url, { waitUntil: 'load', timeout: 60_000 });
         await page.waitForFunction(
-          () => document.documentElement.dataset.seoReady === '1',
-          null,
+          (expectedHref) => {
+            if (document.documentElement.dataset.seoReady !== '1') return false;
+            const link = document.head.querySelector('link[rel="canonical"]');
+            return Boolean(link && link.getAttribute('href') === expectedHref);
+          },
+          canonical,
           { timeout: 20_000 },
         );
         const html = await page.content();
@@ -201,6 +211,11 @@ async function main() {
   } finally {
     await browser.close();
     server.close();
+    try {
+      fs.unlinkSync(spaIndex);
+    } catch {
+      // ignore cleanup errors
+    }
   }
 
   console.log(`[prerender] done: ${ok} ok, ${failed} failed → ${distRoot}`);
