@@ -23,7 +23,7 @@ XTCH_REPO_DIR="${XTCH_REPO_DIR:-/opt/xtch-web-portal}"
 XTCH_BRANCH="${XTCH_BRANCH:-main}"
 XTCH_HEALTH_URL="${XTCH_HEALTH_URL:-http://127.0.0.1:3080/}"
 XTCH_API_HEALTH_URL="${XTCH_API_HEALTH_URL:-http://127.0.0.1:3080/api/routes}"
-XTCH_DIST_BACKUP="${XTCH_DIST_BACKUP:-/var/lib/xtch/dist-backup/cloud-vps}"
+XTCH_DIST_BACKUP="${XTCH_DIST_BACKUP:-$HOME/xtch-dist-backup/cloud-vps}"
 XTCH_SERVICE="${XTCH_SERVICE:-xtch-app}"
 
 WITH_MIGRATE=0
