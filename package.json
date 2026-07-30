@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "xtch-web-portal",
   "private": true,
   "description": "Repo root proxy — npm scripts forward into app/",
@@ -22,6 +22,8 @@
     "db:migrate:cloud-vps": "npm run db:migrate:cloud-vps --prefix app",
     "db:migrate:selfhost": "npm run db:migrate:selfhost --prefix app",
     "test:s3": "npm run test:s3 --prefix app",
-    "test:admin-allowlist": "npm run test:admin-allowlist --prefix app"
+    "test:admin-allowlist": "npm run test:admin-allowlist --prefix app",
+    "env:check:cloud-vps": "tsx scripts/env/check-target-env.ts cloud-vps",
+    "env:check:win11-home": "tsx scripts/env/check-target-env.ts win11-home"
   }
 }

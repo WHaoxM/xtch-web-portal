@@ -13,6 +13,7 @@
 | Vite `base` 必须是 `/` | BrowserRouter 深链依赖绝对 asset 路径；勿改回 `./` |
 | 正式站 canonical 域 | 公网 SEO/GEO 主机为 `https://www.xuntingtravel.com`（Caddy）；品牌名仍 Syncing Travel；勿再把 sitemap/llms/og 写回 `syncingtravel.com` |
 | 公网当前在 cloud-vps | `www.xuntingtravel.com` DNS → 云主机（非本机 Win11）。本机 `xtch_prod` 导入**不会**自动出现在公网；需 SSH 到 VPS 跑 migrate/import + `build:cloud-vps` 重启服务 |
+| 生产自动发布（cloud-vps） | `main` push → GHA SSH → `deploy-from-main.sh --with-lint --with-migrate`（含 restart）。须配 Environment `production` + `VPS_HOST`/`VPS_USER`/`VPS_SSH_KEY`；VPS 工作树必须干净。健康检查失败会还原 `dist` 备份 |
 | sitemap Content-Type | `serve-selfhost.mjs` MIME 须含 `.xml` → `application/xml`；缺了会变成 `application/octet-stream`，不利于引擎认 sitemap |
 | 内容导入 JSON 勿带 BOM | PowerShell `Set-Content` 默认 UTF-8 BOM 会让 `import-content-backup.ts` 解析失败；用无 BOM UTF-8，或从已有干净备份包复制 `tables/*.json` |
 | sitemap 维护 | 改公开路由或 published 内容后：优先 `npx tsx scripts/seo-export-build-content.mjs --env=<target>` 更新 `seo-build-content.json`（无 DB 时用 `node scripts/seo-bootstrap-build-content.mjs`）；再跑 `npm run seo:sitemap`。sitemap 与 prerender 共用该快照；勿手改 `public/sitemap.xml`。无可靠 `updated_at` 时不要写假 `lastmod` |
