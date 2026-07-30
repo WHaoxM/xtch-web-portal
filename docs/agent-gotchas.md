@@ -19,7 +19,7 @@
 | sitemap 维护 | 改公开路由或 published 内容后：优先 `npx tsx scripts/seo-export-build-content.mjs --env=<target>` 更新 `seo-build-content.json`（无 DB 时用 `node scripts/seo-bootstrap-build-content.mjs`）；再跑 `npm run seo:sitemap`。sitemap 与 prerender 共用该快照；勿手改 `public/sitemap.xml`。无可靠 `updated_at` 时不要写假 `lastmod` |
 | 产品枢纽路径 | 公开路由是 `/china-trips`；`/china-tours` 仅别名跳转；sitemap/Seo 勿再写死 `china-tours` |
 | Auth / Stripe 回调 URL | Supabase Redirect：`/auth/callback`；Stripe success/cancel：`/china-trips?checkout=…`（无 `#`）。生产 env 若仍写旧 hash 需改 |
-| 生产 build 含 prerender | `build:win11-home` / `build:cloud-vps` 会跑 Playwright prerender；需 `npx playwright install chromium`。cloud-vps CD 脚本在 build 前会自动装；本机/手工构建仍须自行装一次 |
+| 生产 build 含 prerender | `build:win11-home` / `build:cloud-vps` 会跑 Playwright prerender；需 `npx playwright install chromium`。cloud-vps CD 脚本在 build 前会自动装。prerender 用干净 SPA 壳（勿把已写好的首页 index 再当后续路由壳），并等待路由匹配的 canonical |
 | 页面路由集中在 `app/src/App.tsx` | 新页面或路由改动先查这里 |
 | `@/*` 指向 `app/src/*` | 应优先使用项目已有别名 |
 | 内容事实不能从目标站猜 | 先查 `docs/content-resource-map.md` |
