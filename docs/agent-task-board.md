@@ -20,7 +20,8 @@
 
 | Agent | Goal | Owns | May Touch | Must Not Touch | Status | Last Update |
 |---|---|---|---|---|---|---|
-| Auto (fix-deploy-playwright) | CD build 前装 Playwright Chromium，修 prerender 失败 | `deploy/cloud-vps/deploy-from-main.sh`；ops/gotchas/progress/task-board | — | 改业务代码；VPS 手工装依赖以外的软件 | in-progress（待合并重跑） | 2026-07-30 |
+| Auto (fix-prerender-spa-shell) | prerender 干净 SPA 壳 + 等正确 canonical，修 tour 16 CD 失败 | `app/scripts/prerender.mjs`；`Seo.tsx`（seoReady 顺序）；gotchas/progress/task-board | — | 改路线内容事实；跳过失败路由 | in-progress | 2026-07-30 |
+| Auto (fix-deploy-playwright) | CD build 前装 Playwright Chromium，修 prerender 失败 | `deploy/cloud-vps/deploy-from-main.sh`；ops/gotchas/progress/task-board | — | 改业务代码；VPS 手工装依赖以外的软件 | done（PR #6） | 2026-07-30 |
 | Auto (custom-pay-shell) | 移动端定制/私定：表单→确认页→支付按钮壳（金额待定；邮件询盘后备） | `ChinaTripsMobile.tsx`；`chinaTripsMobile.css`（确认壳最小样式若需） | CONTEXT/mobile-ios/gotchas/progress/task-board/7.28 | 编造定金金额；新 Stripe 商品/API；桌面定制；新依赖 | done（lint/tsc；浏览器未验） | 2026-07-29 |
 | Auto (hide-pay-email) | 隐藏支付→确认发邮件；绿泡泡表单后跳 WhatsApp；桌面支付话术清理 | `ChinaTripsMobile.tsx`; `chinaTripsMobile.css`（FAB/确认相关）；支付话术涉及的 `Home.tsx`/`GroupTours.tsx`/`RouteDetail.tsx`/`RouteInquiryModals.tsx`（文案仅） | `CONTEXT.md`; `mobile-ios-front-end-context.md`; progress/task-board/gotchas; `docs/problem/7.28.md` | 删除 Stripe/checkout API；生产 env；新依赖；锁库存 | superseded（支付已恢复） | 2026-07-29 |
 | Auto (desktop-social-tour-parity) | 桌面 Social Tours 对齐移动端：选班期→旅客名单→确认→group_tour_inquiry | `RouteInquiryModals.tsx`（GroupTourInquiryModal）；`GroupTours.tsx`；`RouteDetail.tsx`（弹窗 props 仅） | `CONTEXT.md`; progress/task-board/gotchas | Stripe/锁库存；新依赖；改 PrivateQuoteModal；审美大改 | done（build/lint；浏览器提交未验） | 2026-07-28 |
