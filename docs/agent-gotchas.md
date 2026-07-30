@@ -26,7 +26,7 @@
 | TOCN 只能作为参考 | 只能参考结构、节奏、交互和信息层级，不能当作 Syncing 事实 |
 | `ChinaTripsMobile` 不是普通长网页 | 先读 `docs/mobile-ios-front-end-context.md`，并检查 320px、375px、390px |
 | Mini-App 顶上出现网站 logo+汉堡 | ≤900px `/china-trips` 不得渲染站点 `Navbar`/`Footer`（见 `App.tsx`）；勿只靠组件内 CSS。断点是 900，不是 `useIsMobile` 的 768 |
-| 订单 Account 看不到、但确认信有 | 登录认领只按 `lead_email`；邮箱不一致时用确认信/成功页链接绑定：`POST /api/claim-orders` + `orderNumber`+`token` 或 `sessionId`（OrderSuccess / My Orders 粘贴） |
+| 订单 Account 看不到、但确认信有 | 登录会按 `lead_email` 自动认领。邮箱不一致时：**点开确认信里的订单链接**（成功页带 token/session，已登录则自动绑定）。勿再让旅客在 My Orders 粘贴 URL |
 | 首页 Curated「View Itinerary」仍进 `/china-trips` 总览 | 桌面链 `/tours/:slug`；手机链 `/china-trips?route={slug}`（打开详情后清 query） |
 | RouteDetail 段导航（Itinerary/Included/FAQ/Price）切过中间内容 | 子导航 `sticky top-24` 假定主 Navbar 仍占顶；`/tours/` 上勿对主 Navbar 做下滚隐藏（`-translate-y-full`），否则会空出顶距让正文从缝里穿过 |
 | Home traveler story 又改回 CSS `real-story-slide` 自动切 | 已改为 Embla JS 轮播（交互暂停 + 8s 恢复、圆点可点）；不要恢复无限 CSS 动画；图片 marquee 是另一套，勿混改 |
@@ -34,7 +34,11 @@
 | 主站手机竖滑发涩 | 全页裁切用 `overflow-x: clip`（勿用会建 scrollport 的 `hidden`）；横滑轨加 `touch-action: pan-x pan-y` + `overscroll-behavior-x: contain`；≤900px 关闭 `html { scroll-behavior: smooth }` |
 | Tailwind `py-18` / `md:py-18` | Tailwind **v3** 无 spacing `18`，类会被丢掉；用 `16`/`20`/`24`。Home Real Moments 曾用无效 `py-18` + `margin-top:-72px` 盖住 Curated trust bar |
 | 跟团游英文产品名 | 旅客可见英文用 **Social Tours / social tour**；URL `/group-tours`、API `group-tour` / `group_tour_inquiry` 与 CSS class 名保持不变 |
-| 拼团支付入口 | Mini-App Social Tours 与桌面走 Stripe Checkout；定制/私定移动端已有同一确认壳（Pay full amount），金额未定前 Pay 提示待配置，可用邮件询盘后备。绿泡泡须先表单发信再开 WhatsApp |
+| 后端领域分层 | 业务在 `app/api/domains/{booking,catalog,inquiry,identity,media}/`；基建在 `platform/`。公开 `/api/*` URL 不变。`api/admin/{auth,booking,catalog,inquiry,media}/` 为入口分组，映射表 `scripts/localApiRoutes.ts`。**`api/lib` 仅 shim**，新代码直连 domains/platform。找支付 → `booking/payment/`。单夹 ≤8。见 ADR 0005 + agent-context 功能地图 |
+| 前端领域/壳层 | `app/src/domains/*`（booking：`payment|checkout|orders|policy`；catalog：`clients|drafts|data|copy`；inquiry：`clients|copy`；identity：`admin|traveler`）；壳 `shells/*`；`@/lib/*` 等为 shim。单夹 ≤8 |
+| Admin API 文件搬家 | 改物理路径后必须同步 `localApiRoutes`；公开路径如 `/api/admin/orders` 不能变；改完需重启 `deploy:serve` / `npm run dev` |
+| domain 子目录 import 深度 | 文件从 `domains/booking/x.ts` 迁到 `domains/booking/orders/x.ts` 后，`platform` 要从 `../../platform` 改成 `../../../platform`；Vite SSR 会直接 500（如 `/api/departures`） |
+| 生产自动发布（cloud-vps） | `main` push → GHA SSH → `deploy-from-main.sh --with-lint --with-migrate`（含 restart）。须配 Environment `production` + `VPS_HOST`/`VPS_USER`/`VPS_SSH_KEY`；VPS 工作树必须干净。健康检查失败会还原 `dist` 备份 |
 | `AGENTS.md` 不是知识库 | 详细内容放入对应 `docs/` 文件 |
 | 本机 `docker` CLI（`docker ps` 等）在这个 shell 环境里可能一直挂起不返回，即使 Docker Desktop 里真的有容器在跑（可能是 shell 会话拿不到桌面会话的 named pipe） | 不要死等 `docker ps`；改用直连 `pg`/`fetch` 测 `POSTGRES_URL` 指向的端口（如 `localhost:5432`）是否能连通，能连通就说明数据库可用，不用管 `docker` CLI 卡不卡 |
 | PowerShell（本项目终端默认）不支持 `&&` 链接命令（会报 `token '&&' is not a valid statement separator`） | 用 `;` 分隔，或用 Shell 工具的 `working_directory` 参数代替 `cd xxx &&` |
@@ -42,7 +46,7 @@
 | `ensureContentTables` 等自愈 DDL 在首屏会并发触发 | 必须用 in-flight Promise 串行化；`CREATE INDEX IF NOT EXISTS` 在并发下仍可能报 `pg_class_relname_nsp_index`（23505），需忽略该碰撞 |
 | 本地 Postgres 空库时 `/api/destinations` `/api/routes` 会 200 但返回空数组；`App` 仍会渲染 | 页面组件不得假设 `routeTours[0]` / `destinationMeta[0]` 一定存在；需要内容时跑 `npx tsx scripts/backfill-content.ts`（在 `app/` 下） |
 | `CREATE TABLE IF NOT EXISTS` 不会修复旧表缺列 | 查询/更新新增列时，同步在对应 ensure schema 里加 `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`，不能只改建表 SQL |
-| 本地未配 `STRIPE_SECRET_KEY` 时点 Pay 会报 `Checkout is not configured.` | 在 `env/local/.env` 设 `DEV_CHECKOUT_BYPASS=1`（示例已有）；会本地建单并确认，跳 Mini-App `Booking confirmed`，并走确认邮件（`console` 只打终端预览）。生产/部署环境该开关强制无效；真测 Stripe 时填 test key 并去掉 bypass；真收信设 `BOOKING_EMAIL_MODE=resend` + `RESEND_API_KEY` |
+| 本地未配收款密钥时点 Pay | 默认 `PAYMENT_PROVIDER=payoneer`。本地可设 `DEV_CHECKOUT_BYPASS=1`（或 `PAYONEER_CHECKOUT_MOCK=1`）本地建单并确认；生产/部署环境 bypass/mock 强制无效。真测 Payoneer 填 `PAYONEER_STORE_CODE` + `PAYONEER_TOKEN`；切回 Stripe 时设 `PAYMENT_PROVIDER=stripe` 并填 test key；真收信设 `BOOKING_EMAIL_MODE=resend` + `RESEND_API_KEY` |
 | Resend `onboarding@resend.dev` 报只能发到本人邮箱 | 试用发件域只能发到 Resend 账号邮箱。本地设 `BOOKING_EMAIL_OVERRIDE_TO=<账号邮箱>`（见 `email.ts`）；表单可填任意 lead email，实际投递走 override。验证自有域名后可去掉 override |
 | 改 env 后仍报 `RESEND_API_KEY is not configured.` | Vite 热重启会保留进程里旧的空 env；`vite.config.ts` 经 `loadTargetEnv` 强制覆盖。若仍异常，停掉终端里的 dev 再 `npm run dev`（完整重启进程） |
 | 订单 `route_snapshot` 日期出现 ISO（如 `…T16:00:00.000Z`） | `pg` DATE 在事务里是 `Date`；写入 snapshot 前必须 `formatDate` 成 `YYYY-MM-DD`，禁止直接 `JSON.stringify(Date)`。展示侧用 `normalizeDateOnly` / `formatOrderDateRange`。历史脏数据跑迁移 `009_normalize_order_route_snapshot_dates` |

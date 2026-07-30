@@ -5,19 +5,12 @@ import {
   subscribeAuthSession,
   type AuthSession,
 } from '@/lib/authClient';
-import {
-  claimOrderToAccount,
-  parseOrderClaimInput,
-  type ClaimOrderProof,
-} from '@/lib/orderClient';
-import { fieldErrorId, focusFirstFieldError } from '@/lib/formErrors';
+import { claimOrderToAccount, type ClaimOrderProof } from '@/lib/orderClient';
 import { Button } from '@/components/ui/button';
 
 type LinkOrderToAccountProps = {
-  /** When set, bind this proof (success page / email link). */
+  /** Bind this proof from the confirmation / success URL (order + token or session). */
   proof?: ClaimOrderProof | null;
-  /** Show paste form for confirmation link (Account / My Orders). */
-  allowPaste?: boolean;
   /** Auto-attempt claim once when signed in and proof is present. */
   autoClaim?: boolean;
   variant?: 'card' | 'mobile';
@@ -25,21 +18,21 @@ type LinkOrderToAccountProps = {
   className?: string;
 };
 
+/**
+ * One-tap / auto bind when the traveler already has an order proof in the URL
+ * (confirmation email link or checkout success). Do not ask them to paste links.
+ */
 export function LinkOrderToAccount({
   proof,
-  allowPaste = false,
   autoClaim = true,
   variant = 'card',
   onLinked,
   className,
 }: LinkOrderToAccountProps) {
   const [session, setSession] = useState<AuthSession | null>(() => readStoredAuthSession());
-  const [pasteValue, setPasteValue] = useState('');
   const [status, setStatus] = useState<'idle' | 'working' | 'linked' | 'error'>('idle');
   const [message, setMessage] = useState('');
-  const [claimInputError, setClaimInputError] = useState('');
   const autoTriedKey = useRef('');
-  const shellRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     return subscribeAuthSession((next) => {
@@ -52,24 +45,21 @@ export function LinkOrderToAccount({
     });
   }, []);
 
-  const proofFromPaste = allowPaste ? parseOrderClaimInput(pasteValue) : null;
   const activeProof =
-    proof && proof.orderNumber && (proof.token || proof.sessionId)
-      ? proof
-      : proofFromPaste;
+    proof && proof.orderNumber && (proof.token || proof.sessionId) ? proof : null;
 
   useEffect(() => {
     if (!autoClaim) return;
-    if (!proof?.orderNumber || !(proof.token || proof.sessionId)) return;
+    if (!activeProof) return;
     if (!session?.accessToken) return;
 
-    const key = `${session.accessToken}:${proof.orderNumber}:${proof.token || ''}:${proof.sessionId || ''}`;
+    const key = `${session.accessToken}:${activeProof.orderNumber}:${activeProof.token || ''}:${activeProof.sessionId || ''}`;
     if (autoTriedKey.current === key) return;
     autoTriedKey.current = key;
 
     let cancelled = false;
 
-    claimOrderToAccount(session.accessToken, proof)
+    claimOrderToAccount(session.accessToken, activeProof)
       .then((result) => {
         if (cancelled) return;
         if (result.ok) {
@@ -94,26 +84,20 @@ export function LinkOrderToAccount({
     return () => {
       cancelled = true;
     };
-  }, [autoClaim, proof, session?.accessToken, onLinked]);
+  }, [autoClaim, activeProof, session?.accessToken, onLinked]);
 
   async function handleClaim() {
     if (!session?.accessToken) {
       setStatus('error');
-      setMessage('Sign in first, then link this booking.');
+      setMessage('Sign in first, then return to this page to save the booking.');
       return;
     }
     if (!activeProof) {
-      const inputError = 'Paste the full link from your confirmation email (includes token).';
       setStatus('error');
-      setMessage(inputError);
-      setClaimInputError(inputError);
-      requestAnimationFrame(() => {
-        focusFirstFieldError(['claimInput'], { claimInput: inputError }, shellRef.current);
-      });
+      setMessage('This page is missing a secure booking link. Open the link from your confirmation email.');
       return;
     }
 
-    setClaimInputError('');
     setStatus('working');
     setMessage('');
     try {
@@ -136,27 +120,30 @@ export function LinkOrderToAccount({
     }
   }
 
+  if (!activeProof) {
+    return null;
+  }
+
   const isMobile = variant === 'mobile';
   const shellClass = isMobile
     ? 'iosapp-booking-link-account'
     : 'mt-6 rounded-lg border bg-slate-50 p-4';
 
   return (
-    <div ref={shellRef} className={[shellClass, className].filter(Boolean).join(' ')}>
+    <div className={[shellClass, className].filter(Boolean).join(' ')}>
       <p className={isMobile ? 'iosapp-booking-cta-note' : 'text-sm font-medium text-slate-900'}>
         Save this booking to your account
       </p>
       <p className={isMobile ? 'iosapp-checkout-note' : 'mt-1 text-sm text-muted-foreground'}>
-        Works even if your login email differs from the booking form email. Use the confirmation
-        email link or this page&apos;s secure link.
+        Works even if your login email differs from the booking form email.
       </p>
 
       {!session ? (
-        <div className={isMobile ? 'mt-3' : 'mt-3'}>
+        <div className="mt-3">
           <p className={isMobile ? 'iosapp-checkout-note' : 'mb-2 text-sm text-muted-foreground'}>
             {isMobile
-              ? 'Open Me → Sign in, then return here or paste the confirmation link under My Orders.'
-              : 'Sign in first, then return here or paste the confirmation link under My Orders.'}
+              ? 'Open Me → Sign in, then return to this confirmation link to save the booking.'
+              : 'Sign in first, then return to this confirmation link to save the booking.'}
           </p>
           {!isMobile && (
             <Button asChild variant="outline" size="sm">
@@ -168,33 +155,6 @@ export function LinkOrderToAccount({
         <p className={isMobile ? 'iosapp-checkout-note' : 'mt-3 text-sm text-emerald-700'}>{message}</p>
       ) : (
         <div className={isMobile ? 'iosapp-booking-actions mt-3' : 'mt-3 space-y-3'}>
-          {allowPaste && (
-            <label className="block space-y-1" data-field-error="claimInput">
-              <span className={isMobile ? 'sr-only' : 'text-xs text-muted-foreground'}>
-                Confirmation link
-              </span>
-              <textarea
-                className={
-                  isMobile
-                    ? 'w-full min-h-[72px] rounded-xl border border-black/10 bg-white px-3 py-2 text-sm'
-                    : 'w-full min-h-[72px] rounded-md border px-3 py-2 text-sm'
-                }
-                placeholder="Paste confirmation link (/orders/…?token=…)"
-                value={pasteValue}
-                aria-invalid={Boolean(claimInputError)}
-                aria-describedby={claimInputError ? fieldErrorId('claimInput') : undefined}
-                onChange={(event) => {
-                  setPasteValue(event.target.value);
-                  setClaimInputError('');
-                  if (status === 'error') {
-                    setStatus('idle');
-                    setMessage('');
-                  }
-                }}
-              />
-            </label>
-          )}
-
           {isMobile ? (
             <button
               type="button"
@@ -202,27 +162,26 @@ export function LinkOrderToAccount({
               disabled={status === 'working'}
               onClick={() => void handleClaim()}
             >
-              {status === 'working' ? 'Saving…' : allowPaste ? 'Link booking' : 'Save to my account'}
+              {status === 'working' ? 'Saving…' : 'Save to my account'}
             </button>
           ) : (
             <Button
               type="button"
               size="sm"
-              disabled={status === 'working' || (!allowPaste && !activeProof)}
+              disabled={status === 'working'}
               onClick={() => void handleClaim()}
             >
-              {status === 'working' ? 'Saving…' : allowPaste ? 'Link booking' : 'Save to my account'}
+              {status === 'working' ? 'Saving…' : 'Save to my account'}
             </Button>
           )}
 
-          {status === 'working' && !allowPaste && (
+          {status === 'working' && (
             <p className={isMobile ? 'iosapp-checkout-note' : 'text-sm text-muted-foreground'}>
               Linking to {session.user.email}…
             </p>
           )}
           {message && status === 'error' && (
             <p
-              id={claimInputError ? fieldErrorId('claimInput') : undefined}
               className={isMobile ? 'iosapp-checkout-note text-destructive' : 'text-sm text-destructive'}
               role="alert"
             >

@@ -35,7 +35,7 @@ if (!isTestKey) {
     process.env.STRIPE_WEBHOOK_SECRET || 'whsec_booking_integrity_local_e2e_secret';
 
   const { ensureBookingTables } = await import('./lib/bookingSchema.ts');
-  const { sql } = await import('./lib/db.ts');
+  const { sql } = await import('./platform/db.ts');
   const { createPendingOrderAndHold, findDepartureByPublicId, attachStripeSessionToOrder } =
     await import('./lib/orders.ts');
   const webhookHandler = (await import('./stripe-webhook.ts')).default;

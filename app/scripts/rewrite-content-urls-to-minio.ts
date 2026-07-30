@@ -8,8 +8,8 @@
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { ensureContentTables } from '../api/lib/contentSchema';
-import { sql } from '../api/lib/db';
+import { ensureContentTables } from '../api/domains/catalog/contentSchema';
+import { sql } from '../api/platform/db';
 import { argValue, hasFlag, loadEnvLocal } from './lib/envLocal';
 import type { MediaMapFile } from './lib/mediaMapTypes';
 
@@ -44,7 +44,7 @@ async function main() {
     if (!image.startsWith('/')) continue;
     const next = byLocalUrl.get(image);
     if (!next || next === image) continue;
-    console.log(`destination ${row.slug}: ${image} â†’ ${next}`);
+    console.log(`destination ${row.slug}: ${image} â†?${next}`);
     if (!dryRun) {
       await sql`
         UPDATE destinations SET image = ${next}, updated_at = NOW()
@@ -61,7 +61,7 @@ async function main() {
     if (!image.startsWith('/')) continue;
     const next = byLocalUrl.get(image);
     if (!next || next === image) continue;
-    console.log(`route ${row.slug}: ${image} â†’ ${next}`);
+    console.log(`route ${row.slug}: ${image} â†?${next}`);
     if (!dryRun) {
       await sql`
         UPDATE routes SET hero_image = ${next}, updated_at = NOW()

@@ -36,8 +36,8 @@ async function main() {
   const { env, outPath } = parseArgs(process.argv.slice(2));
   loadTargetEnv(env, { override: true });
 
-  const { listPublicDestinations, listPublicRoutes } = await import('../api/lib/contentQueries.ts');
-  const { sql } = await import('../api/lib/db.ts');
+  const { listPublicDestinations, listPublicRoutes } = await import('../api/domains/catalog/contentQueries.ts');
+  const { sql } = await import('../api/platform/db.ts');
 
   const destinations = await listPublicDestinations();
   const routes = await listPublicRoutes();
@@ -81,7 +81,7 @@ async function main() {
 
   fs.writeFileSync(outPath, `${JSON.stringify(snapshot, null, 2)}\n`, 'utf8');
   console.log(
-    `[seo-export] wrote ${destinations.length} destinations, ${routes.length} routes â†’ ${outPath}`,
+    `[seo-export] wrote ${destinations.length} destinations, ${routes.length} routes â†?${outPath}`,
   );
   console.log(`[seo-export] sourceEnv=${env} contentHash=${snapshot.contentHash}`);
   console.log(`[seo-export] lastmod paths=${Object.keys(updatedAtByPath).length}`);

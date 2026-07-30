@@ -10,7 +10,7 @@ This file is the working design contract for `app/src/components/ChinaTripsMobil
 - Top-level tabs: Home, Places, Routes, Custom, Me.
 - Custom private trip planning is the primary Home-screen business goal.
 - Group tour reserve is a supporting path, not the primary Home-screen story and not a top-level tab. It appears on Home and can be reviewed from Me.
-- Reserve flow: choose destination first, then choose an existing route / sellable departure, fill traveler details, then **Pay full amount** via Stripe Checkout. Custom tab and route-private short form use the same payment-entry shell (form → confirm → Pay); amount/product still TBD, with email inquiry as fallback on confirm.
+- Reserve flow: choose destination first, then choose an existing route / sellable departure, fill traveler details, then **Pay full amount** via hosted Checkout (default Payoneer; Stripe retained behind `VITE_PAYMENT_PROVIDER=stripe`). Custom tab and route-private short form use the same payment-entry shell (form → confirm → Pay); amount/product still TBD, with email inquiry as fallback on confirm.
 - Route booking CTAs for sellable social tours may use full-payment language (`Pay full amount` / `Total due today`). Do not use deposit-only wording.
 - WhatsApp green FAB: gate (“already submitted a form?”) → short or long `quick_contact` form → on success open WhatsApp (optional prefilled text). Do not deep-link WhatsApp before the form succeeds.
 - Route selection is structured only. Do not allow arbitrary custom route text in the group tour reserve flow.
@@ -78,11 +78,11 @@ Reference URLs:
 
 ## Checkout Rules
 
-- Confirmation sheet opens **Stripe Checkout** via `createFixedDepartureCheckoutSession` (`POST /api/checkout-session`). Primary CTA: `Pay full amount` / loading `Opening Stripe Checkout...`.
+- Confirmation sheet opens hosted Checkout via `createFixedDepartureCheckoutSession` (`POST /api/checkout-session`). Primary CTA: `Pay full amount` / loading `Opening … Checkout...` (provider name from `VITE_PAYMENT_PROVIDER`, default Payoneer).
 - Use a full-screen iOS grouped form visual language: **one** confirmation sheet (`iosapp-checkout-review`), not stacked marketing cards with nested white blocks.
 - Hero anchors the trip: destination kicker + route title + date range; availability/spots as compact meta under the hero — not as key-value rows.
-- Below the hero: Travelers rows, then **Payment** summary (`Total due today`) plus Stripe trust copy.
-- Do not collect card fields locally; redirect to hosted Stripe Checkout.
+- Below the hero: **Travelers** (names + gender pills), **Contact** (email/phone), then **Payment** line items; sticky `iosapp-checkout-paybar` shows **Total due today** + primary `Pay full amount`. Book screens use `iosapp-checkout-screen` (no tab-bar bottom inset).
+- Do not collect card fields locally; redirect to hosted Payoneer/Stripe Checkout.
 - On the group tour booking form, every adult must provide a full name and self-report exactly `male` or `female`; never infer gender from a name. Keep indexed error focus/ARIA behavior on the departure form.
 - The public joined roster is aggregate-only: expose counts for `male`, `female`, `unknown`, and `total`, never traveler names, emails, order numbers, or a per-traveler array. Count only orders in `confirmed` or `cancellation_requested`; exclude pending-payment orders and active inventory holds. Historical traveler snapshots without gender contribute to `unknown` and must never be backfilled or guessed.
 - Roster `total` means confirmed travelers and is intentionally different from `capacity - available_seats`, because availability also subtracts unexpired checkout holds. Keep the remaining-seat label and explain this distinction in UI copy.
@@ -102,8 +102,9 @@ Reference URLs:
 
 - Me → **My Orders** stays inside the Mini-App (`myOrders` view). Do **not** `navigate('/account')` or open the desktop Account page from China Trips.
 - Me and tab headers expose a light exit to the portal homepage: AppHeader trailing **home** button, BackBar trailing **home** button, brand **Syncing Travel**, and Me **Back to website** all link to `/`. Tab AppHeader also shows a **back** (chevron) that runs `navigate(-1)`. Booking flows stay in-app; these are not primary CTAs.
+- Signed-in Me: identity card (avatar + login email) + settings rows (**My Orders**, **Back to website**, **Sign out**). Do **not** add a dead **Contact info** row or a “how orders link” tutorial sheet. Unsigned Me card layout stays as-is.
 - Homepage Curated “View Itinerary” on mobile opens `/#/china-trips?route={slug}` which clears the query and opens that route detail. Desktop Curated links go to `/tours/{slug}`.
-- List loads via `fetchMyOrders` (`/api/my-orders` + Bearer token). Empty state CTA **Explore trips** returns to the Home tab.
+- List loads via `fetchMyOrders` (`/api/my-orders` + Bearer token). Empty state CTA **Explore trips** returns to the Home tab. Do **not** ask travelers to paste confirmation URLs into My Orders; same-email login auto-claims, and cross-email linking happens by opening the confirmation email link while signed in.
 - Opening a list row shows order details in-app (`bookingConfirmed` with `mode: 'detail'`); Back returns to `myOrders`, not Home.
 - Desktop `/#/account` remains for non–Mini-App entry points (bookmarks, future desktop nav); do not delete it as part of this rule.
 

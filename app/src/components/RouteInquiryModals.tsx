@@ -21,6 +21,12 @@ import {
   saveCheckoutCancelDraft,
 } from '@/lib/checkoutClient';
 import {
+  checkoutOpenFailedCopy,
+  hostedCheckoutTrustCopy,
+  openingCheckoutCopy,
+  payFullAmountReviewCopy,
+} from '@/lib/paymentProviderCopy';
+import {
   departureAvailability,
   fetchPublicDepartures,
   formatDeparturePrice,
@@ -488,7 +494,7 @@ export function PrivateQuoteModal({
 
 /**
  * Social tour booking — departure-bound like the Mini-App:
- * pick a sellable departure → traveler roster → confirm → Stripe Checkout.
+ * pick a sellable departure → traveler roster → confirm → hosted checkout.
  */
 export function GroupTourInquiryModal({
   open,
@@ -685,7 +691,7 @@ function GroupTourInquiryBody({
       clearCheckoutCancelDraft();
       setStatus('error');
       setFormError(
-        error instanceof Error ? error.message : 'We could not open Stripe Checkout. Please try again.',
+        error instanceof Error ? error.message : checkoutOpenFailedCopy(),
       );
     }
   };
@@ -716,7 +722,7 @@ function GroupTourInquiryBody({
           </DialogTitle>
           <DialogDescription>
             {step === 'confirm'
-              ? 'Review your details, then pay the full amount securely with Stripe Checkout.'
+              ? payFullAmountReviewCopy()
               : 'Choose a published departure, add traveler details, then pay to confirm your booking.'}
           </DialogDescription>
           <p className="text-[13px] text-[#63707a]">
@@ -1064,7 +1070,7 @@ function GroupTourInquiryBody({
                 </strong>
               </div>
               <p className="text-[13px] leading-6 text-[#63707a]">
-                Secure Stripe Checkout — card details stay with Stripe. Syncing Travel never stores them.
+                {hostedCheckoutTrustCopy()}
               </p>
             </div>
 
@@ -1096,7 +1102,7 @@ function GroupTourInquiryBody({
                 onClick={() => void handleConfirm()}
                 className="min-h-[52px] w-full rounded-[6px] bg-[#ef4f43] px-6 text-[16px] font-semibold text-white transition-colors hover:bg-[#d84338] disabled:cursor-not-allowed disabled:opacity-65"
               >
-                {submitting ? 'Opening Stripe Checkout...' : 'Pay full amount'}
+                {submitting ? openingCheckoutCopy() : 'Pay full amount'}
               </button>
             </div>
           </div>

@@ -2,16 +2,164 @@
 
 ## Status
 
-**in-progress（fix-prerender-spa-shell）** — Playwright 已绿；tour 16 因污染的 index.html（首页 seoReady）抢跑导致 missing canonical。修 prerender 干净壳 + 等正确 canonical。
+**done（fix-prerender-spa-shell）** — Deploy cloud-vps Actions success（run Å36129700\）。prerender 干净 SPA 壳 + 等正确 canonical。
 
 ### Progress note（fix-prerender-spa-shell，2026-07-30）
 
-- 依据：run `30534960335` — 44 ok / 1 fail `16-kashgar… missing canonical`。
-- 已改：`prerender.mjs`（`.prerender-spa-index.html` + wait canonical）；`Seo.tsx`（seoReady 移到 canonical 之后）；gotchas。
-- 未验：合并后 CD 全绿。
-- 下一步：PR → main → 重跑 Deploy。
+- 已合 main；shell Seo 已同步 seoReady 顺序。
 
-**done（fix-deploy-playwright）** — CD build 前 `npx playwright install chromium`；已合 main（PR #6）。
+**done（fix-deploy-playwright）** — CD build 前 px playwright install chromium\；已合 main（PR #6）。
+
+**done（prod-cd-configure）** — VPS `103.201.130.12`：用户 `deploy`、脏缓存迁出、xtch home→`/var/lib/xtch`；GitHub Environment `production` 已设 `VPS_HOST/USER/SSH_KEY/PORT`。Workflow 仍在本地未进 `main`，需合并后才会自动跑。
+
+### Progress note（prod-cd-configure，2026-07-30）
+
+- VPS：deploy 用户 + Actions 公钥；github fetch 用已有 `xtch_github_deploy`；sudoers 限 systemctl/chgrp/chmod/chown。
+- GitHub：`production` secrets 已写。
+- 未做：把 `.github/workflows` + `deploy-from-main.sh` 提交并合并进 `main`；未跑首次 workflow。
+- 风险：当前本机 `dev` 工作树大量未提交改动；CD 文件需单独干净合并。
+
+**done（prod-cd-gate）** — `main` push 自动部署：lint + **migrate** + build + restart；`workflow_dispatch` 默认同。须配 `production` Environment 与 `VPS_*` secrets 后才真正跑通。
+
+### Progress note（prod-cd-gate，2026-07-30）
+
+- 用户确认：合并进远程 main → 自动触发；自动 migrate；服务器拉取并重建重启。
+- 已改：`.github/workflows/deploy-cloud-vps.yml`（`push: main` + 默认 `--with-lint --with-migrate`）；ops/gotchas/脚本头注释。
+- 未验：真机 secrets / 首次 Actions 跑通。
+- 下一步：用户配 `VPS_HOST`/`VPS_USER`/`VPS_SSH_KEY`，把含 workflow 的提交推进 main。
+
+**done（me-signed-in-identity）** — 已登录 Me：删假 Contact info；身份卡（头像+邮箱）；Sign out 不再重复邮箱；未登录不动。用户否决「账户说明/认领教学」方案。
+
+### Progress note（me-signed-in-identity，2026-07-30）
+
+- 已改：`MeTab`；`chinaTripsMobile.css`（`.iosapp-me-signed` / `.iosapp-me-identity`）；mobile-ios Me 规则一行。
+- 验证：待用户刷新已登录 Me。
+
+**done（my-orders-no-paste）** — My Orders/Account 去掉粘贴确认信 URL；空态引导「同邮箱登录 / 点确认信链接」。`LinkOrderToAccount` 仅保留成功页 proof 自动认领。
+
+### Progress note（my-orders-no-paste，2026-07-30）
+
+- 判断：旅客不会在 App 里粘贴长链接；认领应是登录同邮箱自动挂单，或点确认信深链。
+- 已改：`ChinaTripsMobile` MyOrders；`Account.tsx`；`LinkOrderToAccount.tsx`（删 allowPaste）；gotchas / mobile-ios。
+- 验证：待 lint；浏览器待用户看空态。
+- 保留：`parseOrderClaimInput` 仍在 orderClient（深链解析用）；OrderSuccess / 支付成功页 proof 认领未删。
+
+**done（checkout-review-polish）** — 结账确认：Contact 分组、sticky Total+Pay；修 Female pill 被行内 `span max-width:42%` 挤成竖条；标签改 `Lead traveler` + `iosapp-review-label`。待用户刷新看 320/375/390。
+
+### Progress note（checkout-review-polish，2026-07-30）
+
+- 目标：按用户截图收紧 Book 确认卡；修性别 pill 换行。
+- 已改：`ChinaTripsMobile.tsx` CheckoutReview + PlanningCheckout；`chinaTripsMobile.css`（label 选择器收窄、pill `nowrap`）；`mobile-ios-front-end-context.md` Checkout 段。
+- 验证：未再跑 lint；浏览器待用户刷新确认页。
+- 下一步：若还有疏密/文案问题继续点改。
+
+**done（local-refresh-images）** — 本地刷新慢：Vite `/images`/`/s3` `Cache-Control max-age=3600` + Home/Destinations/移动列表图 `loading="lazy"`。lint 绿。需重启 `npm run dev` 后硬刷对比 Network。
+
+### Progress note（local-refresh-images，2026-07-30）
+
+- 目标：减轻本地刷新时图片请求风暴（非 API）。
+- 已改：`vite.config.ts`；`Home.tsx`/`Destinations.tsx`；`MobileDestinationCard|ListRow|RouteListCard`；gotchas/task-board。
+- 验证：`npm run lint` 绿。未在浏览器复测瀑布（需重启 Vite 加载中间件）。
+- 未验/风险：同路径换图后需硬刷；未压原图；生产本就更快。
+- 下一步：用户重启 dev → 首页刷新看 304 是否明显减少。
+
+**done（api-entry-lib-cleanup）** — C：`admin/{auth,booking,catalog,inquiry,media}` + `localApiRoutes`；scripts/测试直连 domains/platform；`api/lib` 仅 shim+README。lint/build + test:s3 + test:admin-allowlist 绿。公开 `/api/admin/*` URL 未变。
+
+### Progress note（api-entry-lib-cleanup，2026-07-30）
+
+- 目标：理清 api 根入口 / admin / lib / platform。
+- 已改：admin 分组；`localApiRoutes.ts`；scripts 与 PG e2e import；`package.json` 测试路径；lib/README；ADR 2.8；gotchas/agent-context。
+- 验证：lint；build；`test:s3`（15）；`test:admin-allowlist`（8）。
+- 未验：浏览器打真实 `/api/admin/*`；需重启 dev/deploy:serve 才能加载新路由表。
+- 下一步：可选继续删未引用 lib shim；根 `api/*.ts` 保持平铺（URL 绑定）。
+
+**done（function-visibility）** — Phase 2.7：功能地图 + `booking/payment`（原 providers）+ 前端 booking `payment|checkout|orders|policy` + identity `admin|traveler` + inquiry FE `clients|copy`。23 unit tests + lint + build 绿。
+
+### Progress note（function-visibility，2026-07-30）
+
+- 目标：不止支付 — 各功能在目录名上可辨认；不拆独立 payment 域。
+- 已改：`docs/agent-context.md` 功能地图；`booking/providers`→`payment/`（含 paymentProvider）；FE booking 子目录；identity admin/traveler；inquiry admin + FE clients/copy；shim/ADR/gotchas/task-board。
+- 验证：payoneer + bookingIntegrity + checkoutPayload + adminAllowlist（23）；lint；build。
+- 未验：PG integration；浏览器 smoke；未清全部顶层 shim。
+- 下一步：可选逐步去 shim；media 已够清晰可不动。
+
+**done（domain-subfolder-split）** — ADR 0005 Phase 2.6：单夹 ≤8 源文件；booking → orders/inventory/checkout/integrity；catalog/http → public/admin；前端 catalog → clients/drafts/data/copy；shim 路径更新。lint/build + 相关单测绿。
+
+### Progress note（domain-subfolder-split，2026-07-30）
+
+- 目标：domain 子目录再分层（软上限 ≤8 源文件；测试不计）。
+- 已改：`domains/booking/{orders,inventory,checkout,integrity}`；`catalog/http/{public,admin}`；`src/domains/catalog/{clients,drafts,data,copy}`；api/lib 与 src/lib shim；ADR 0005 Phase 2.6；gotchas/task-board。
+- 验证：相关 unit tests；`npm run lint`；`npm run build`。
+- 未验：PG integration；浏览器 smoke。
+- 下一步：可选去 shim；不拆 ChinaTripsMobile/Admin 巨文件（另任务）。
+
+**done（backend-phase2.5）** — ADR 0005 Phase 2.5：booking HTTP 补全（orders/my-orders/claim-orders/admin orders）；`platform/email` 去 booking 反向依赖（`BookingConfirmationOrder` + caller 传 `orderUrl`）；`platform/dateFormat`；`platform/actorTypes`（`auditLog` 不再 import booking）；migrations/admin/dashboard/webhook events 直 import domain/platform；`lib/` shim 保留。email + booking unit tests + lint + build 绿。
+
+### Progress note（backend-phase2.5，2026-07-30）
+
+- 目标：Phase 2.5 后端 — 补全 booking HTTP 迁移、解开 platform→booking 反向依赖、非 shim 直 import domains/platform。
+- 已改：`domains/booking/http/{orders,myOrders,claimOrders,adminOrdersHttp}.ts`；薄入口 re-export；`platform/email.ts`（`BookingConfirmationOrder`，无 rotateAccessToken）；`platform/dateFormat.ts`；`platform/actorTypes.ts` + `auditLog`/`bookingSchema` re-export；`orders.buildOrderAccessUrl`；checkout/webhook/admin resend 传 `orderUrl`；13 migrations → `platform/db`；`admin/dashboard.ts`；webhook event providers → `platform/db`；e2e test → domains；ADR/gotchas/task-board。
+- 验证：`email.test`（5）；`checkoutPayload.test`；`bookingIntegrity.test`；`npm run lint`；`npm run build`。
+- 未验：PG integration；浏览器/API smoke。
+- 下一步：booking 内部子目录（orders/inventory）可选；逐步去掉剩余 shim import。
+
+**done（domain-frontend-phase3）** — ADR 0005 Phase 3 前端：`domains/*` 客户端、`shells/*`（china-trips-mobile/admin/desktop chrome）、`shared/ui|lib|seo`；旧 `@/lib/*` / `@/components/ui/*` / `@/components/ChinaTripsMobile` shim。`formErrors` tests + lint + build 绿。
+
+### Progress note（domain-frontend-phase3，2026-07-30）
+
+- 目标：Phase 3 前端 domain/shell/shared 布局；不改路由/URL/视觉/业务行为。
+- 已改：`app/src/domains/{booking,catalog,inquiry,identity,media}/` + `index.ts`；`shared/ui|lib|seo`；`shells/china-trips-mobile`（ChinaTripsMobile + mobile 组件 + motion/css）；`shells/admin`（Admin + admin 组件）；`shells/desktop/components`（Navbar/Footer/Seo/ScrollToTop）；全量 lib/ui/组件 shim；`eslint.config.js` 忽略 shim 路径；ADR 0005 / agent-context / gotchas。
+- 验证：`npx tsx --test scripts/formErrors.test.ts`（4）；`npm run lint`；`npm run build`。
+- 未验：浏览器逐页 smoke（Admin/ChinaTripsMobile/桌面页）。
+- 下一步：逐步让新代码 import `@/domains/*` / `@/shells/*`；Phase 4 可迁桌面 `pages/` 到 `shells/desktop/`。
+
+**done（domain-phase2）** — ADR 0005 Phase 2：catalog/inquiry/identity/media 迁入 `app/api/domains/`；platform 迁入 `app/api/platform/`；`app/api/lib/*` 薄 shim；HTTP 薄 re-export 不变。`publicOrigin`/`adminAllowlist`/`email`/`s3Key` tests + lint + build 绿。
+
+### Progress note（domain-phase2，2026-07-30）
+
+- 目标：Phase 2 后端 domain cut — catalog/inquiry/identity/media + platform；booking 不再改。
+- 已改：`platform/{db,email,publicOrigin,auditLog}`；`domains/catalog|inquiry|identity|media` lib + http handlers；`lib/` shims；顶层/admin 路由薄 re-export；各 domain `index.ts`；booking 内 import 改 `platform/`/`identity/`。
+- 验证：`publicOrigin.test`（6）；`adminAllowlist.test`（8）；`email.test`（5）；`s3Key.test`（9）；`npm run lint`；`npm run build`。
+- 未验：PG integration；真实 webhook/询盘联调；`admin/dashboard.ts` 仍直 import shim（有意保留）。
+- 下一步：Phase 3 前端 shells/domains；逐步去掉 shim import。
+
+**done（domain-booking-phase1）** — booking 模块迁入 `app/api/domains/booking/`；`app/api/lib/*` 保留薄 re-export shim；HTTP 路径不变（checkout-session / stripe-webhook / payoneer-webhook 薄入口）。`payoneer` + `checkoutPayload` unit tests + lint + build 绿。
+
+### Progress note（domain-booking-phase1，2026-07-30）
+
+- 目标：Phase 1 后端 domain cut — booking 逻辑集中到 `domains/booking/`，platform 留 `lib/db|email|auth`。
+- 已改：移动 bookingSchema/orders/orderQueries/checkout*/payment*/availability/departureRefill/adminOrders + providers(stripe/payoneer/webhooks) + http handlers；`lib/`  shim；`domains/booking/index.ts`；ADR 0005 已存在。
+- 验证：`npx tsx --test api/domains/booking/providers/payoneer.test.ts`（5）；`checkoutPayload.test.ts`（3）；`bookingIntegrity*.test.ts`（12）；`npm run lint`；`npm run build`。
+- 未验：PG integration tests（需 POSTGRES_URL）；真实 webhook 联调。
+- 下一步：Phase 2 catalog/inquiry domain cut；逐步让新代码 import `domains/booking` 而非 shim。
+
+**done（Payoneer checkout cutover）** — 旅客默认 Payoneer Checkout；Stripe 代码保留可 `PAYMENT_PROVIDER=stripe` 切回。`payoneer` unit + env tests + lint + build 绿。
+
+### Progress note（Payoneer checkout cutover，2026-07-30）
+
+- 目标：程序化派安盈托管收款替换旅客可见 Stripe；订单/库存状态机不变。
+- 已改：`paymentProvider.ts`/`payoneer.ts`/`payoneer-webhook.ts`/`checkout-session.ts`；schema 013 + ensure columns；订单 lookup/claim；旅客文案 helper；CONTEXT/ADR0002/gotchas/mobile-ios；env examples；`validateTargetEnv`。
+- 验证：`npx tsx --test api/lib/payoneer.test.ts`（5）；`validateTargetEnv.test.ts`（15）；`npm run lint`；`npm run build`。
+- 未验：真实派安盈沙箱密钥下的 list 创建与 webhook 签名（仓库无密钥）；浏览器端到端。
+- 下一步：填入 `PAYONEER_STORE_CODE`/`PAYONEER_TOKEN`/`PAYONEER_WEBHOOK_SECRET` 后沙箱联调；`db:migrate` 跑 013。
+
+**done（桌面定制支付壳）** — `/custom-trip`：Continue to payment → 确认页 Pay full amount（金额待定）+ Send request by email。`lint`/`tsc` 绿。
+
+### Progress note（桌面定制支付壳，2026-07-29）
+
+- 目标：桌面定制对齐移动端统一支付入口壳。
+- 已改：`CustomTrip.tsx`；CONTEXT/gotchas。
+- 未改：`PrivateQuoteModal`（仍直发询盘）。
+- 验证：lint + tsc。未验：浏览器 Continue → Pay / 邮件后备。
+- 下一步：金额/商品确定后接 Stripe；可选对齐桌面 PrivateQuote。
+
+**done（dev → main）** — PR [#2](https://github.com/WHaoxM/xtch-web-portal/pull/2) 已合并；`origin/main` = `d033251`（Merge pull request #2 from WHaoxM/dev）。本地仍在 `dev`；sitemap/manifest 未提交脏文件仍在工作区。
+
+### Progress note（合并 main，2026-07-29）
+
+- 目标：将 Stripe 恢复 + 定制/私定支付壳合入 main。
+- 已做：`gh pr create` + `gh pr merge --merge`。
+- 下一步：生产部署按既有流程 pull/build；定制 Pay 仍待金额/商品。
 
 **done（定制/私定支付壳）** — 移动端 Custom + route-private：表单→确认页→Pay full amount（金额待定）；邮件询盘后备。`lint`/`tsc` 绿。
 

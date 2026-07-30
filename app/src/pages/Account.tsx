@@ -7,7 +7,6 @@ import {
   type AuthSession,
 } from '@/lib/authClient';
 import { fetchMyOrders, type SafeOrderSummary } from '@/lib/orderClient';
-import { LinkOrderToAccount } from '@/components/LinkOrderToAccount';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -39,7 +38,6 @@ export default function Account() {
   const [orders, setOrders] = useState<SafeOrderSummary[]>([]);
   const [error, setError] = useState('');
   const [loadedForToken, setLoadedForToken] = useState('');
-  const [ordersEpoch, setOrdersEpoch] = useState(0);
 
   const accessToken = session?.accessToken ?? '';
   const status = !accessToken
@@ -106,7 +104,7 @@ export default function Account() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, ordersEpoch]);
+  }, [accessToken]);
 
   if (status === 'unauthenticated') {
     return (
@@ -165,13 +163,6 @@ export default function Account() {
         )}
       </div>
 
-      <LinkOrderToAccount
-        allowPaste
-        autoClaim={false}
-        className="mb-8"
-        onLinked={() => setOrdersEpoch((value) => value + 1)}
-      />
-
       {orders.length === 0 ? (
         <Card>
           <CardContent className="p-6 text-center">
@@ -179,6 +170,10 @@ export default function Account() {
             <Button className="mt-4" onClick={() => navigate('/china-trips')}>
               Explore trips
             </Button>
+            <p className="mt-4 text-sm text-muted-foreground text-pretty">
+              Already booked? Sign in with the same email you used at checkout. If you used a
+              different email, open the link in your confirmation email while signed in.
+            </p>
           </CardContent>
         </Card>
       ) : (

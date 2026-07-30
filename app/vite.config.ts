@@ -109,6 +109,21 @@ export default defineConfig(({ mode }) => {
     base: '/',
     plugins: [
       localApiPlugin(),
+      // Local DX: Vite on Windows can spend ~500–600ms per image on 304 revalidation
+      // when many Home/China Trips imgs load at once. Long max-age skips that on refresh.
+      // Content editors replacing same-path files should hard-refresh once after edits.
+      {
+        name: 'xtch-dev-static-cache',
+        configureServer(server) {
+          server.middlewares.use((req, res, next) => {
+            const url = req.url?.split('?')[0] ?? '';
+            if (url.startsWith('/images/') || url.startsWith('/s3/')) {
+              res.setHeader('Cache-Control', 'public, max-age=3600');
+            }
+            next();
+          });
+        },
+      },
       inspectAttr(),
       react(),
       {

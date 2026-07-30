@@ -1,4 +1,4 @@
-import type { SqlClient } from '../lib/db';
+import type { SqlClient } from '../platform/db';
 
 export const name = '012_departure_refill_chains';
 

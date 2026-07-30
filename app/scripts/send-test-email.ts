@@ -2,7 +2,7 @@ import { loadTargetEnv } from '../../scripts/env/targetEnv';
 
 loadTargetEnv('local', { override: false });
 
-const { sendBookingConfirmationEmail } = await import('../api/lib/email.ts');
+const { sendBookingConfirmationEmail } = await import('../api/platform/email.ts');
 
 const order = {
   id: '7f6945ef-199f-4e02-9741-666b9af56b55',
@@ -36,8 +36,8 @@ const order = {
   confirmation_email_status: 'confirmation_email_pending',
 };
 
-import type { Order } from '../api/lib/bookingSchema';
+import type { Order } from '../api/domains/booking/bookingSchema';
 
 const result = await sendBookingConfirmationEmail(order as Order);
 console.log('Email result:', result);
-await import('../api/lib/db.ts').then((m) => m.sql.end?.());
+await import('../api/platform/db.ts').then((m) => m.sql.end?.());

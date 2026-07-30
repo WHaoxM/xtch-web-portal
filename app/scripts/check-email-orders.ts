@@ -2,8 +2,8 @@ import { loadTargetEnv } from '../../scripts/env/targetEnv';
 
 loadTargetEnv('local', { override: false });
 
-import { sql } from '../api/lib/db.ts';
-import { claimOrdersByEmail, listOrdersByUserId } from '../api/lib/orderQueries.ts';
+import { sql } from '../api/platform/db.ts';
+import { claimOrdersByEmail, listOrdersByUserId } from '../api/domains/booking/orders/orderQueries.ts';
 
 const TEST_USER_ID = 'test-user-id-emonakhatun';
 const TEST_EMAIL = 'emonakhatun64@gmail.com';

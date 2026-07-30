@@ -1,4 +1,4 @@
-import type { SqlClient } from '../lib/db';
+import type { SqlClient } from '../platform/db';
 
 export const name = '010_relative_s3_public_urls';
 

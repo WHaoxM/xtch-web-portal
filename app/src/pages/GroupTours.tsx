@@ -18,6 +18,7 @@ import {
   type PublicDeparture,
 } from '@/lib/departuresClient';
 import { formatOrderDateRange } from '@/lib/orderClient';
+import { groupToursPaymentCopy } from '@/lib/paymentProviderCopy';
 
 type LoadState = 'loading' | 'ready' | 'error';
 
@@ -78,8 +79,8 @@ export default function GroupTours() {
               Ready to Join
             </h1>
             <p className="mt-6 max-w-2xl text-[16px] leading-8 text-white/88 md:text-[18px]">
-              Browse published routes with real departure dates and fixed adult prices. Book a
-              departure here with full payment through secure Stripe Checkout.
+              Browse published routes with real departure dates and fixed adult prices. Book a{' '}
+              {groupToursPaymentCopy()}
             </p>
           </div>
         </div>

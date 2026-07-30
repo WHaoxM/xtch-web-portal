@@ -13,9 +13,9 @@
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import pg from 'pg';
-import { ensureContentTables } from '../api/lib/contentSchema';
-import { sql } from '../api/lib/db';
-import { getS3Config } from '../api/lib/s3';
+import { ensureContentTables } from '../api/domains/catalog/contentSchema';
+import { sql } from '../api/platform/db';
+import { getS3Config } from '../api/domains/media/s3';
 import { argValue, loadEnvLocal } from './lib/envLocal';
 import { tablesForScope, type BackupScope } from './lib/backupTables';
 
@@ -124,7 +124,7 @@ npx tsx scripts/import-content-backup.ts --dir=../data/content-backups/${outDirA
 # then restore MinIO objects if needed
 \`\`\`
 
-Business tables may include traveler PII â€” handle accordingly.
+Business tables may include traveler PII â€?handle accordingly.
 `,
     'utf-8',
   );

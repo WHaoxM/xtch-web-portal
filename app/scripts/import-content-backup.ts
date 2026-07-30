@@ -13,9 +13,9 @@
 import { createReadStream, existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { ensureContentTables } from '../api/lib/contentSchema';
-import { sql } from '../api/lib/db';
-import { getS3Config, publicUrlForKey } from '../api/lib/s3';
+import { ensureContentTables } from '../api/domains/catalog/contentSchema';
+import { sql } from '../api/platform/db';
+import { getS3Config, publicUrlForKey } from '../api/domains/media/s3';
 import {
   loadTargetEnv,
   normalizeTarget,

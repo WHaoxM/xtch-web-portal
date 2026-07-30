@@ -66,11 +66,11 @@ A pre-payment step for inquiry or manual follow-up flows that shows a payable pl
 _Avoid_: Using this model for guaranteed fixed-departure group tour seats that are intended to be fully purchased online
 
 **Hosted Card Payment**:
-The real-payment step where travelers pay by credit card through a trusted payment provider such as Stripe Checkout or Stripe Elements, rather than Syncing Travel collecting raw card numbers directly.
+The real-payment step where travelers pay by credit card (and other methods the provider offers) through a trusted hosted checkout such as Payoneer Checkout or Stripe Checkout, rather than Syncing Travel collecting raw card numbers directly.
 _Avoid_: Building a custom credit-card form that stores or directly handles card numbers
 
 **Group Tour Booking (fixed departure)**:
-A guaranteed group tour route date that can be purchased online at a fixed adult price, with backend inventory enforcement, full USD payment, and immediate order confirmation after trusted Stripe webhook success.
+A guaranteed group tour route date that can be purchased online at a fixed adult price, with backend inventory enforcement, full USD payment, and immediate order confirmation after trusted payment-provider webhook success.
 _Avoid_: Deposit-only language, final price TBC, minimum-group uncertainty, forced pre-payment account creation, or payment buttons when core transaction information is incomplete
 
 **Lead Follow-Up**:
@@ -142,7 +142,7 @@ _Avoid_: Untracked media dump, raw-folder hotlinking
 - Mobile **China Trips** should help travelers continue by preference rather than date, using travel styles such as **First Time in China**, **Nature & Scenery**, **Culture & Heritage**, and **Family & Easy Pace**.
 - Mobile **China Trips** travel style cards should route travelers toward the **Custom Trip Request** form, optionally carrying the selected style as context.
 - Mobile **China Trips** search should submit to the existing site search route rather than creating complex in-page filtering.
-- **Mobile China Trips Mini-App** and **desktop Social Tours** (`/group-tours`, RouteDetail booking) use the same **Stripe Checkout** path for fixed departures (`POST /api/checkout-session`). Mobile **custom** and **route-private** flows share the same payment-entry shell (form → confirm → Pay full amount); payable amount/product is not configured yet, so email inquiry remains available as a fallback on that confirm screen. Account creation should not block starting checkout.
+- **Mobile China Trips Mini-App** and **desktop Social Tours** (`/group-tours`, RouteDetail booking) use the same **Stripe Checkout** path for fixed departures (`POST /api/checkout-session`). Mobile **custom** / **route-private**, and desktop **Custom Trip** (`/custom-trip`), share the same payment-entry shell (form → confirm → Pay full amount); payable amount/product is not configured yet, so email inquiry remains available as a fallback on that confirm screen. Desktop route-private (`PrivateQuoteModal`) remains inquiry-only until aligned. Account creation should not block starting checkout.
 - **Mobile China Trips Mini-App** may still include a **Custom trip inquiry** flow for non-guaranteed, custom, incomplete, or not-yet-online-sellable departures.
 - **Payment Intent / Invoice Preview** belongs to inquiry or manual follow-up flows, not to fixed-departure Stripe Checkout.
 - **Group Tour Booking (fixed departure)** online Stripe purchase is the live traveler path (guaranteed departure, fixed adult price, full USD payment, inventory enforcement, webhook-confirmed order).

@@ -8,7 +8,7 @@ if (!orderNumber) {
   process.exit(1);
 }
 
-const { sql } = await import('../api/lib/db.ts');
+const { sql } = await import('../api/platform/db.ts');
 
 const orderResult = await sql`
   SELECT

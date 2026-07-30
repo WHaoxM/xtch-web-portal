@@ -17,8 +17,8 @@
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { ensureContentTables } from '../api/lib/contentSchema';
-import { sql } from '../api/lib/db';
+import { ensureContentTables } from '../api/domains/catalog/contentSchema';
+import { sql } from '../api/platform/db';
 import { loadTargetEnv } from '../../scripts/env/targetEnv';
 
 type DraftDay = {
@@ -67,7 +67,7 @@ function isInternalNote(note: string): boolean {
     'needs human review',
     'table cell conflicting',
     'Brief table',
-    '未提及',
+    '未杝坊',
     '留空',
     'do not publish',
     'Tour-level meals:',

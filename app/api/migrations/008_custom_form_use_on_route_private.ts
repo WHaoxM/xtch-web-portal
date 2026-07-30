@@ -1,4 +1,4 @@
-import type { SqlClient } from '../lib/db';
+import type { SqlClient } from '../platform/db';
 
 export const name = '008_custom_form_use_on_route_private';
 
