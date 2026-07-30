@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "xtch-web-portal",
   "private": true,
   "description": "Repo root proxy — npm scripts forward into app/",
