@@ -1,0 +1,86 @@
+# Deploy cloud-vps when main is updated.
+#
+# On push/merge to main (and manual workflow_dispatch):
+#   SSH to VPS → ff-only pull main → env gate → lint → migrate → build → restart → health check
+#
+# Required repository or Environment "production" secrets:
+#   VPS_HOST          — e.g. 203.0.113.10
+#   VPS_USER          — deploy user (sudo for systemctl / grant script)
+#   VPS_SSH_KEY       — private key (ed25519 recommended)
+# Optional:
+#   VPS_SSH_PORT      — default 22
+#   DEPLOY_EXTRA_FLAGS — extra flags appended to deploy-from-main.sh
+#
+# Create GitHub Environment "production" (recommended: required reviewers) before first run.
+
+name: Deploy cloud-vps
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      with_migrate:
+        description: Run db:migrate:cloud-vps
+        type: boolean
+        default: true
+      with_lint:
+        description: Run npm run lint on the VPS before build
+        type: boolean
+        default: true
+      with_unit_tests:
+        description: Run test:s3 + test:admin-allowlist on the VPS
+        type: boolean
+        default: false
+      no_restart:
+        description: Build only (do not systemctl restart)
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-cloud-vps
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Build remote flags
+        id: flags
+        shell: bash
+        run: |
+          flags=()
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            [[ "${{ inputs.with_migrate }}" == "true" ]] && flags+=(--with-migrate)
+            [[ "${{ inputs.with_lint }}" == "true" ]] && flags+=(--with-lint)
+            [[ "${{ inputs.with_unit_tests }}" == "true" ]] && flags+=(--with-unit-tests)
+            [[ "${{ inputs.no_restart }}" == "true" ]] && flags+=(--no-restart)
+          else
+            # push → main: always lint + migrate + restart (rebuild)
+            flags+=(--with-lint --with-migrate)
+          fi
+          extra='${{ secrets.DEPLOY_EXTRA_FLAGS }}'
+          if [[ -n "$extra" ]]; then
+            # shellcheck disable=SC2206
+            flags+=($extra)
+          fi
+          echo "value=${flags[*]}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT || 22 }}
+          script_stop: true
+          command_timeout: 45m
+          script: |
+            set -euo pipefail
+            cd /opt/xtch-web-portal
+            git fetch origin main
+            git checkout main
+            git merge --ff-only origin/main
+            # Use the script from the commit just checked out.
+            bash deploy/cloud-vps/deploy-from-main.sh --skip-pull ${{ steps.flags.outputs.value }}
