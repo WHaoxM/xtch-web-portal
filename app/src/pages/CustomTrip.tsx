@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Check } from 'lucide-react';
+import { Check, ShieldCheck } from 'lucide-react';
 import { CustomTripPreferenceSections } from '@/components/CustomTripPreferenceFields';
 import { TurnstileWidget } from '@/components/TurnstileWidget';
 import {
@@ -17,7 +17,33 @@ import {
   type FieldErrors,
 } from '@/lib/formErrors';
 import { submitInquiry } from '@/lib/inquiryClient';
+import { hostedCheckoutTrustCopy, openingCheckoutCopy } from '@/lib/paymentProviderCopy';
 import { cn } from '@/lib/utils';
+
+const PLANNING_PAYMENT_PENDING_NOTE =
+  'Online payment for private/custom trips is not configured yet. Confirm the amount/product next, or send a planning request by email below.';
+
+type FormStep = 'form' | 'confirm';
+type PayStatus = 'idle' | 'loading' | 'error';
+type EmailStatus = 'idle' | 'loading' | 'success' | 'error';
+
+type CustomTripDraft = {
+  destinations: string[];
+  otherDestination: string;
+  travelDate: string;
+  travelers: string;
+  days: string;
+  interests: string[];
+  fullName: string;
+  email: string;
+  phone: string;
+  contactPreference: string[];
+  message: string;
+  preferences: CustomPreferences;
+  requestedTour: string;
+  requestedDestination: string;
+  sourcePath: string;
+};
 
 const promiseLines = [
   'A private trip shaped around your pace, interests, and the way you like to travel',
@@ -69,8 +95,13 @@ export default function CustomTrip() {
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState('');
-  const [status, setStatus] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const [step, setStep] = useState<FormStep>('form');
+  const [draft, setDraft] = useState<CustomTripDraft | null>(null);
+  const [payStatus, setPayStatus] = useState<PayStatus>('idle');
+  const [payError, setPayError] = useState('');
+  const [emailStatus, setEmailStatus] = useState<EmailStatus>('idle');
+  const [emailError, setEmailError] = useState('');
+  const [emailMessage, setEmailMessage] = useState('');
   const [turnstileToken, setTurnstileToken] = useState('');
   const [turnstileResetSignal, setTurnstileResetSignal] = useState(0);
   const [preferenceFields, setPreferenceFields] = useState<CustomTripFormField[]>([]);
@@ -79,6 +110,7 @@ export default function CustomTrip() {
   const [configLoading, setConfigLoading] = useState(true);
   const [configError, setConfigError] = useState('');
   const [moreOpen, setMoreOpen] = useState(false);
+  const [formKey, setFormKey] = useState(0);
   const location = useLocation();
   const requestedTour = new URLSearchParams(location.search).get('tour') ?? '';
   const requestedDestination = new URLSearchParams(location.search).get('destination') ?? '';
@@ -99,15 +131,12 @@ export default function CustomTrip() {
       ...moreFields.map((field) => field.fieldKey),
       'fullName',
       'email',
-      'turnstile',
     ],
     [basicFields, moreFields],
   );
 
   useEffect(() => {
     let cancelled = false;
-    setConfigLoading(true);
-    setConfigError('');
     fetchCustomTripFormConfig()
       .then(({ fields, defaults }) => {
         if (cancelled) return;
@@ -143,7 +172,26 @@ export default function CustomTrip() {
     });
   };
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const resetAfterEmailSuccess = () => {
+    setSelectedDestinations([]);
+    setSelectedInterests([]);
+    setPreferences(preferenceDefaults);
+    setMoreOpen(false);
+    setFieldErrors({});
+    setFormError('');
+    setDraft(null);
+    setStep('form');
+    setPayStatus('idle');
+    setPayError('');
+    setEmailStatus('idle');
+    setEmailError('');
+    setEmailMessage('');
+    setTurnstileToken('');
+    setTurnstileResetSignal((value) => value + 1);
+    setFormKey((value) => value + 1);
+  };
+
+  const handleContinue = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (configLoading || configError) return;
 
@@ -174,12 +222,15 @@ export default function CustomTrip() {
     if (!fullName) nextErrors.fullName = 'Please enter your full name.';
     if (!email) nextErrors.email = 'Please enter your email.';
     else if (!isValidEmail(email)) nextErrors.email = 'Please enter a valid email address.';
-    if (!turnstileToken) nextErrors.turnstile = 'Please complete the anti-spam check.';
 
     setFieldErrors(nextErrors);
     setFormError('');
+    setPayError('');
+    setPayStatus('idle');
+    setEmailError('');
+    setEmailMessage('');
+    setEmailStatus('idle');
     if (Object.keys(nextErrors).length) {
-      setStatus('');
       const moreError = moreFields.some((field) => nextErrors[field.fieldKey]);
       if (moreError) setMoreOpen(true);
       requestAnimationFrame(() => {
@@ -188,44 +239,112 @@ export default function CustomTrip() {
       return;
     }
 
-    setSubmitting(true);
-    setStatus('');
+    setDraft({
+      destinations: [...selectedDestinations],
+      otherDestination,
+      travelDate,
+      travelers,
+      days,
+      interests: [...selectedInterests],
+      fullName,
+      email,
+      phone: getValue('phone'),
+      contactPreference,
+      message: getValue('message'),
+      preferences: { ...preferences },
+      requestedTour,
+      requestedDestination,
+      sourcePath: window.location.href,
+    });
+    setStep('confirm');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const attemptPayment = () => {
+    setPayStatus('error');
+    setPayError(PLANNING_PAYMENT_PENDING_NOTE);
+  };
+
+  const sendEmailRequest = async () => {
+    if (!draft) return;
+    if (!turnstileToken) {
+      setEmailStatus('error');
+      setEmailError('Please complete the anti-spam check.');
+      return;
+    }
+
+    setEmailStatus('loading');
+    setEmailError('');
+    setEmailMessage('');
+    setPayError('');
 
     try {
       await submitInquiry({
         type: 'custom_trip',
-        requestedTour,
-        requestedDestination,
-        destinations: selectedDestinations,
-        otherDestination,
-        travelMonth: travelDate,
-        travelers,
-        tripLength: days,
-        supportPreference: contactPreference.join(', '),
-        interests: selectedInterests,
-        name: fullName,
-        email,
-        phone: getValue('phone'),
-        message: getValue('message'),
-        customPreferences: preferences,
-        sourcePath: window.location.href,
+        requestedTour: draft.requestedTour,
+        requestedDestination: draft.requestedDestination,
+        destinations: draft.destinations,
+        otherDestination: draft.otherDestination,
+        travelMonth: draft.travelDate,
+        travelers: draft.travelers,
+        tripLength: draft.days,
+        supportPreference: draft.contactPreference.join(', '),
+        interests: draft.interests,
+        name: draft.fullName,
+        email: draft.email,
+        phone: draft.phone,
+        message: draft.message,
+        customPreferences: draft.preferences,
+        sourcePath: draft.sourcePath,
         turnstileToken,
-        honeypot: getValue('companyWebsite'),
+        honeypot: '',
       });
-      formElement.reset();
-      setSelectedDestinations([]);
-      setSelectedInterests([]);
-      setPreferences(preferenceDefaults);
-      setMoreOpen(false);
-      setFieldErrors({});
+      setEmailStatus('success');
+      setEmailMessage('Thank you. We received your inquiry and will reply within 24 hours.');
+      setTurnstileToken('');
       setTurnstileResetSignal((value) => value + 1);
-      setStatus('Thank you. We received your inquiry and will reply within 24 hours.');
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : 'We could not submit your inquiry. Please try again.');
-    } finally {
-      setSubmitting(false);
+      setEmailStatus('error');
+      setEmailError(
+        error instanceof Error ? error.message : 'We could not submit your inquiry. Please try again.',
+      );
+      setTurnstileToken('');
+      setTurnstileResetSignal((value) => value + 1);
     }
   };
+
+  const paying = payStatus === 'loading';
+  const sendingEmail = emailStatus === 'loading';
+  const emailDone = emailStatus === 'success';
+
+  const reviewRows = draft
+    ? [
+        ...(draft.requestedTour
+          ? [{ label: 'Route inquiry', value: draft.requestedTour }]
+          : []),
+        ...(draft.requestedDestination
+          ? [{ label: 'Destination inquiry', value: draft.requestedDestination }]
+          : []),
+        {
+          label: 'Destinations',
+          value:
+            [...draft.destinations, draft.otherDestination].filter(Boolean).join(', ') || '—',
+        },
+        ...(draft.travelDate ? [{ label: 'Estimated travel date', value: draft.travelDate }] : []),
+        ...(draft.travelers ? [{ label: 'Travelers', value: draft.travelers }] : []),
+        ...(draft.days ? [{ label: 'Trip length', value: draft.days }] : []),
+        ...(draft.interests.length
+          ? [{ label: 'Interests', value: draft.interests.join(', ') }]
+          : []),
+        { label: 'Name', value: draft.fullName },
+        { label: 'Email', value: draft.email },
+        ...(draft.phone ? [{ label: 'Phone', value: draft.phone }] : []),
+        ...(draft.contactPreference.length
+          ? [{ label: 'Contact preference', value: draft.contactPreference.join(', ') }]
+          : []),
+        ...(draft.message ? [{ label: 'Notes', value: draft.message }] : []),
+      ]
+    : [];
 
   return (
     <div className="bg-white text-[#122332]">
@@ -263,29 +382,15 @@ export default function CustomTrip() {
             ))}
           </ul>
 
-          <form
-            onSubmit={handleSubmit}
-            noValidate
-            className="mx-auto mt-14 max-w-[930px] overflow-hidden bg-white shadow-[0_1px_18px_rgba(0,0,0,0.04)]"
-          >
-            <input
-              type="text"
-              name="companyWebsite"
-              tabIndex={-1}
-              autoComplete="off"
-              className="hidden"
-              aria-hidden="true"
-            />
-
+          <div className="mx-auto mt-14 max-w-[930px] overflow-hidden bg-white shadow-[0_1px_18px_rgba(0,0,0,0.04)]">
             <div className="relative bg-[#294f5b] px-8 pb-24 pt-16 text-center text-white md:px-14">
               <h2 className="font-serif text-[31px] font-semibold leading-tight text-[#d2aa63] md:text-[40px]">
                 Syncing Travel — Your China Trip Plan
               </h2>
               <p className="mx-auto mt-7 max-w-[760px] text-[17px] font-semibold leading-9 text-white">
-                Tell us your trip basics. Share your dates, group size, places you’d like to
-                visit, and any special preferences. If you’re not sure yet, rough ideas are
-                perfectly fine. We’ll reply within 24 hours with realistic route ideas and next
-                steps.
+                {step === 'confirm'
+                  ? 'Review your plan, then continue through the shared payment entry. Until the payable product is set, you can still email this request to a planner.'
+                  : 'Tell us your trip basics. Share your dates, group size, places you’d like to visit, and any special preferences. If you’re not sure yet, rough ideas are perfectly fine. We’ll reply within 24 hours with realistic route ideas and next steps.'}
               </p>
               <div
                 className="absolute inset-x-0 bottom-[-1px] h-16 bg-white"
@@ -295,7 +400,17 @@ export default function CustomTrip() {
               />
             </div>
 
-            <div className="px-6 pb-14 pt-16 md:px-8">
+            <div className={cn('px-6 pb-14 pt-16 md:px-8', step !== 'form' && 'hidden')}>
+              <form key={formKey} onSubmit={handleContinue} noValidate>
+            <input
+              type="text"
+              name="companyWebsite"
+              tabIndex={-1}
+              autoComplete="off"
+              className="hidden"
+              aria-hidden="true"
+            />
+
               {(requestedTour || requestedDestination) && (
                 <div className="mb-10 rounded-[3px] border border-[#e2e7ec] bg-[#f8fafc] px-5 py-4 text-[15px] leading-7 text-[#63707a]">
                   {requestedTour && (
@@ -496,47 +611,140 @@ export default function CustomTrip() {
                   />
                 </label>
 
-                <div
-                  data-field-error="turnstile"
-                  data-error-scroll-only
-                  aria-invalid={Boolean(fieldErrors.turnstile)}
-                  aria-describedby={fieldErrors.turnstile ? fieldErrorId('turnstile') : undefined}
-                  className={cn(
-                    fieldErrors.turnstile && 'rounded-[6px] border border-red-400 bg-red-50/40 p-4',
-                  )}
-                >
-                  <TurnstileWidget
-                    onTokenChange={setTurnstileToken}
-                    resetSignal={turnstileResetSignal}
-                  />
-                  {fieldErrors.turnstile && (
-                    <p id={fieldErrorId('turnstile')} className="mt-2 text-[14px] text-red-600" role="alert">
-                      {fieldErrors.turnstile}
-                    </p>
-                  )}
-                </div>
-
                 {formError && (
                   <div className="rounded-[6px] border border-red-200 bg-red-50 px-5 py-4 text-[15px] leading-7 text-red-700" role="alert">
                     <p>{formError}</p>
                   </div>
                 )}
-                {status && (
-                  <p className="rounded-[6px] border border-[#CDE7E1] bg-[#F0FAF7] px-5 py-4 text-[15px] text-[#1D6F62]">
-                    {status}
-                  </p>
-                )}
 
                 <button
                   type="submit"
-                  disabled={submitting || configLoading || Boolean(configError)}
+                  disabled={configLoading || Boolean(configError)}
                   className="min-h-[58px] w-full rounded-[4px] bg-[#294f5b] px-8 text-[18px] font-bold text-white transition-colors hover:bg-[#1f3f49] disabled:cursor-not-allowed disabled:opacity-65"
                 >
-                  {submitting ? 'Sending...' : 'Submit My Trip Plan'}
+                  Continue to payment
                 </button>
               </div>
+              </form>
             </div>
-          </form>
+
+            {step === 'confirm' && draft ? (
+              <div className="space-y-8 px-6 pb-14 pt-16 md:px-8">
+                <div>
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[#718087]">
+                    Custom trip planning
+                  </p>
+                  <h3 className="mt-2 font-serif text-[28px] font-medium text-[#122332]">
+                    Review & payment entry
+                  </h3>
+                  <p className="mt-3 text-[15px] leading-7 text-[#63707a]">
+                    This is the shared payment entry for private and custom trips. The payable amount
+                    will be wired once the product is set.
+                  </p>
+                </div>
+
+                <div className="rounded-[8px] border border-[#dce5ee] bg-[#f8fafc] p-5">
+                  <h4 className="text-[15px] font-bold text-[#122332]">Request details</h4>
+                  <dl className="mt-4 space-y-3">
+                    {reviewRows.map((row) => (
+                      <div
+                        key={row.label}
+                        className="flex flex-col gap-1 border-b border-[#e8eef3] pb-3 last:border-0 last:pb-0 sm:flex-row sm:justify-between sm:gap-6"
+                      >
+                        <dt className="shrink-0 text-[14px] text-[#63707a]">{row.label}</dt>
+                        <dd className="text-[14px] font-semibold text-[#122332] sm:text-right">{row.value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+
+                <div className="rounded-[8px] border border-[#dce5ee] bg-[#f8fafc] p-5">
+                  <h4 className="text-[15px] font-bold text-[#122332]">Payment</h4>
+                  <div className="mt-4 flex items-center justify-between text-[15px] font-semibold text-[#122332]">
+                    <span>Total due today</span>
+                    <strong>To be confirmed</strong>
+                  </div>
+                  <div className="mt-4 flex gap-3 rounded-[6px] border border-[#dce5ee] bg-white px-4 py-3 text-[13px] leading-6 text-[#63707a]">
+                    <ShieldCheck className="mt-0.5 shrink-0 text-[#2a9f8b]" size={18} aria-hidden="true" />
+                    <p>{hostedCheckoutTrustCopy()}</p>
+                  </div>
+                </div>
+
+                {(payError || emailError) && (
+                  <div
+                    className="rounded-[6px] border border-red-200 bg-red-50 px-5 py-4 text-[15px] leading-7 text-red-700"
+                    role="alert"
+                  >
+                    <p>{payError || emailError}</p>
+                  </div>
+                )}
+                {emailMessage && (
+                  <p className="rounded-[6px] border border-[#CDE7E1] bg-[#F0FAF7] px-5 py-4 text-[15px] text-[#1D6F62]">
+                    {emailMessage}
+                  </p>
+                )}
+
+                {!emailDone ? (
+                  <>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStep('form');
+                          setPayError('');
+                          setPayStatus('idle');
+                          setEmailError('');
+                          setEmailStatus('idle');
+                        }}
+                        disabled={paying || sendingEmail}
+                        className="min-h-[58px] w-full rounded-[4px] border border-[#B7CBC7] px-8 text-[18px] font-bold text-[#002A3A] disabled:cursor-not-allowed disabled:opacity-65"
+                      >
+                        Back
+                      </button>
+                      <button
+                        type="button"
+                        onClick={attemptPayment}
+                        disabled={paying || sendingEmail}
+                        className="min-h-[58px] w-full rounded-[4px] bg-[#ef4f43] px-8 text-[18px] font-bold text-white transition-colors hover:bg-[#d84338] disabled:cursor-not-allowed disabled:opacity-65"
+                      >
+                        {paying ? openingCheckoutCopy() : 'Pay full amount'}
+                      </button>
+                    </div>
+
+                    <div className="space-y-4 border-t border-[#e2e7ec] pt-8">
+                      <h4 className="text-[17px] font-bold text-[#122332]">Or send a planning request</h4>
+                      <p className="text-[14px] leading-7 text-[#63707a]">
+                        Until the payment product is configured, you can still email this request to a
+                        planner.
+                      </p>
+                      <div data-field-error="turnstile" data-error-scroll-only>
+                        <TurnstileWidget
+                          onTokenChange={setTurnstileToken}
+                          resetSignal={turnstileResetSignal}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void sendEmailRequest()}
+                        disabled={paying || sendingEmail}
+                        className="min-h-[58px] w-full rounded-[4px] border border-[#294f5b] bg-white px-8 text-[18px] font-bold text-[#294f5b] transition-colors hover:bg-[#f4f8f9] disabled:cursor-not-allowed disabled:opacity-65"
+                      >
+                        {sendingEmail ? 'Sending request...' : 'Send request by email'}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={resetAfterEmailSuccess}
+                    className="min-h-[58px] w-full rounded-[4px] bg-[#294f5b] px-8 text-[18px] font-bold text-white transition-colors hover:bg-[#1f3f49]"
+                  >
+                    Plan another trip
+                  </button>
+                )}
+              </div>
+            ) : null}
+          </div>
         </div>
       </section>
 

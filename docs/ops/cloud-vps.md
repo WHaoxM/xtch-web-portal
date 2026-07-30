@@ -150,6 +150,17 @@ sudo systemctl reload caddy
 
 ## 日常更新
 
+推荐用门禁脚本（与 CI 默认一致：lint + migrate + restart）：
+
+```bash
+cd /opt/xtch-web-portal
+bash deploy/cloud-vps/deploy-from-main.sh --with-lint --with-migrate
+# 只构建不重启：
+bash deploy/cloud-vps/deploy-from-main.sh --with-lint --with-migrate --no-restart
+```
+
+手工等价步骤：
+
 ```bash
 cd /opt/xtch-web-portal
 git pull
@@ -159,6 +170,41 @@ npm run db:migrate:cloud-vps   # 若有新 migration
 npm run build:cloud-vps
 cd .. && bash deploy/cloud-vps/grant-xtch-read-access.sh
 sudo systemctl restart xtch-app
+```
+
+## 自动发布（main → 校验 → migrate → 重建重启）
+
+目标：合并进远程 **`main`** 后，GitHub Actions 自动 SSH 到 cloud-vps：拉取、生产门禁、**自动 migrate**、`build:cloud-vps`、重启 `xtch-app`。
+
+| 阶段 | 做什么 |
+|------|--------|
+| 触发 | `push` 到 `main`，或 Actions 里手工 `workflow_dispatch` |
+| 拉代码 | `git fetch` + `ff-only` 到 `main`；脏工作树直接失败 |
+| 校验 | `npm ci`；`check-target-env cloud-vps`；默认 lint |
+| 适配 | **默认** `db:migrate:cloud-vps` |
+| 重建 | `build:cloud-vps`；先前 `dist/cloud-vps` 备份到 `/var/lib/xtch/dist-backup/` |
+| 发布 | `grant-xtch-read-access` + `systemctl restart`；健康检查失败则还原 dist 再重启 |
+
+仓库文件：
+
+- 服务器脚本：[`deploy/cloud-vps/deploy-from-main.sh`](../../deploy/cloud-vps/deploy-from-main.sh)
+- Workflow：[`.github/workflows/deploy-cloud-vps.yml`](../../.github/workflows/deploy-cloud-vps.yml)
+
+### 上线前必配（否则 push 会失败）
+
+1. GitHub → Settings → Environments → 建 **`production`**（建议加 required reviewers）。
+2. 在该 Environment（或 repo secrets）配置：
+   - `VPS_HOST` — 云主机 IP/域名  
+   - `VPS_USER` — 可写 `/opt/xtch-web-portal` 的 deploy 用户  
+   - `VPS_SSH_KEY` — 该用户的私钥  
+   - 可选 `VPS_SSH_PORT`（默认 22）、`DEPLOY_EXTRA_FLAGS`
+3. VPS：deploy 用户对 `systemctl restart xtch-app` 与 `grant-xtch-read-access.sh` 有 sudo；仓库干净、能 `git fetch` origin。
+4. 建议先 **Actions → Deploy cloud-vps → Run workflow** 跑通一次，再依赖 push。
+
+手工等价（与 push 默认门禁一致）：
+
+```bash
+bash deploy/cloud-vps/deploy-from-main.sh --with-lint --with-migrate
 ```
 
 ## 旧 bootstrap 迁移（home 曾指向仓库）

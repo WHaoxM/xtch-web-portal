@@ -14,8 +14,8 @@
  *
  * Run once with: npx tsx scripts/backfill-content.ts
  */
-import { ensureContentTables } from '../api/lib/contentSchema';
-import { sql } from '../api/lib/db';
+import { ensureContentTables } from '../api/domains/catalog/contentSchema';
+import { sql } from '../api/platform/db';
 import { loadTargetEnv } from '../../scripts/env/targetEnv';
 
 loadTargetEnv('local', { override: false });

@@ -91,9 +91,10 @@ Special cases should route to inquiry or manual support.
 4. Backend validates departure, price, status, and available seats.
 5. Backend creates an order in `pending_payment`.
 6. Backend creates an inventory hold with an expiry.
-7. Backend creates a Stripe Checkout Session from the order price snapshot.
-8. Traveler pays through Stripe Checkout.
-9. Stripe webhook confirms payment.
+7. Backend creates a hosted checkout session (Payoneer by default; Stripe when
+   `PAYMENT_PROVIDER=stripe`) from the order price snapshot.
+8. Traveler pays through the provider hosted checkout.
+9. Provider webhook confirms payment.
 10. Backend moves the order to `confirmed`.
 11. Backend sends a Syncing Travel booking confirmation email.
 12. Success page reads local order state and displays the durable order page.
@@ -211,30 +212,35 @@ Traveler detail deadlines:
 
 Sensitive traveler details must not be included in ordinary email bodies.
 
-## Payment and Stripe Rules
+## Payment Provider Rules
 
-Stripe Checkout requirements:
+Traveler-facing provider (default):
 
-- Use hosted Stripe Checkout.
+- Use hosted **Payoneer Checkout** for fixed-departure traveler payments
+  (`PAYMENT_PROVIDER=payoneer`, `VITE_PAYMENT_PROVIDER=payoneer`).
+- Stripe Checkout code and env remain in the repo as a retained fallback
+  (`PAYMENT_PROVIDER=stripe`). Do not delete Stripe modules.
 - Use USD only in version 1.
 - Force English locale for the first version.
 - Use Syncing Travel customer-facing merchant and product naming.
-- The total charged by Stripe must match the checkout summary.
+- The total charged by the provider must match the checkout summary.
 - Do not add checkout payment processing fees on top of the displayed package
-  price.
-- Payment button area must state that card payment is securely processed by
-  Stripe and Syncing Travel does not store card details.
+  price in the portal summary. Fee payer choice (buyer vs seller), when offered,
+  stays on the Payoneer hosted page.
+- Payment button area must state that card payment is securely processed by the
+  active provider and Syncing Travel does not store card details.
 
-Stripe webhook requirements:
+Webhook requirements:
 
-- Use Stripe webhook events as the payment source of truth.
-- Process webhook events idempotently by storing Stripe event IDs.
+- Use provider webhook / notification events as the payment source of truth
+  (`/api/payoneer-webhook` or `/api/stripe-webhook`).
+- Process webhook events idempotently by storing provider event IDs.
 - Do not confirm orders from the frontend success URL alone.
 - Do not duplicate inventory deduction or confirmation emails on repeated
   webhook delivery.
 
-The success page reads local order state. Stripe `session_id` is auxiliary, not
-the primary order system.
+The success page reads local order state. Provider `session_id` / list id is
+auxiliary, not the primary order system.
 
 ## Refund and Cancellation Rules
 

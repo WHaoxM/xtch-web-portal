@@ -61,6 +61,8 @@ export default function Destinations() {
                       src={destination.image}
                       alt={destination.name}
                       className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.04]"
+                      loading={index < 3 ? 'eager' : 'lazy'}
+                      decoding="async"
                     />
                   </div>
                   <div className="absolute inset-0 bg-gradient-to-t from-black via-black/22 to-transparent" />

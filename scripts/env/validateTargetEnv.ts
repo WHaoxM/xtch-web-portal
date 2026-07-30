@@ -206,6 +206,38 @@ export function validateTargetEnv(
     }
   }
 
+  const paymentProvider = (trim(env, 'PAYMENT_PROVIDER') || 'payoneer').toLowerCase();
+  if (paymentProvider !== 'payoneer' && paymentProvider !== 'stripe') {
+    pushIssue(issues, 'PAYMENT_PROVIDER', 'must be "payoneer" or "stripe".');
+  }
+
+  const payoneerStore = trim(env, 'PAYONEER_STORE_CODE');
+  const payoneerToken = trim(env, 'PAYONEER_TOKEN');
+  const payoneerOn = isCapabilityEnabled(payoneerStore) || isCapabilityEnabled(payoneerToken);
+  if (payoneerOn) {
+    if (!payoneerStore) {
+      pushIssue(issues, 'PAYONEER_STORE_CODE', 'required when Payoneer is enabled (PAYONEER_TOKEN is set).');
+    }
+    if (!payoneerToken) {
+      pushIssue(issues, 'PAYONEER_TOKEN', 'required when Payoneer is enabled (PAYONEER_STORE_CODE is set).');
+    }
+  }
+
+  if (paymentProvider === 'payoneer' && !payoneerOn) {
+    pushIssue(
+      issues,
+      'PAYONEER_STORE_CODE|PAYONEER_TOKEN',
+      'required when PAYMENT_PROVIDER=payoneer on a public deploy target.',
+    );
+  }
+  if (paymentProvider === 'stripe' && !stripeOn) {
+    pushIssue(
+      issues,
+      'STRIPE_SECRET_KEY|STRIPE_WEBHOOK_SECRET',
+      'required when PAYMENT_PROVIDER=stripe on a public deploy target.',
+    );
+  }
+
   const turnstileSite = trim(env, 'VITE_TURNSTILE_SITE_KEY');
   const turnstileSecret = trim(env, 'TURNSTILE_SECRET_KEY');
   if (isCapabilityEnabled(turnstileSite) !== isCapabilityEnabled(turnstileSecret)) {
@@ -301,7 +333,9 @@ export function describeProdEnvRequirements(): {
       'ADMIN_TECH_EMAIL_ALLOWLIST and/or ADMIN_OPS_EMAIL_ALLOWLIST (usable emails)',
     ],
     conditional: [
-      'STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET (both required if either set)',
+      'PAYMENT_PROVIDER=payoneer|stripe (default payoneer)',
+      'PAYONEER_STORE_CODE + PAYONEER_TOKEN when PAYMENT_PROVIDER=payoneer',
+      'STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET when PAYMENT_PROVIDER=stripe (or if either Stripe key is set)',
       'VITE_TURNSTILE_SITE_KEY + TURNSTILE_SECRET_KEY (both or neither)',
       'RESEND_API_KEY when INQUIRY_EMAIL_MODE or BOOKING_EMAIL_MODE is resend',
       'BOOKING_FROM_EMAIL (or INQUIRY_FROM_EMAIL fallback) when BOOKING_EMAIL_MODE is resend',

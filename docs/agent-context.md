@@ -8,12 +8,50 @@
 - 实际应用目录是 `app/`，npm 命令在 `app/` 下执行。
 - 路由入口是 `app/src/main.tsx`，使用 `BrowserRouter`（旧 `#/…` 开机迁移）。
 - 页面路由集中在 `app/src/App.tsx`。
-- 页面在 `app/src/pages/`，共享组件在 `app/src/components/`。
-- UI 基础组件在 `app/src/components/ui/`。
+- 页面在 `app/src/pages/`，共享组件在 `app/src/components/`（迁移期大量 shim 指向新位置）。
+- UI 基础组件 canonical 路径为 `app/src/shared/ui/`；`app/src/components/ui/` 为兼容 shim。
+- 领域客户端在 `app/src/domains/<domain>/`；`app/src/lib/` 为兼容 shim。
+- 展示壳：`app/src/shells/{desktop,china-trips-mobile,admin}/`。
+- 共享工具：`app/src/shared/lib/`、`app/src/shared/seo/`。
 - 样式主要是 Tailwind CSS + `app/src/index.css`。
 - `@/*` 指向 `app/src/*`。
 - 本地开发端口默认是 `3000`（Vite），见 `app/vite.config.ts`。生产 `deploy:serve` 默认 `3080`（与开发分开）。
 - `npm run deploy:serve` / `selfhost`：读 `env/win11-home`（或 `--target`），默认监听 `:3080`。
+
+## 架构分层（Accepted）
+
+详见 `docs/adr/0005-domain-module-layout.md`。
+
+- **一个后端进程**服务桌面站、China Trips 移动壳、未来 APP；不按微服务拆支付。
+- 后端领域模块落在 `app/api/domains/<domain>/`；HTTP 入口文件保持薄、公开路径不变。
+- Phase 1：`domains/booking/`（订单、库存、checkout、Stripe/Payoneer providers、webhook）。
+- Phase 2：`domains/catalog|inquiry|identity|media` + `platform/`；`app/api/lib/*` shim。
+- Phase 3（前端）：`app/src/domains/*`、`app/src/shells/*`、`app/src/shared/*`；`app/src/lib/*` 与 `@/components/ChinaTripsMobile` 等为 shim。
+- Phase 2.6：domain 内单夹 ≤8 源文件（测试/barrel 不计）；booking 分 `orders|inventory|checkout|integrity`；catalog HTTP 分 `public|admin`；前端 catalog 分 `clients|drafts|data|copy`。
+- Phase 2.7：功能可见命名 — 支付在 `booking/payment/`（非独立域）；见下方功能地图。
+- 前端壳层不得实现支付确认或库存扣减。
+- 支付适配器属于 **booking**，不要单独做成与订单脱节的 `payment` 服务孤岛。
+
+## 功能地图（找代码从这里进）
+
+| 功能 | 后端 | 前端 |
+|------|------|------|
+| 支付（Payoneer/Stripe、选 provider、webhook 事件） | `app/api/domains/booking/payment/` | `app/src/domains/booking/payment/` |
+| 结账会话（创建 checkout、payload、限流） | `…/booking/checkout/` + `…/booking/http/checkoutSession.ts` | `…/booking/checkout/` |
+| 订单（下单、查询、认领、Admin 订单） | `…/booking/orders/` + `…/booking/http/` | `…/booking/orders/` |
+| 库存/班期座位 | `…/booking/inventory/` | （班期列表多走 catalog clients） |
+| 支付完整性规则 | `…/booking/integrity/` | — |
+| 班期政策/旅客姓名工具 | — | `…/booking/policy/` |
+| 路线/目的地/班期内容 | `app/api/domains/catalog/`（`http/public`、`http/admin`） | `app/src/domains/catalog/{clients,drafts,data,copy}/` |
+| 询盘/定制游线索 | `app/api/domains/inquiry/`（`admin/`、`http/`） | `app/src/domains/inquiry/{clients,copy}/` |
+| 登录/Admin 鉴权 | `app/api/domains/identity/`（`admin/`、`traveler/`、`http/`） | `app/src/domains/identity/{admin,traveler}/` |
+| 素材上传 | `app/api/domains/media/`（`http/` + `s3`） | `app/src/domains/media/`（若有） |
+| DB/邮件/审计 | `app/api/platform/` | — |
+| 页面壳 | — | `app/src/shells/{desktop,china-trips-mobile,admin}/` |
+| 薄 HTTP 入口（路径稳定） | `app/api/*.ts`；`app/api/admin/{auth,booking,catalog,inquiry,media}/*.ts`（公开 URL 仍 `/api/admin/…`，见 `scripts/localApiRoutes.ts`） | — |
+| 兼容 shim（勿堆新业务） | `app/api/lib/*`（仅 re-export；新代码直连 domains/platform） | `app/src/lib/*` |
+
+顶层 `app/api/checkout-session.ts`、`payoneer-webhook.ts` 等只是 re-export，真实逻辑在 `domains/booking/`。
 
 ## 必读入口
 

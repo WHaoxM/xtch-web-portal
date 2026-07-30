@@ -2,7 +2,7 @@ import { loadTargetEnv } from '../../scripts/env/targetEnv';
 
 loadTargetEnv('local', { override: false });
 
-import { sql } from '../api/lib/db.ts';
+import { sql } from '../api/platform/db.ts';
 
 const EMAIL = 'emonakhatun64@gmail.com';
 

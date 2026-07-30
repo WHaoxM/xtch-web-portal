@@ -9,6 +9,16 @@ export default defineConfig([
   globalIgnores(['dist']),
   {
     files: ['**/*.{ts,tsx}'],
+    ignores: [
+      'src/components/ui/**',
+      'src/components/admin/**',
+      'src/components/mobile/**',
+      'src/lib/**',
+      'src/pages/Admin.tsx',
+      'src/components/ChinaTripsMobile.tsx',
+      'src/components/chinaTripsMobileMotion.ts',
+      'src/components/{Navbar,Footer,Seo,ScrollToTop}.tsx',
+    ],
     extends: [
       js.configs.recommended,
       tseslint.configs.recommended,

@@ -2,7 +2,7 @@ import { loadTargetEnv } from '../../scripts/env/targetEnv';
 
 loadTargetEnv('local', { override: false });
 
-import { sql } from '../api/lib/db.ts';
+import { sql } from '../api/platform/db.ts';
 
 const REAL_USER_ID = 'ac510925-173d-45e1-bb98-a7ba5e682b01';
 const TEST_USER_ID = 'test-user-id-emonakhatun';

@@ -1,6 +1,6 @@
 /**
- * Scan local image/video trees â†’ sha256 dedupe â†’ PutObject â†’ upsert media_assets
- * â†’ write media-map.json under data/content-backups/<ts>/.
+ * Scan local image/video trees â†?sha256 dedupe â†?PutObject â†?upsert media_assets
+ * â†?write media-map.json under data/content-backups/<ts>/.
  *
  * From app/:
  *   npx tsx scripts/migrate-local-media-to-minio.ts
@@ -11,14 +11,14 @@
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { ensureContentTables } from '../api/lib/contentSchema';
-import { sql } from '../api/lib/db';
+import { ensureContentTables } from '../api/domains/catalog/contentSchema';
+import { sql } from '../api/platform/db';
 import {
   buildObjectKey,
   getS3Config,
   putObject,
   publicUrlForKey,
-} from '../api/lib/s3';
+} from '../api/domains/media/s3';
 import { argValue, hasFlag, loadEnvLocal } from './lib/envLocal';
 import {
   defaultScanRoots,

@@ -1,5 +1,5 @@
-import { ensureBookingTables } from '../api/lib/bookingSchema';
-import { sql } from '../api/lib/db';
+import { ensureBookingTables } from '../api/domains/booking/bookingSchema';
+import { sql } from '../api/platform/db';
 import { loadTargetEnv } from '../../scripts/env/targetEnv';
 
 loadTargetEnv('local', { override: false });

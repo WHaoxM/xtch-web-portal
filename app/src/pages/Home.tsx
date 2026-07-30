@@ -584,7 +584,7 @@ function TravelerStoryCarousel({ forcePaused }: { forcePaused: boolean }) {
                 <h3>{story.title}</h3>
                 <div className="real-story-byline">
                   <span className="real-story-avatar">
-                    <img src={story.avatar} alt="" />
+                    <img src={story.avatar} alt="" loading="lazy" decoding="async" />
                   </span>
                   <span>By {story.author}</span>
                   <i />
@@ -616,13 +616,15 @@ function TravelerStoryCarousel({ forcePaused }: { forcePaused: boolean }) {
                   src={story.mainImage}
                   alt={story.location}
                   className="real-story-main-image"
+                  loading="lazy"
+                  decoding="async"
                 />
                 <div className="real-story-location">
                   <MapPin size={20} />
                   {story.location}
                 </div>
                 <figure className="real-story-polaroid">
-                  <img src={story.polaroidImage} alt={story.polaroidCaption} />
+                  <img src={story.polaroidImage} alt={story.polaroidCaption} loading="lazy" decoding="async" />
                   <figcaption>{story.polaroidCaption}</figcaption>
                 </figure>
               </div>
@@ -725,7 +727,7 @@ function RealMomentsSection() {
                   setLightbox({ source: 'iconic', index: index % iconicMomentCards.length })
                 }
               >
-                <img src={card.image} alt="" />
+                <img src={card.image} alt="" loading="lazy" decoding="async" />
                 <div className="real-place-card-shade" />
                 <div className="real-place-card-caption">
                   <MapPin size={24} />
@@ -763,7 +765,7 @@ function RealMomentsSection() {
                   setLightbox({ source: 'traveler', index: index % travelerMomentCards.length })
                 }
               >
-                <img src={card.image} alt="" />
+                <img src={card.image} alt="" loading="lazy" decoding="async" />
               </button>
             ))}
           </div>
@@ -923,6 +925,8 @@ export default function Home() {
             src="/images/recognition-media-logos.png"
             alt="CNN Travel, BBC Travel, USA Today, Outdoor, Lonely Planet, Tripadvisor, World Travel Awards, and ASTA"
             className="recognition-logo-strip"
+            loading="lazy"
+            decoding="async"
           />
         </div>
       </section>
@@ -946,7 +950,7 @@ export default function Home() {
                 key={journey.title}
                 className={`curated-card ${journey.wide ? 'curated-card-wide' : ''}`}
               >
-                <img src={journey.image} alt={journey.title} />
+                <img src={journey.image} alt={journey.title} loading="lazy" decoding="async" />
                 <div className="curated-card-shade" />
                 <div className="curated-card-top">
                   {journey.featured ? (
@@ -997,7 +1001,7 @@ export default function Home() {
             ))}
 
             <Link to="/custom-trip" className="curated-banner">
-              <img src="/images/route-guilin-bamboo-raft-01.jpg" alt="Tailor-made private China tours" />
+              <img src="/images/route-guilin-bamboo-raft-01.jpg" alt="Tailor-made private China tours" loading="lazy" decoding="async" />
               <div className="curated-card-shade" />
               <div className="curated-banner-content">
                 <span className="curated-banner-icon">
@@ -1015,7 +1019,7 @@ export default function Home() {
             </Link>
 
             <Link to="/china-trips" className="curated-banner">
-              <img src="/images/ref-tour-zhangjiajie.jpg" alt="More China tour routes" />
+              <img src="/images/ref-tour-zhangjiajie.jpg" alt="More China tour routes" loading="lazy" decoding="async" />
               <div className="curated-card-shade" />
               <div className="curated-banner-content">
                 <span className="curated-banner-icon">
@@ -1056,6 +1060,8 @@ export default function Home() {
           src="/images/route-beijing-greatwall-01.png"
           alt="Great Wall private China trip"
           className="home-final-cta-image"
+          loading="lazy"
+          decoding="async"
         />
         <div className="home-final-cta-shade" />
         <div className="home-final-cta-inner">

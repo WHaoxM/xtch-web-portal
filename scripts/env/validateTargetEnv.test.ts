@@ -74,6 +74,10 @@ function validProdEnv(overrides: Record<string, string> = {}) {
     ADMIN_TECH_EMAIL_ALLOWLIST: 'tech-operator@syncingtravel.com',
     INQUIRY_EMAIL_MODE: 'off',
     BOOKING_EMAIL_MODE: 'off',
+    PAYMENT_PROVIDER: 'payoneer',
+    PAYONEER_STORE_CODE: 'store_test',
+    PAYONEER_TOKEN: 'token_test_value',
+    VITE_PAYMENT_PROVIDER: 'payoneer',
     ...overrides,
   };
 }
@@ -145,6 +149,34 @@ test('rejects half-configured Stripe', () => {
   const result = validateTargetEnv('win11-home', env);
   assert.equal(result.ok, false);
   assert.ok(result.issues.some((issue) => issue.variable === 'STRIPE_WEBHOOK_SECRET'));
+});
+
+test('rejects half-configured Payoneer', () => {
+  const env = validProdEnv({ PAYONEER_TOKEN: '' });
+  applyEnv(env);
+  const result = validateTargetEnv('win11-home', env);
+  assert.equal(result.ok, false);
+  assert.ok(
+    result.issues.some(
+      (issue) =>
+        issue.variable === 'PAYONEER_TOKEN' ||
+        issue.variable === 'PAYONEER_STORE_CODE|PAYONEER_TOKEN',
+    ),
+  );
+});
+
+test('rejects stripe provider without Stripe keys', () => {
+  const env = validProdEnv({
+    PAYMENT_PROVIDER: 'stripe',
+    PAYONEER_STORE_CODE: '',
+    PAYONEER_TOKEN: '',
+  });
+  applyEnv(env);
+  const result = validateTargetEnv('cloud-vps', env);
+  assert.equal(result.ok, false);
+  assert.ok(
+    result.issues.some((issue) => issue.variable === 'STRIPE_SECRET_KEY|STRIPE_WEBHOOK_SECRET'),
+  );
 });
 
 test('rejects half-configured Turnstile', () => {
