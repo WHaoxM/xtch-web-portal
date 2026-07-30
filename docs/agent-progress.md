@@ -2,6 +2,15 @@
 
 ## Status
 
+**in-progress（fix-deploy-playwright）** — CD `build:cloud-vps` 失败因 prerender 缺 Playwright Chromium；脚本在 build 前加 `npx playwright install chromium`。待合并 main 并重跑 Actions。
+
+### Progress note（fix-deploy-playwright，2026-07-30）
+
+- 依据：Actions run `30533927055` — `browserType.launch: Executable doesn't exist`（ms-playwright chromium）。
+- 已改：`deploy/cloud-vps/deploy-from-main.sh`；ops/gotchas 一行。
+- 未验：合并后真机 CD 绿；首次装浏览器可能较慢。
+- 下一步：PR → main → 重跑 Deploy cloud-vps。
+
 **done（定制/私定支付壳）** — 移动端 Custom + route-private：表单→确认页→Pay full amount（金额待定）；邮件询盘后备。`lint`/`tsc` 绿。
 
 ### Progress note（定制/私定支付壳，2026-07-29）
