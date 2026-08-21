@@ -25,6 +25,8 @@
   "include": [
     "vite.config.ts",
     "scripts/localApiRoutes.ts",
+    "scripts/messagingSocket.ts",
+    "scripts/messagingOutbox.ts",
     "scripts/requestBodyLimits.ts",
     "scripts/httpRoutePolicy.ts",
     "../scripts/env/targetEnv.ts",

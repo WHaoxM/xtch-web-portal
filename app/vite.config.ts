@@ -4,7 +4,7 @@ import type { IncomingMessage } from 'node:http'
 import react from "@vitejs/plugin-react"
 import { defineConfig, loadEnv, type Plugin } from "vite"
 import { inspectAttr } from 'kimi-plugin-inspect-react'
-import { localApiRoutes, rawBodyRoutes } from './scripts/localApiRoutes'
+import { rawBodyRoutes, resolveLocalApiRoute } from './scripts/localApiRoutes'
 import { loadTargetEnv, normalizeTarget } from '../scripts/env/targetEnv'
 import { assertTargetEnvValid, isProdDeployTarget } from '../scripts/env/validateTargetEnv'
 
@@ -12,6 +12,7 @@ type VercelResponseLike = {
   status: (code: number) => VercelResponseLike;
   json: (body: unknown) => void;
   send: (body: string) => void;
+  setHeader: (name: string, value: string | string[]) => VercelResponseLike;
 };
 
 function localApiPlugin(): Plugin {
@@ -20,7 +21,7 @@ function localApiPlugin(): Plugin {
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
         const apiPath = req.url?.split('?')[0] ?? '';
-        const modulePath = localApiRoutes[apiPath];
+        const modulePath = resolveLocalApiRoute(apiPath);
 
         if (!modulePath) {
           next();
@@ -43,6 +44,10 @@ function localApiPlugin(): Plugin {
             send(payload) {
               res.setHeader('content-type', 'text/plain; charset=utf-8');
               res.end(payload);
+            },
+            setHeader(name, value) {
+              res.setHeader(name, value);
+              return response;
             },
           };
 

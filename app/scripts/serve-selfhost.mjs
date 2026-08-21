@@ -1,5 +1,5 @@
 /**
- * Production-ish deploy serve: static dist + Vercel-like /api handlers + /s3 â†?MinIO.
+ * Production-ish deploy serve: static dist + Vercel-like /api handlers + /s3 -> MinIO.
  * Default listen 0.0.0.0:3080 (LAN/public IP reachable); set SELFHOST_HOST=127.0.0.1 for loopback-only.
  * Port 3080 keeps deploy:serve off Vite's fixed :3000. Override with SELFHOST_PORT if needed.
  * Put Caddy in front for domain HTTPS on 80/443.
@@ -7,7 +7,7 @@
  * Usage (from app/ or repo root):
  *   npm run build:win11-home   # writes app/dist/win11-home/ (isolated from local)
  *   npm run deploy:serve       # serves app/dist/<target>/ ; DEPLOY_TARGET or --target (default win11-home)
- *   npm run selfhost           # alias â†?win11-home
+ *   npm run selfhost           # alias -> win11-home
  *
  * Env: env/<target>/.env (legacy app/.env.<target>.local still falls back).
  * Public origin: PUBLIC_DOMAIN > PUBLIC_IP > LAN auto-detect (see publicOrigin.ts).
@@ -16,7 +16,14 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { localApiRoutes, rawBodyRoutes } from './localApiRoutes.ts';
+import { localApiRoutes, rawBodyRoutes, resolveLocalApiRoute } from './localApiRoutes.ts';
+import {
+  authenticateVisitorSession,
+  createMessagingSocketServer,
+  createRemoteMessagingAuthenticator,
+  parseMessagingSocketOrigins,
+} from './messagingSocket.ts';
+import { startMessagingOutbox } from './messagingOutbox.ts';
 import { detectLanIPv4, resolvePublicOrigin } from '../api/platform/publicOrigin.ts';
 import {
   requireTargetEnv,
@@ -152,6 +159,10 @@ function createVercelResponse(res) {
       res.setHeader('content-type', 'text/plain; charset=utf-8');
       res.end(payload);
     },
+    setHeader(name, value) {
+      res.setHeader(name, value);
+      return response;
+    },
   };
   return response;
 }
@@ -182,7 +193,7 @@ function sendJsonError(res, statusCode, error) {
 }
 
 async function handleApi(req, res, apiPath) {
-  const modulePath = localApiRoutes[apiPath];
+  const modulePath = resolveLocalApiRoute(apiPath);
   const useRawBody = rawBodyRoutes.has(apiPath);
   const limitBytes = bodyLimitBytesForKind(useRawBody ? 'webhook' : 'json');
 
@@ -282,7 +293,7 @@ function resolveDistFile(urlPathname) {
     return candidate;
   }
 
-  // Prerendered routes: /destinations/beijing â†?destinations/beijing/index.html
+  // Prerendered routes: /destinations/beijing -> destinations/beijing/index.html
   const dirIndexPath =
     urlPathname.endsWith('/') ? `${urlPathname}index.html` : `${urlPathname}/index.html`;
   const dirIndex = safeJoinDist(dirIndexPath);
@@ -389,7 +400,7 @@ function main() {
     console.error(`Missing ${path.relative(appRoot, distRoot)}/index.html. Run: npm run build:${target}`);
     if (fs.existsSync(legacyFlatDist)) {
       console.error(
-        'Note: found legacy app/dist/index.html â€?ignored. Builds are isolated under app/dist/<target>/.',
+        'Note: found legacy app/dist/index.html (ignored). Builds are isolated under app/dist/<target>/.',
       );
     }
     process.exit(1);
@@ -401,7 +412,7 @@ function main() {
     const pathname = url.split('?')[0] || '/';
 
     if (pathname === '/api' || pathname.startsWith('/api/')) {
-      if (localApiRoutes[pathname]) {
+      if (resolveLocalApiRoute(pathname)) {
         await handleApi(req, res, pathname);
         return;
       }
@@ -419,6 +430,22 @@ function main() {
     serveStatic(req, res, pathname);
   });
 
+  let messagingSocketEnabled = false;
+  if (process.env.MESSAGING_SOCKET_ENABLED === 'true') {
+    const authUrl = process.env.MESSAGING_SOCKET_AUTH_URL?.trim();
+    const allowedOrigins = parseMessagingSocketOrigins(process.env.MESSAGING_SOCKET_ALLOWED_ORIGINS);
+    if (!authUrl) {
+      throw new Error('MESSAGING_SOCKET_AUTH_URL is required when MESSAGING_SOCKET_ENABLED=true');
+    }
+    const messagingSocket = createMessagingSocketServer(server, {
+      authenticate: createRemoteMessagingAuthenticator(authUrl),
+      authenticateVisitor: authenticateVisitorSession,
+      allowedOrigins,
+    });
+    startMessagingOutbox(messagingSocket.namespace);
+    messagingSocketEnabled = true;
+  }
+
   server.listen(PORT, HOST, () => {
     const canonicalOrigin = resolvePublicOrigin(process.env);
     const lanIp = detectLanIPv4();
@@ -432,8 +459,9 @@ function main() {
     }
     console.log(`  static: ${distRoot}`);
     console.log(`  api: ${Object.keys(localApiRoutes).length} routes`);
+    console.log(`  messaging socket: ${messagingSocketEnabled ? 'enabled (/im)' : 'disabled'}`);
     console.log(`  public paths (SEO manifest): ${publicPaths.size}`);
-    console.log(`  s3 proxy â†?http://${MINIO_HOST}:${MINIO_PORT}`);
+    console.log(`  s3 proxy -> http://${MINIO_HOST}:${MINIO_PORT}`);
     console.log(`  env: ${envPath}`);
     console.log(
       'Domain HTTPS: put Caddy on 80/443. Direct IP/LAN: open the LAN hint URL (firewall permitting).',

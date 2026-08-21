@@ -1,5 +1,22 @@
 # Agent Progress
 
+## Current Goal（socketio-server-scaffold，2026-08-21）
+
+- 已读取 xtch Node 自托管入口、Caddy 反代和 XT_MVP 鉴权实现；确认不能共享 XT_MVP 的 JWT secret，Socket.IO 必须走注入式 token introspection。
+- 已增加 `socket.io@4.8.3`、独立 `/im` namespace 工厂、Origin 白名单、连接状态恢复、鉴权中间件和 staff/tenant 服务端房间；默认不启用，等待 token-exchange/introspection endpoint 后再配置生产环境变量。
+- 已增加 Socket.IO 定向测试；`tsconfig.node.json` 可独立通过。全量 `npm run typecheck` 仍被既有 `ChinaTripsMobile.tsx` 的 `draft` 未使用错误阻断。
+- 未完成：因现有 `serve-selfhost.mjs` 含损坏的非 UTF-8 字节，尚未直接改动该启动文件；需要下一阶段先安全规范编码，再在 `http.createServer` 后调用工厂。
+- 本阶段验证：`npx tsc -p app/tsconfig.node.json --noEmit` 通过；`npm run test:messaging-socket` 2/2 通过。
+
+## Current Goal（im-architecture-draft，2026-08-21）
+
+- 已结合 XT_MVP `/api/v1/auth/me`、现有 xtch PostgreSQL/migration 机制和 Socket.IO scaffold，写出从数据库、双 Token、REST、实时 outbox、断线补偿、多客服分配到审计的完整草案。
+- 设计文档：`docs/superpowers/specs/2026-08-21-im-architecture.md`。
+- 当前状态：Draft；待用户确认账号模型（推荐 xtch 本地客服账号 + XT_MVP super_admin exchange）后再写 migration/API 实现。
+- 已补充身份与实时性设计：临时访客 cookie、门户 Supabase 登录身份、客服 xtch 身份三层区分；明确 persisted/published/connected/read 四种消息状态和匿名会话升级规则。
+- 本阶段已实现：`014_im_core` migration、`/api/im/public/session`、public conversation/message REST、identity link、`/api/im/auth/exchange|refresh|logout`、客服消息 REST、动态 IM 路由、访客 cookie Socket ACL、Socket.IO production attach 和 outbox worker；尚未在真实数据库/XT_MVP 环境执行 migration。
+- 后续确认项已追加实现：客服邀请/权限接口、claim/takeover/transfer assignment API、mobile 独立 IM token store/API/Socket client；mobile `pnpm typecheck` 通过。真实 migration 因本机 PostgreSQL `localhost:5432` 未启动而未执行，未触碰远程/生产数据库。
+
 ## Current Goal（restart-xtch-server，2026-08-21）
 
 - 用户明确要求网站先恢复运行，暂不考虑支付；不伪造 Payoneer 凭据。

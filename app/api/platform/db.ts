@@ -54,7 +54,7 @@ export async function sql<T = Record<string, unknown>>(
   const url = getConnectionString();
 
   if (isVercelPostgresUrl(url)) {
-    return vercelSql(strings, ...values) as Promise<SqlResult<T>>;
+    return vercelSql(strings, ...(values as never[])) as unknown as Promise<SqlResult<T>>;
   }
 
   if (!url) {
@@ -81,7 +81,7 @@ sql.begin = async function begin<T>(callback: (tx: SqlClient) => Promise<T>): Pr
       const tx: SqlClient = <R = Record<string, unknown>>(
         strings: TemplateStringsArray,
         ...innerValues: unknown[]
-      ) => client.sql(strings, ...innerValues) as Promise<SqlResult<R>>;
+      ) => client.sql(strings, ...(innerValues as never[])) as unknown as Promise<SqlResult<R>>;
 
       const result = await callback(tx);
       await client.sql`COMMIT`;
