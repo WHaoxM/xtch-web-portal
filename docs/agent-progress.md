@@ -1,5 +1,12 @@
 # Agent Progress
 
+## Delivery（portal-public-im-entry-fix，2026-08-21）
+
+- 修复门户聊天入口被内容预加载门禁遮挡的问题：内容仍在加载或加载失败时，公开 IM 气泡仍可显示并打开窗口。
+- 移动端入口改为可识别的“联系客服”文字按钮，不再只显示难发现的圆形图标；聊天面板文案改为中文客服场景。
+- 已验证：`npm run build`、`npm run lint`、`git diff --check` 通过；本地构建产物包含 `public-im-trigger` 与“联系客服”。
+- 已交付：提交 `a2efaf3`（当前门户分支）；未做真实生产截图验收。
+
 ## Current Goal（public-im-visual-refresh，2026-08-21）
 
 - 已统一官网桌面端与 China Trips 移动端的公开 IM 入口视觉：旅行顾问身份头部、欢迎卡片、快捷话题、消息发送者层级、响应式触发器与移动端图标模式。
