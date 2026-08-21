@@ -1,5 +1,12 @@
 # Agent Progress
 
+## Delivery（xtch-server-im-production，2026-08-21）
+
+- 已在 cloud-vps `/opt/xtch-web-portal` 配置 IM 生产环境：独立 IM JWT 密钥、XT_MVP API 地址、Socket.IO `/im`、Socket/REST 明确 Origin 白名单；密钥未写入 Git，原环境文件备份保存在受限目录 `/opt/xtch-env-backups/`。
+- 已以 `origin/main`（`b8d6d16`）完成 `npm ci`、生产环境门禁、lint、数据库迁移（无待执行迁移）、cloud-vps 构建与 prerender；服务已启用并重启。
+- 已验证：`xtch-app` active，服务日志显示 `messaging socket: enabled (/im)`；本机首页和 `/api/routes` 健康检查通过；公网官网 `200`；IM REST CORS `OPTIONS` 返回 `204`。
+- 部署脚本最后的 systemd 步骤因 deploy 用户没有免密 sudo 未自动完成，已由 root 按同一服务单元手动执行 `systemctl enable/restart` 并复核健康状态。
+
 ## Current Goal（socketio-server-scaffold，2026-08-21）
 
 - 已读取 xtch Node 自托管入口、Caddy 反代和 XT_MVP 鉴权实现；确认不能共享 XT_MVP 的 JWT secret，Socket.IO 必须走注入式 token introspection。
