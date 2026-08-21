@@ -32,7 +32,8 @@
 ## Current Goal（im-access-gate，2026-08-21）
 - 用户要求 mobile/门户的客服 IM 不对所有 XT_MVP 账号开放，仅 super_admin 与明确指定的内部客服可用。
 - 服务端已将 IM token 签发资格收紧为：active super_admin，或 active staff 且拥有 `im:conversation:read`；exchange/login/refresh 均执行该门禁。门户访客 public session 保持客户接待用途，不视为客服权限。
-- 验证：目标 IM TypeScript 编译通过；待提交并推送 main。
+- 验证：目标 IM TypeScript 编译通过；变更文件 ESLint 通过；Socket/CORS 测试 4/4 通过。
+- 已交付：提交 `85103cc` 已推送到 `origin/main`，等待 CI/CD 构建与部署。
 
 ## Current Goal（restart-xtch-server，2026-08-21）
 
