@@ -4,6 +4,7 @@
 
 - 已统一官网桌面端与 China Trips 移动端的公开 IM 入口视觉：旅行顾问身份头部、欢迎卡片、快捷话题、消息发送者层级、响应式触发器与移动端图标模式。
 - 已验证：`app/` 下 `npm run typecheck`、`npm run lint -- --quiet`、`npm run build` 全部通过。
+- 已部署：cloud-vps 已同步提交 `96892e0`，清理并重装远端 npm 依赖后完成 cloud-vps 构建、prerender、服务重启；`xtch-app` active，公网官网返回 200。
 - 未做：当前环境未安装 Playwright 浏览器，未进行真实截图验收；构建输出仅有既有 chunk size/Browserslist 提示。
 
 ## Delivery（xtch-server-im-production，2026-08-21）
