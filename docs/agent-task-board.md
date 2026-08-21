@@ -20,6 +20,8 @@
 
 | Agent | Goal | Owns | May Touch | Must Not Touch | Status | Last Update |
 |---|---|---|---|---|---|---|
+| Codex (vps-boot-restart) | Persist cloud-vps boot enablement and crash restart for `xtch-app`, then push to `main` | `deploy/cloud-vps/deploy-from-main.sh`; `docs/ops/cloud-vps.md`; `docs/agent-progress.md`; `docs/agent-task-board.md` | VPS service enable/status | Payment, database, DNS, Caddy behavior | in progress | 2026-08-21 |
+| Codex (restart-xtch-server) | Restart production website on user-requested `xtch-server`, then verify service and public HTTPS | `docs/agent-progress.md`; `docs/agent-task-board.md` | Production service state: `xtch-app` only | Source, deployment artifacts, database, Caddy, DNS, environment | done（676d55f；健康检查通过） | 2026-08-21 |
 | Auto (fix-prerender-spa-shell) | prerender 干净 SPA 壳 + 等正确 canonical，修 tour 16 CD 失败 | `app/scripts/prerender.mjs`；shells Seo（seoReady 顺序）；gotchas/progress/task-board | — | 改路线内容事实；跳过失败路由 | done（Actions 绿） | 2026-07-30 |
 | Auto (fix-deploy-playwright) | CD build 前装 Playwright Chromium，修 prerender 失败 | `deploy/cloud-vps/deploy-from-main.sh`；ops/gotchas/progress/task-board | — | 改业务代码；VPS 手工装依赖以外的软件 | done（PR #6） | 2026-07-30 |
 | Auto (prod-cd-gate) | main push→自动 lint+migrate+build+restart | `deploy-from-main.sh`；`check-target-env.ts`；`.github/workflows/deploy-cloud-vps.yml`；ops/gotchas | package.json env:check | 未配 secrets 时勿指望已自动上线 | done（真机已绿） | 2026-07-30 |

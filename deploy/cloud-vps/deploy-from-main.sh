@@ -137,6 +137,9 @@ if [[ "$NO_RESTART" -eq 1 ]]; then
   exit 0
 fi
 
+log "Ensure ${XTCH_SERVICE} is enabled at boot"
+sudo systemctl enable "$XTCH_SERVICE"
+
 log "Restart ${XTCH_SERVICE}"
 sudo systemctl restart "$XTCH_SERVICE"
 sleep 3
