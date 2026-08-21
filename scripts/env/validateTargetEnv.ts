@@ -223,13 +223,8 @@ export function validateTargetEnv(
     }
   }
 
-  if (paymentProvider === 'payoneer' && !payoneerOn) {
-    pushIssue(
-      issues,
-      'PAYONEER_STORE_CODE|PAYONEER_TOKEN',
-      'required when PAYMENT_PROVIDER=payoneer on a public deploy target.',
-    );
-  }
+  // An unconfigured Payoneer provider must not take the public site offline.
+  // Checkout remains unavailable: createPayoneerCheckoutSession rejects without credentials.
   if (paymentProvider === 'stripe' && !stripeOn) {
     pushIssue(
       issues,
