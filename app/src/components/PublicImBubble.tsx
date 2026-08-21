@@ -134,9 +134,9 @@ export default function PublicImBubble({ source }: PublicImBubbleProps) {
             <div className="public-im-header-main">
               <div className="public-im-avatar" aria-hidden="true"><Headphones size={19} /></div>
               <div>
-                <p className="public-im-eyebrow">SYNCING TRAVEL · TRAVEL DESK</p>
-                <h2>Plan your China trip</h2>
-                <p className="public-im-status"><span /> Online · replies within a few minutes</p>
+                <p className="public-im-eyebrow">SYNCING TRAVEL · 客服中心</p>
+                <h2>联系客服</h2>
+                <p className="public-im-status"><span /> 在线 · 通常几分钟内回复</p>
               </div>
             </div>
             <button type="button" className="public-im-close" onClick={() => setOpen(false)} aria-label="Close chat">
@@ -145,18 +145,18 @@ export default function PublicImBubble({ source }: PublicImBubbleProps) {
           </header>
 
           <div className="public-im-messages" aria-live="polite">
-            {loading && <p className="public-im-empty">Starting a secure chat…</p>}
+            {loading && <p className="public-im-empty">正在连接客服…</p>}
             {!loading && messages.length === 0 && (
               <div className="public-im-welcome">
                 <div className="public-im-welcome-top">
                   <span className="public-im-welcome-mark"><Sparkles size={16} /></span>
-                  <span>WELCOME TO THE TRAVEL DESK</span>
+                  <span>欢迎来到旅行顾问中心</span>
                 </div>
-                <h3>Where will China take you?</h3>
-                <p>Share a destination, a date, or just an idea. A real China specialist will help shape it.</p>
+                <h3>想去中国哪里？</h3>
+                <p>告诉我们目的地、出行时间或一个旅行想法，专业顾问会帮你把计划变成可执行的行程。</p>
                 <div className="public-im-prompts" aria-label="Conversation starters">
-                  <button type="button" onClick={() => setDraft('I am thinking about Beijing and Shanghai.')}>Beijing + Shanghai <ArrowUpRight size={13} /></button>
-                  <button type="button" onClick={() => setDraft('I would like help planning a bespoke trip.')}>A bespoke trip <ArrowUpRight size={13} /></button>
+                  <button type="button" onClick={() => setDraft('我想去北京和上海。')}>北京 + 上海 <ArrowUpRight size={13} /></button>
+                  <button type="button" onClick={() => setDraft('我想定制一条专属旅行线路。')}>定制专属行程 <ArrowUpRight size={13} /></button>
                 </div>
               </div>
             )}
@@ -176,8 +176,8 @@ export default function PublicImBubble({ source }: PublicImBubbleProps) {
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
                 onKeyDown={handleDraftKeyDown}
-                placeholder="Write a message…"
-                aria-label="Message"
+                placeholder="输入消息，咨询旅行计划…"
+                aria-label="输入消息"
                 rows={1}
                 maxLength={8000}
                 disabled={loading || !conversation || sending}
@@ -186,7 +186,7 @@ export default function PublicImBubble({ source }: PublicImBubbleProps) {
                 <Send size={17} />
               </button>
             </div>
-            <p className="public-im-hint">Enter to send · Shift + Enter for a new line</p>
+            <p className="public-im-hint">按 Enter 发送 · Shift + Enter 换行</p>
           </form>
         </section>
       )}
@@ -195,12 +195,12 @@ export default function PublicImBubble({ source }: PublicImBubbleProps) {
         type="button"
         className={`public-im-trigger ${open ? 'is-open' : ''}`}
         onClick={() => setOpen((value) => !value)}
-        aria-label={open ? 'Close chat' : 'Open chat with Syncing Travel'}
+        aria-label={open ? '关闭客服窗口' : '打开客服聊天窗口'}
         aria-expanded={open}
       >
         <span className="public-im-trigger-icon">{open ? <X size={20} /> : <MessageCircle size={20} />}</span>
-        {!open && <span className="public-im-trigger-copy"><strong>Talk to a specialist</strong><small>We reply in minutes</small></span>}
-        {!open && unreadHint && <i aria-label="New reply" />}
+        {!open && <span className="public-im-trigger-copy"><strong>联系客服</strong><small>在线为你规划旅程</small></span>}
+        {!open && unreadHint && <i aria-label="有新的客服回复" />}
       </button>
     </div>
   );

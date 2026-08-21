@@ -120,21 +120,26 @@ function App() {
   const contentReady = isAdminRoute || isAuthCallbackRoute || contentDataLoaded;
   const hideSiteChrome =
     isAdminRoute || isAuthCallbackRoute || (isChinaTripsRoute && isMiniAppViewport);
+  const publicImSource = isChinaTripsRoute && isMiniAppViewport ? 'portal_mobile' : 'portal_web';
+  const showPublicIm = !isAdminRoute && !isAuthCallbackRoute;
 
   if (!authReady) return null;
 
   if (contentDataFailed && !isAdminRoute && !isAuthCallbackRoute) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-white px-6 text-center">
-        <h1 className="font-serif text-[32px] text-[#002A3A]">Content temporarily unavailable</h1>
-        <p className="mt-4 max-w-md text-[15px] leading-7 text-[#5D5D5D]">
-          We could not load destinations and routes. Please refresh the page in a moment.
-        </p>
-      </div>
+      <>
+        <div className="flex min-h-screen flex-col items-center justify-center bg-white px-6 text-center">
+          <h1 className="font-serif text-[32px] text-[#002A3A]">Content temporarily unavailable</h1>
+          <p className="mt-4 max-w-md text-[15px] leading-7 text-[#5D5D5D]">
+            We could not load destinations and routes. Please refresh the page in a moment.
+          </p>
+        </div>
+        {showPublicIm && <PublicImBubble source={publicImSource} />}
+      </>
     );
   }
 
-  if (!contentReady) return null;
+  if (!contentReady) return showPublicIm ? <PublicImBubble source={publicImSource} /> : null;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -167,9 +172,7 @@ function App() {
         </Routes>
       </main>
       {!hideSiteChrome && <Footer />}
-      {!isAdminRoute && !isAuthCallbackRoute && (
-        <PublicImBubble source={isChinaTripsRoute && isMiniAppViewport ? 'portal_mobile' : 'portal_web'} />
-      )}
+      {showPublicIm && <PublicImBubble source={publicImSource} />}
     </div>
   );
 }

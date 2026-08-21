@@ -126,7 +126,7 @@
   .public-im-hint { margin: 6px 1px 0; color: #899396; font-size: 10px; }
 
   @keyframes public-im-panel-in { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
-  @media (max-width: 600px) { .public-im-root { right: 12px; bottom: calc(76px + env(safe-area-inset-bottom)); left: 12px; } .public-im-trigger { margin-left: auto; min-height: 56px; } .public-im-trigger-copy { display: none; } .public-im-trigger-icon { width: 40px; height: 40px; } .public-im-panel { width: 100%; height: min(680px, calc(100vh - 158px)); margin-bottom: 10px; border-radius: 23px; } .public-im-welcome { padding: 17px; } .public-im-welcome h3 { font-size: 22px; } }
+  @media (max-width: 600px) { .public-im-root { right: 12px; bottom: calc(76px + env(safe-area-inset-bottom)); left: 12px; } .public-im-trigger { margin-left: auto; min-height: 56px; } .public-im-trigger-copy { display: flex; } .public-im-trigger-copy strong { font-size: 12px; } .public-im-trigger-copy small { font-size: 9px; } .public-im-trigger-icon { width: 40px; height: 40px; } .public-im-panel { width: 100%; height: min(680px, calc(100vh - 158px)); margin-bottom: 10px; border-radius: 23px; } .public-im-welcome { padding: 17px; } .public-im-welcome h3 { font-size: 22px; } }
   @media (prefers-reduced-motion: reduce) { .public-im-panel, .public-im-trigger, .public-im-close, .public-im-input-row button, .public-im-prompts button { animation: none; transition: none; } }
 }
 
