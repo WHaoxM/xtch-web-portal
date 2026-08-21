@@ -11,7 +11,7 @@
 
 - 用户澄清目标机器为 cloud-vps；当前 VPS `xtch-app` 已是 `enabled` + `active`，systemd `Restart=on-failure` / `RestartSec=5s`。
 - 本次改动：云端部署脚本在每次重启前显式执行 `systemctl enable xtch-app`，并在运维文档记录该持久化保障；不改支付、数据库、DNS 或 Caddy 行为。
-- 待验证：bash 语法、远程 `systemctl enable` 状态、提交并推送 `main`。
+- 已验证：VPS 上 `bash -n deploy/cloud-vps/deploy-from-main.sh` 通过；`systemctl enable xtch-app` 返回 enabled，服务 active，`Restart=on-failure`；提交 `ddaa5b5 ops: persist cloud-vps boot restart` 已推送到 `main`。
 
 ## Status
 
