@@ -1,6 +1,6 @@
 import { sql } from '../../../platform/db';
 import { bearerToken, getClientIp, headerValue, type ImRequest, type ImResponse } from '../httpTypes';
-import { hashToken, introspectXtMvpToken, issueStaffTokens } from '../imAuth';
+import { hashToken, ImAccessDeniedError, introspectXtMvpToken, issueStaffTokens } from '../imAuth';
 
 type StaffRow = {
   id: string;
@@ -22,6 +22,7 @@ export default async function handler(req: ImRequest, res: ImResponse) {
     return;
   }
 
+  let matchedStaffId: string | null = null;
   try {
     const external = await introspectXtMvpToken(token);
     if (!external) {
@@ -43,6 +44,7 @@ export default async function handler(req: ImRequest, res: ImResponse) {
       res.status(403).json({ ok: false, error: 'This XT_MVP account is not enabled for IM.' });
       return;
     }
+    matchedStaffId = staff.id;
 
     const issued = await issueStaffTokens(staff, {
       ipHash: hashToken(getClientIp(req)),
@@ -66,6 +68,11 @@ export default async function handler(req: ImRequest, res: ImResponse) {
       },
     });
   } catch (error) {
+    if (error instanceof ImAccessDeniedError) {
+      await writeExchangeAudit('auth.exchange.denied', matchedStaffId, req, 'im_access_not_enabled');
+      res.status(403).json({ ok: false, error: error.message });
+      return;
+    }
     console.error('IM auth exchange failed:', error instanceof Error ? error.message : error);
     res.status(503).json({ ok: false, error: 'IM identity service is temporarily unavailable.' });
   }
@@ -88,4 +95,3 @@ async function writeExchangeAudit(
     )
   `;
 }
-

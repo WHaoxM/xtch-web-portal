@@ -117,6 +117,9 @@ export async function issueStaffTokens(
       AND revoked_at IS NULL
   `;
   const permissions = [...new Set(permissionsResult.rows.map((row) => row.permission_code))] as string[];
+  if (staff.account_type !== 'super_admin' && !permissions.includes('im:conversation:read')) {
+    throw new ImAccessDeniedError();
+  }
   const tenantIds = [...new Set(
     permissionsResult.rows
       .filter((row) => row.scope_type === 'tenant' && row.permission_code === 'im:conversation:read')
@@ -163,6 +166,13 @@ export async function issueStaffTokens(
     permissions,
     tenantIds,
   };
+}
+
+export class ImAccessDeniedError extends Error {
+  constructor() {
+    super('IM access is not enabled for this account.');
+    this.name = 'ImAccessDeniedError';
+  }
 }
 
 export async function introspectXtMvpToken(token: string): Promise<ExternalMvpPrincipal | null> {

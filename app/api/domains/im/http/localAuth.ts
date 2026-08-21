@@ -1,5 +1,5 @@
 import { sql } from '../../../platform/db';
-import { hashPassword, hashToken, issueStaffTokens, verifyPassword } from '../imAuth';
+import { hashPassword, hashToken, ImAccessDeniedError, issueStaffTokens, verifyPassword } from '../imAuth';
 import { getClientIp, headerValue, type ImRequest, type ImResponse } from '../httpTypes';
 
 type StaffRow = {
@@ -54,10 +54,19 @@ export async function login(req: ImRequest, res: ImResponse) {
     res.status(401).json({ ok: false, error: 'Invalid username or password.' });
     return;
   }
-  const issued = await issueStaffTokens(staff, {
-    ipHash: hashToken(getClientIp(req)),
-    userAgentHash: hashToken(headerValue(req.headers['user-agent']) || 'unknown'),
-  });
+  let issued;
+  try {
+    issued = await issueStaffTokens(staff, {
+      ipHash: hashToken(getClientIp(req)),
+      userAgentHash: hashToken(headerValue(req.headers['user-agent']) || 'unknown'),
+    });
+  } catch (error) {
+    if (error instanceof ImAccessDeniedError) {
+      res.status(403).json({ ok: false, error: error.message });
+      return;
+    }
+    throw error;
+  }
   res.status(200).json({
     ok: true,
     access_token: issued.accessToken,
@@ -75,4 +84,3 @@ function record(value: unknown): Record<string, unknown> {
 function value(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
-

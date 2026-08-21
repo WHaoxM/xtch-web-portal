@@ -1,6 +1,6 @@
 import { sql } from '../../../platform/db';
 import { type ImRequest, type ImResponse } from '../httpTypes';
-import { hashToken, issueStaffTokens } from '../imAuth';
+import { hashToken, ImAccessDeniedError, issueStaffTokens } from '../imAuth';
 
 type SessionRow = {
   session_id: string;
@@ -62,6 +62,10 @@ export default async function handler(req: ImRequest, res: ImResponse) {
       expires_in: issued.expiresIn,
     });
   } catch (error) {
+    if (error instanceof ImAccessDeniedError) {
+      res.status(403).json({ ok: false, error: error.message });
+      return;
+    }
     console.error('IM refresh failed:', error instanceof Error ? error.message : error);
     res.status(503).json({ ok: false, error: 'IM session service is temporarily unavailable.' });
   }

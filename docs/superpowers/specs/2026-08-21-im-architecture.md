@@ -35,6 +35,8 @@
 - `super_admin`：唯一能够管理客服账号、权限和全局会话的内部管理员。
 - `staff`：xtch 本地客服账号，可用密码/一次性邀请登录；不需要修改 XT_MVP。
 - `external_subject`：只有被 XT_MVP 明确交换并映射的账号才可作为外部管理员入口。
+- IM 会话资格默认关闭：`super_admin` 可用；普通 `staff` 必须由 super_admin 明确授予 `im:conversation:read` 后才可 exchange/login/refresh，只有 active 且有该权限的账号才会签发 IM token。
+- 门户访客的 public session 是客户接待链路，不等同于客服工作台权限；门户内部若接入客服工作台，同样必须走 exchange，不能仅凭 XT_MVP 登录态显示客服功能。
 - 任何“XT_MVP 返回 platform_admin 就自动成为 xtch super_admin”的逻辑都禁止；必须存在显式映射或一次性 bootstrap 配置。
 
 ## 3. 目标拓扑
@@ -257,7 +259,7 @@ Content-Type: application/json
 1. 校验 Authorization 格式和长度，拒绝 query/body token。
 2. 使用 3 秒超时调用 XT_MVP `GET /api/v1/auth/me`；不在 xtch 本地解析 XT_MVP JWT。
 3. 只接受明确映射到 `im_staff_accounts.external_subject` 的账号；首次 bootstrap 必须使用一次性配置或人工命令。
-4. 检查本地账号状态和权限。
+4. 检查本地账号状态和权限：`super_admin` 直接允许；普通账号必须存在 active 的 `im:conversation:read` 授权，否则返回 403，不签发任何 IM token。
 5. 签发 xtch 专用短期 JWT：`iss=xtch`、`aud=im-mobile`、`sub=im_staff_accounts.id`、`jti`、权限 scope、租户范围；使用独立 `XTCH_IM_JWT_SECRET`/algorithm。
 6. 签发随机 refresh token，只存 hash，并写 `im_staff_sessions` 和 `auth.exchange` 审计。
 
