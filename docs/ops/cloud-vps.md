@@ -169,8 +169,12 @@ npm install
 npm run db:migrate:cloud-vps   # 若有新 migration
 npm run build:cloud-vps
 cd .. && bash deploy/cloud-vps/grant-xtch-read-access.sh
+sudo systemctl enable xtch-app   # persist start at VPS boot
 sudo systemctl restart xtch-app
 ```
+
+`xtch-app.service` uses `Restart=on-failure`; the deploy gate also runs
+`systemctl enable xtch-app` before each restart so boot activation remains enabled.
 
 ## 自动发布（main → 校验 → migrate → 重建重启）
 

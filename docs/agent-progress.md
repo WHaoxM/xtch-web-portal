@@ -1,5 +1,18 @@
 # Agent Progress
 
+## Current Goal（restart-xtch-server，2026-08-21）
+
+- 用户明确要求网站先恢复运行，暂不考虑支付；不伪造 Payoneer 凭据。
+- 已改生产启动校验：当 `PAYMENT_PROVIDER=payoneer` 且 `PAYONEER_STORE_CODE`、`PAYONEER_TOKEN` 均为空时，不再阻止整站启动；半配置仍拒绝启动，付款接口本身仍会拒绝无凭据请求。
+- 已验证：生产环境校验测试 15/15；`xtch-app` active；本机首页与 `/api/routes` 200；公网 `https://www.xuntingtravel.com/` 200。
+- 已提交并推送：`676d55f fix: allow public site without payment credentials`；VPS 工作树干净，推送后健康检查通过。
+
+## Current Goal（vps-boot-restart，2026-08-21）
+
+- 用户澄清目标机器为 cloud-vps；当前 VPS `xtch-app` 已是 `enabled` + `active`，systemd `Restart=on-failure` / `RestartSec=5s`。
+- 本次改动：云端部署脚本在每次重启前显式执行 `systemctl enable xtch-app`，并在运维文档记录该持久化保障；不改支付、数据库、DNS 或 Caddy 行为。
+- 待验证：bash 语法、远程 `systemctl enable` 状态、提交并推送 `main`。
+
 ## Status
 
 **done（fix-prerender-spa-shell）** — Deploy cloud-vps Actions success（run Å36129700\）。prerender 干净 SPA 壳 + 等正确 canonical。
