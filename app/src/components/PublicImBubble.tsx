@@ -6,14 +6,15 @@ import {
   establishPublicImSession,
   listPublicImMessages,
   sendPublicImMessage,
+  PUBLIC_IM_OPEN_EVENT,
   type PublicImConversation,
   type PublicImMessage,
   type PublicImSource,
 } from '@/domains/im/publicImClient';
 
-type PublicImBubbleProps = { source: PublicImSource };
+type PublicImBubbleProps = { source: PublicImSource; showTrigger?: boolean };
 
-export default function PublicImBubble({ source }: PublicImBubbleProps) {
+export default function PublicImBubble({ source, showTrigger = true }: PublicImBubbleProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
@@ -24,6 +25,12 @@ export default function PublicImBubble({ source }: PublicImBubbleProps) {
   const socketRef = useRef<ReturnType<typeof connectPublicImSocket> | null>(null);
   const lastSeqRef = useRef(0);
   const conversationIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const openFromExistingEntry = () => setOpen(true);
+    window.addEventListener(PUBLIC_IM_OPEN_EVENT, openFromExistingEntry);
+    return () => window.removeEventListener(PUBLIC_IM_OPEN_EVENT, openFromExistingEntry);
+  }, []);
 
   const unreadHint = useMemo(
     () => messages.some((message) => message.sender_type === 'staff'),
@@ -191,17 +198,19 @@ export default function PublicImBubble({ source }: PublicImBubbleProps) {
         </section>
       )}
 
-      <button
-        type="button"
-        className={`public-im-trigger ${open ? 'is-open' : ''}`}
-        onClick={() => setOpen((value) => !value)}
-        aria-label={open ? '关闭客服窗口' : '打开客服聊天窗口'}
-        aria-expanded={open}
-      >
-        <span className="public-im-trigger-icon">{open ? <X size={20} /> : <MessageCircle size={20} />}</span>
-        {!open && <span className="public-im-trigger-copy"><strong>联系客服</strong><small>在线为你规划旅程</small></span>}
-        {!open && unreadHint && <i aria-label="有新的客服回复" />}
-      </button>
+      {showTrigger && (
+        <button
+          type="button"
+          className={`public-im-trigger ${open ? 'is-open' : ''}`}
+          onClick={() => setOpen((value) => !value)}
+          aria-label={open ? '关闭客服窗口' : '打开客服聊天窗口'}
+          aria-expanded={open}
+        >
+          <span className="public-im-trigger-icon">{open ? <X size={20} /> : <MessageCircle size={20} />}</span>
+          {!open && <span className="public-im-trigger-copy"><strong>联系客服</strong><small>在线为你规划旅程</small></span>}
+          {!open && unreadHint && <i aria-label="有新的客服回复" />}
+        </button>
+      )}
     </div>
   );
 }

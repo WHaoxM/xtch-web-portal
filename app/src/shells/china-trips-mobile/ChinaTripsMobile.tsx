@@ -96,6 +96,7 @@ import {
   type FieldErrors,
 } from '@/lib/formErrors';
 import { submitInquiry } from '@/lib/inquiryClient';
+import { PUBLIC_IM_OPEN_EVENT } from '@/domains/im/publicImClient';
 import {
   buildInternationalPhone,
   DEFAULT_PHONE_COUNTRY_CODE,
@@ -3850,8 +3851,7 @@ function WhatsAppShortcut() {
   };
 
   const openFab = () => {
-    resetForm();
-    setStep('gate');
+    window.dispatchEvent(new Event(PUBLIC_IM_OPEN_EVENT));
   };
 
   const chooseGate = (alreadySubmitted: boolean) => {
@@ -3914,7 +3914,7 @@ function WhatsAppShortcut() {
       <button
         type="button"
         className="iosapp-whatsapp-fab"
-        aria-label="Contact Syncing Travel on WhatsApp"
+        aria-label="打开客服聊天窗口"
         onClick={openFab}
       >
         <MessageCircle size={20} />

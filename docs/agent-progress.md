@@ -1,5 +1,12 @@
 # Agent Progress
 
+## Delivery（portal-mobile-im-entry-reuse，2026-08-22）
+
+- 按用户确认，移动端不新增聊天组件：复用现有右侧绿色客服按钮，点击后通过 IM 事件桥接打开已存在的 `PublicImBubble` 聊天窗口。
+- China Trips 移动壳隐藏通用 IM 气泡触发器，避免右侧入口与底部入口重复；原按钮不再打开询盘/WhatsApp 表单。
+- 已验证：`npm run typecheck`、`npm run lint`、`npm run build` 通过；构建输出包含移动端 IM 事件桥接。
+- 待验证：真实生产部署后的真机点击与客服消息往返。
+
 ## Delivery（portal-public-im-entry-fix，2026-08-21）
 
 - 修复门户聊天入口被内容预加载门禁遮挡的问题：内容仍在加载或加载失败时，公开 IM 气泡仍可显示并打开窗口。

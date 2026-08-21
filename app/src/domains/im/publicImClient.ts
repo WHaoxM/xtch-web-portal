@@ -2,6 +2,8 @@ import { io, type Socket } from 'socket.io-client';
 
 export type PublicImSource = 'portal_web' | 'portal_mobile';
 
+export const PUBLIC_IM_OPEN_EVENT = 'xtch:open-public-im';
+
 export type PublicImConversation = {
   id: string;
   status: string;

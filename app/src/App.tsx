@@ -134,12 +134,16 @@ function App() {
             We could not load destinations and routes. Please refresh the page in a moment.
           </p>
         </div>
-        {showPublicIm && <PublicImBubble source={publicImSource} />}
+        {showPublicIm && <PublicImBubble source={publicImSource} showTrigger={!isChinaTripsRoute || !isMiniAppViewport} />}
       </>
     );
   }
 
-  if (!contentReady) return showPublicIm ? <PublicImBubble source={publicImSource} /> : null;
+  if (!contentReady) {
+    return showPublicIm ? (
+      <PublicImBubble source={publicImSource} showTrigger={!isChinaTripsRoute || !isMiniAppViewport} />
+    ) : null;
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -172,7 +176,9 @@ function App() {
         </Routes>
       </main>
       {!hideSiteChrome && <Footer />}
-      {showPublicIm && <PublicImBubble source={publicImSource} />}
+      {showPublicIm && (
+        <PublicImBubble source={publicImSource} showTrigger={!isChinaTripsRoute || !isMiniAppViewport} />
+      )}
     </div>
   );
 }
