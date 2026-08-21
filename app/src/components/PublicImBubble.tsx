@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
-import { MessageCircle, Send, X } from 'lucide-react';
+import { ArrowUpRight, Headphones, MessageCircle, Send, Sparkles, X } from 'lucide-react';
 import {
   connectPublicImSocket,
   createPublicImConversation,
@@ -131,10 +131,13 @@ export default function PublicImBubble({ source }: PublicImBubbleProps) {
       {open && (
         <section className="public-im-panel" role="dialog" aria-label="Chat with Syncing Travel">
           <header className="public-im-header">
-            <div>
-              <p className="public-im-eyebrow">SYNCING TRAVEL</p>
-              <h2>Chat with our team</h2>
-              <p className="public-im-status"><span /> Usually replies within a few minutes</p>
+            <div className="public-im-header-main">
+              <div className="public-im-avatar" aria-hidden="true"><Headphones size={19} /></div>
+              <div>
+                <p className="public-im-eyebrow">SYNCING TRAVEL · TRAVEL DESK</p>
+                <h2>Plan your China trip</h2>
+                <p className="public-im-status"><span /> Online · replies within a few minutes</p>
+              </div>
             </div>
             <button type="button" className="public-im-close" onClick={() => setOpen(false)} aria-label="Close chat">
               <X size={18} />
@@ -145,12 +148,21 @@ export default function PublicImBubble({ source }: PublicImBubbleProps) {
             {loading && <p className="public-im-empty">Starting a secure chat…</p>}
             {!loading && messages.length === 0 && (
               <div className="public-im-welcome">
-                <span className="public-im-welcome-mark"><MessageCircle size={18} /></span>
-                <p>Tell us what you are planning. A China travel specialist will be here shortly.</p>
+                <div className="public-im-welcome-top">
+                  <span className="public-im-welcome-mark"><Sparkles size={16} /></span>
+                  <span>WELCOME TO THE TRAVEL DESK</span>
+                </div>
+                <h3>Where will China take you?</h3>
+                <p>Share a destination, a date, or just an idea. A real China specialist will help shape it.</p>
+                <div className="public-im-prompts" aria-label="Conversation starters">
+                  <button type="button" onClick={() => setDraft('I am thinking about Beijing and Shanghai.')}>Beijing + Shanghai <ArrowUpRight size={13} /></button>
+                  <button type="button" onClick={() => setDraft('I would like help planning a bespoke trip.')}>A bespoke trip <ArrowUpRight size={13} /></button>
+                </div>
               </div>
             )}
             {messages.map((message) => (
               <div key={message.id} className={`public-im-message ${message.sender_type === 'visitor' ? 'is-visitor' : 'is-staff'}`}>
+                {message.sender_type === 'staff' && <span className="public-im-message-author">TRAVEL DESK</span>}
                 <p>{message.body}</p>
                 <time>{formatMessageTime(message.created_at)}</time>
               </div>
@@ -186,8 +198,8 @@ export default function PublicImBubble({ source }: PublicImBubbleProps) {
         aria-label={open ? 'Close chat' : 'Open chat with Syncing Travel'}
         aria-expanded={open}
       >
-        {open ? <X size={22} /> : <MessageCircle size={22} />}
-        {!open && <span className="public-im-trigger-label">Chat with us</span>}
+        <span className="public-im-trigger-icon">{open ? <X size={20} /> : <MessageCircle size={20} />}</span>
+        {!open && <span className="public-im-trigger-copy"><strong>Talk to a specialist</strong><small>We reply in minutes</small></span>}
         {!open && unreadHint && <i aria-label="New reply" />}
       </button>
     </div>

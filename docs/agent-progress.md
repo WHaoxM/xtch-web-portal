@@ -1,5 +1,11 @@
 # Agent Progress
 
+## Current Goal（public-im-visual-refresh，2026-08-21）
+
+- 已统一官网桌面端与 China Trips 移动端的公开 IM 入口视觉：旅行顾问身份头部、欢迎卡片、快捷话题、消息发送者层级、响应式触发器与移动端图标模式。
+- 已验证：`app/` 下 `npm run typecheck`、`npm run lint -- --quiet`、`npm run build` 全部通过。
+- 未做：当前环境未安装 Playwright 浏览器，未进行真实截图验收；构建输出仅有既有 chunk size/Browserslist 提示。
+
 ## Delivery（xtch-server-im-production，2026-08-21）
 
 - 已在 cloud-vps `/opt/xtch-web-portal` 配置 IM 生产环境：独立 IM JWT 密钥、XT_MVP API 地址、Socket.IO `/im`、Socket/REST 明确 Origin 白名单；密钥未写入 Git，原环境文件备份保存在受限目录 `/opt/xtch-env-backups/`。
