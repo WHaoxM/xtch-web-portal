@@ -1,9 +1,10 @@
 import { sql } from '../../../platform/db';
 import { getUserFromRequest } from '../../identity/traveler/userAuth';
 import { hashToken, randomToken } from '../imAuth';
+import { VISITOR_COOKIE_NAME } from '../visitorAuth';
 import { getClientIp, headerValue, parseCookies, type ImRequest, type ImResponse } from '../httpTypes';
 
-const VISITOR_COOKIE = '__Host-im_visitor';
+const VISITOR_COOKIE = VISITOR_COOKIE_NAME;
 const VISITOR_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 type VisitorRow = {
@@ -134,4 +135,3 @@ async function listConversations(identityType: string, subject: string) {
   `;
   return result.rows;
 }
-

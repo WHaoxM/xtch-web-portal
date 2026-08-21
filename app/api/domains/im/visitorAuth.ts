@@ -2,7 +2,8 @@ import { sql } from '../../platform/db';
 import { hashToken } from './imAuth';
 import { headerValue, parseCookies, type ImRequest } from './httpTypes';
 
-export const VISITOR_COOKIE_NAME = '__Host-im_visitor';
+/** __Host- cookies require Secure; local HTTP development uses a compatible name. */
+export const VISITOR_COOKIE_NAME = process.env.NODE_ENV === 'production' ? '__Host-im_visitor' : 'im_visitor';
 
 export type VisitorPrincipal = {
   sessionId: string;
@@ -25,4 +26,3 @@ export async function getVisitorPrincipal(req: ImRequest): Promise<VisitorPrinci
   }
   return principal;
 }
-

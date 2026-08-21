@@ -26,6 +26,7 @@ import AuthCallback from './pages/AuthCallback';
 import NotFound from './pages/NotFound';
 import { completeAuthRedirectNavigation, urlHasAuthTokens } from './lib/authClient';
 import { ensureContentDataLoaded } from './lib/contentStore';
+import PublicImBubble from './components/PublicImBubble';
 
 /** Matches `chinaTripsMobile.css` Mini-App shell breakpoint (not `useIsMobile` 768). */
 const MINI_APP_MAX_WIDTH_QUERY = '(max-width: 900px)';
@@ -166,6 +167,9 @@ function App() {
         </Routes>
       </main>
       {!hideSiteChrome && <Footer />}
+      {!isAdminRoute && !isAuthCallbackRoute && (
+        <PublicImBubble source={isChinaTripsRoute && isMiniAppViewport ? 'portal_mobile' : 'portal_web'} />
+      )}
     </div>
   );
 }

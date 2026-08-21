@@ -3,6 +3,7 @@ import { Server as SocketIOServer, type Namespace } from 'socket.io';
 import { sql } from '../api/platform/db';
 import { parseCookies } from '../api/domains/im/httpTypes';
 import { hashToken } from '../api/domains/im/imAuth';
+import { VISITOR_COOKIE_NAME } from '../api/domains/im/visitorAuth';
 
 export type MessagingSocketPrincipal = {
   subject: string;
@@ -70,7 +71,7 @@ export function createMessagingSocketServer(
 
   namespace.use(async (socket, next) => {
     const token = socket.handshake.auth?.token;
-    const cookieToken = parseCookies(socket.handshake.headers.cookie)['__Host-im_visitor'];
+    const cookieToken = parseCookies(socket.handshake.headers.cookie)[VISITOR_COOKIE_NAME];
     if (typeof token !== 'string' && (!cookieToken || !options.authenticateVisitor)) {
       next(new Error('Authentication required'));
       return;

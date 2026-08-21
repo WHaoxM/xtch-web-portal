@@ -84,6 +84,7 @@
     "react-router-dom": "^7.17.0",
     "recharts": "^2.15.4",
     "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
     "sonner": "^2.0.7",
     "stripe": "^22.3.0",
     "tailwind-merge": "^3.4.0",
