@@ -8,7 +8,7 @@ export default async function handler(req: ImRequest, res: ImResponse) {
     return;
   }
   const auth = await authenticateStaffRequest(req);
-  if (!auth.ok) {
+  if (auth.ok === false) {
     res.status(auth.status).json({ ok: false, error: auth.error });
     return;
   }
@@ -28,13 +28,43 @@ export default async function handler(req: ImRequest, res: ImResponse) {
     res.status(403).json({ ok: false, error: 'Assignment permission or valid action is missing.' });
     return;
   }
+  if (!isUuid(conversationId) || !isUuid(targetStaffId)) {
+    res.status(400).json({ ok: false, error: 'Valid conversation and staff ids are required.' });
+    return;
+  }
 
   try {
     const result = await sql.begin(async (tx) => {
-      const current = await tx<{ id: string }>`
-        SELECT id FROM im_conversations WHERE id = ${conversationId}::uuid AND status <> 'closed' FOR UPDATE
+      const current = await tx<{ id: string; tenant_id: string | null }>`
+        SELECT id, tenant_id FROM im_conversations WHERE id = ${conversationId}::uuid AND status <> 'closed' FOR UPDATE
       `;
       if (!current.rows[0]) throw new AssignmentError('Conversation is unavailable.', 404);
+      const conversationRow = current.rows[0];
+      if (
+        auth.principal.accountType !== 'super_admin' &&
+        (!conversationRow.tenant_id || !auth.principal.tenantIds.includes(conversationRow.tenant_id))
+      ) {
+        throw new AssignmentError('Conversation is outside your tenant scope.', 403);
+      }
+      const target = await tx<{ id: string; account_type: string }>`
+        SELECT id, account_type
+        FROM im_staff_accounts
+        WHERE id = ${targetStaffId}::uuid AND status = 'active'
+      `;
+      if (!target.rows[0]) throw new AssignmentError('Target staff account is inactive or missing.', 409);
+      if (conversationRow.tenant_id && target.rows[0].account_type !== 'super_admin') {
+        const targetScope = await tx<{ staff_id: string }>`
+          SELECT staff_id
+          FROM im_staff_permissions
+          WHERE staff_id = ${targetStaffId}::uuid
+            AND permission_code = 'im:conversation:read'
+            AND scope_type = 'tenant'
+            AND scope_id = ${conversationRow.tenant_id}::uuid
+            AND revoked_at IS NULL
+          LIMIT 1
+        `;
+        if (!targetScope.rows[0]) throw new AssignmentError('Target staff is outside the conversation tenant scope.', 409);
+      }
       const primary = await tx<{ staff_id: string }>`
         SELECT staff_id FROM im_conversation_assignments
         WHERE conversation_id = ${conversationId}::uuid AND assignment_role = 'primary' AND status = 'active'
@@ -66,7 +96,8 @@ export default async function handler(req: ImRequest, res: ImResponse) {
         INSERT INTO im_conversation_members (
           conversation_id, principal_type, principal_id, identity_assurance, member_role
         ) VALUES (${conversationId}::uuid, 'staff', ${targetStaffId}, 'verified', 'primary')
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (conversation_id, principal_type, principal_id) WHERE left_at IS NULL
+        DO UPDATE SET identity_assurance = 'verified', member_role = 'primary', left_at = NULL
       `;
       await tx`
         UPDATE im_conversations SET version = version + 1, updated_at = NOW() WHERE id = ${conversationId}::uuid
@@ -102,9 +133,12 @@ function stringValue(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
 class AssignmentError extends Error {
   constructor(message: string, readonly status: number) {
     super(message);
   }
 }
-

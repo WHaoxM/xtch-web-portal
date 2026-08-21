@@ -5,6 +5,7 @@ import react from "@vitejs/plugin-react"
 import { defineConfig, loadEnv, type Plugin } from "vite"
 import { inspectAttr } from 'kimi-plugin-inspect-react'
 import { rawBodyRoutes, resolveLocalApiRoute } from './scripts/localApiRoutes'
+import { handleMessagingCors, parseMessagingRestOrigins } from './scripts/messagingCors'
 import { loadTargetEnv, normalizeTarget } from '../scripts/env/targetEnv'
 import { assertTargetEnvValid, isProdDeployTarget } from '../scripts/env/validateTargetEnv'
 
@@ -15,12 +16,13 @@ type VercelResponseLike = {
   setHeader: (name: string, value: string | string[]) => VercelResponseLike;
 };
 
-function localApiPlugin(): Plugin {
+function localApiPlugin(messagingCorsOrigins: string[]): Plugin {
   return {
     name: 'local-vercel-api',
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
         const apiPath = req.url?.split('?')[0] ?? '';
+        if (handleMessagingCors(apiPath, req, res, messagingCorsOrigins)) return;
         const modulePath = resolveLocalApiRoute(apiPath);
 
         if (!modulePath) {
@@ -108,12 +110,15 @@ export default defineConfig(({ mode }) => {
   }
 
   const outDir = path.join('dist', target);
+  const messagingCorsOrigins = parseMessagingRestOrigins(
+    process.env.IM_REST_ALLOWED_ORIGINS || process.env.MESSAGING_SOCKET_ALLOWED_ORIGINS,
+  );
 
   return {
     // Absolute base required for BrowserRouter deep links (/destinations/…).
     base: '/',
     plugins: [
-      localApiPlugin(),
+      localApiPlugin(messagingCorsOrigins),
       // Local DX: Vite on Windows can spend ~500–600ms per image on 304 revalidation
       // when many Home/China Trips imgs load at once. Long max-age skips that on refresh.
       // Content editors replacing same-path files should hard-refresh once after edits.

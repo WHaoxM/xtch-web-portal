@@ -4,7 +4,7 @@ import { type ImRequest, type ImResponse } from '../httpTypes';
 
 export default async function handler(req: ImRequest, res: ImResponse) {
   const auth = await authenticateStaffRequest(req);
-  if (!auth.ok) {
+  if (auth.ok === false) {
     res.status(auth.status).json({ ok: false, error: auth.error });
     return;
   }
@@ -109,4 +109,3 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function stringValue(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
-

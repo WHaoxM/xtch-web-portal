@@ -158,6 +158,7 @@
 
 | From | Needs | Reason | Proposed Change | Status |
 |---|---|---|---|---|
+| Codex (im-server-completion) | Coordinator | xtch-server IM 服务端补齐移动客服工作台接口与 Socket/CORS 安全边界 | 仅修改 `app/api/domains/im/**`、`app/api/im/**`、`app/scripts/localApiRoutes.ts`、`app/scripts/serve-selfhost.mjs`、相关文档与测试；不修改 XT_MVP/backend | working |
 | Subagent-6 (infra-hardening) | Role 5 (release-engineering) | `package.json` scripts 归角色 5；基础设施需登记校验命令 | 增加：`test:infra`→`node --test ../deploy/validate-infra.test.mjs`（在 `app/`）或根目录 `node --test deploy/validate-infra.test.mjs` | open |
 | Subagent-6 (infra-hardening) | Role 5 (release-engineering) | Role 5 Owns `.gitignore`；角色 6 为 Compose 凭据增加了 `/.env` 忽略行 | 收口发行时请保留仓库根 `/.env` ignore（配合 `.env.example`）；勿回滚该行 | open |
 | Subagent-2 (runtime-api-security) | Role 5 (release-engineering) | `package.json` scripts 归角色 5；运行时安全需登记测试命令 | 增加：`test:runtime-security`→`tsx --test scripts/requestBodyLimits.test.ts scripts/httpRoutePolicy.test.ts ../scripts/env/validateTargetEnv.test.ts`（在 `app/`） | open |

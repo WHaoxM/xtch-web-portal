@@ -5,6 +5,7 @@
  */
 export const localApiRoutes: Record<string, string> = {
   '/api/im/auth/exchange': '/api/im/auth-exchange.ts',
+  '/api/im/auth/introspect': '/api/im/auth-introspect.ts',
   '/api/im/auth/refresh': '/api/im/auth-refresh.ts',
   '/api/im/auth/logout': '/api/im/auth-logout.ts',
   '/api/im/auth/activate': '/api/im/auth-activate.ts',
@@ -12,6 +13,7 @@ export const localApiRoutes: Record<string, string> = {
   '/api/im/staff/invite': '/api/im/staff-invite.ts',
   '/api/im/staff/permissions': '/api/im/staff-permissions.ts',
   '/api/im/conversations/assign': '/api/im/assignment.ts',
+  '/api/im/conversations': '/api/im/conversations.ts',
   '/api/im/public/session': '/api/im/public-session.ts',
   '/api/im/public/conversations': '/api/im/public-conversations.ts',
   '/api/inquiries': '/api/inquiries.ts',
@@ -60,6 +62,14 @@ const dynamicApiRoutes: Array<{ pattern: RegExp; modulePath: string }> = [
   {
     pattern: /^\/api\/im\/conversations\/[^/]+\/messages$/,
     modulePath: '/api/im/staff-messages.ts',
+  },
+  {
+    pattern: /^\/api\/im\/conversations\/[^/]+\/read$/,
+    modulePath: '/api/im/read-cursor.ts',
+  },
+  {
+    pattern: /^\/api\/im\/conversations\/[^/]+$/,
+    modulePath: '/api/im/conversation-detail.ts',
   },
 ];
 

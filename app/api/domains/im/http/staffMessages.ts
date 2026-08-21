@@ -1,17 +1,24 @@
 import crypto from 'node:crypto';
 import { sql } from '../../../platform/db';
+import { canAccessConversation } from '../conversationAccess';
 import { authenticateStaffRequest, hasPermission } from '../imAuth';
 import { headerValue, type ImRequest, type ImResponse } from '../httpTypes';
 
 export default async function handler(req: ImRequest, res: ImResponse) {
   const auth = await authenticateStaffRequest(req);
-  if (!auth.ok) {
+  if (auth.ok === false) {
     res.status(auth.status).json({ ok: false, error: auth.error });
     return;
   }
   const conversationId = readConversationId(req.url);
   if (!conversationId) {
     res.status(400).json({ ok: false, error: 'Conversation id is required.' });
+    return;
+  }
+
+  const accessMode = req.method === 'GET' ? 'read' : req.method === 'POST' ? 'write' : null;
+  if (accessMode && !(await canAccessConversation(auth.principal, conversationId, accessMode))) {
+    res.status(403).json({ ok: false, error: 'Conversation access denied.' });
     return;
   }
 
@@ -148,4 +155,3 @@ class StaffMessageError extends Error {
     super(message);
   }
 }
-

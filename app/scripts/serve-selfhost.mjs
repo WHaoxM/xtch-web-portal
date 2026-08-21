@@ -24,6 +24,7 @@ import {
   parseMessagingSocketOrigins,
 } from './messagingSocket.ts';
 import { startMessagingOutbox } from './messagingOutbox.ts';
+import { handleMessagingCors, parseMessagingRestOrigins } from './messagingCors.ts';
 import { detectLanIPv4, resolvePublicOrigin } from '../api/platform/publicOrigin.ts';
 import {
   requireTargetEnv,
@@ -64,6 +65,7 @@ function distRootForTarget(target) {
 let distRoot = '';
 /** SEO public indexable paths (role 4 manifest). */
 let publicPaths = new Set();
+let messagingRestCorsOrigins = [];
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -377,6 +379,9 @@ function main() {
     process.exit(1);
   }
   const envPath = loaded.path;
+  messagingRestCorsOrigins = parseMessagingRestOrigins(
+    process.env.IM_REST_ALLOWED_ORIGINS || process.env.MESSAGING_SOCKET_ALLOWED_ORIGINS,
+  );
 
   try {
     assertTargetEnvValid(target, process.env, envPath);
@@ -412,6 +417,7 @@ function main() {
     const pathname = url.split('?')[0] || '/';
 
     if (pathname === '/api' || pathname.startsWith('/api/')) {
+      if (handleMessagingCors(pathname, req, res, messagingRestCorsOrigins)) return;
       if (resolveLocalApiRoute(pathname)) {
         await handleApi(req, res, pathname);
         return;
@@ -432,11 +438,9 @@ function main() {
 
   let messagingSocketEnabled = false;
   if (process.env.MESSAGING_SOCKET_ENABLED === 'true') {
-    const authUrl = process.env.MESSAGING_SOCKET_AUTH_URL?.trim();
+    const authUrl = process.env.MESSAGING_SOCKET_AUTH_URL?.trim()
+      || `http://127.0.0.1:${PORT}/api/im/auth/introspect`;
     const allowedOrigins = parseMessagingSocketOrigins(process.env.MESSAGING_SOCKET_ALLOWED_ORIGINS);
-    if (!authUrl) {
-      throw new Error('MESSAGING_SOCKET_AUTH_URL is required when MESSAGING_SOCKET_ENABLED=true');
-    }
     const messagingSocket = createMessagingSocketServer(server, {
       authenticate: createRemoteMessagingAuthenticator(authUrl),
       authenticateVisitor: authenticateVisitorSession,

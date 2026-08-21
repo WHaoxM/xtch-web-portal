@@ -20,7 +20,7 @@
     "deploy:serve": "tsx scripts/serve-selfhost.mjs",
     "selfhost": "tsx scripts/serve-selfhost.mjs --target win11-home",
     "test:s3": "tsx --test api/domains/media/s3Key.test.ts api/platform/publicOrigin.test.ts",
-    "test:messaging-socket": "tsx --test scripts/messagingSocket.test.ts",
+    "test:messaging-socket": "tsx --test scripts/messagingSocket.test.ts scripts/messagingCors.test.ts",
     "test:admin-allowlist": "tsx --test api/domains/identity/admin/adminAllowlist.test.ts",
     "typecheck": "tsc -b",
     "db:migrate": "tsx ../scripts/db/migrate.ts",

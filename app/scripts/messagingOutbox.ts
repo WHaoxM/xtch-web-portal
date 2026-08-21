@@ -5,6 +5,7 @@ type OutboxRow = {
   id: number;
   event_id: string;
   conversation_id: string | null;
+  tenant_id: string | null;
   event_type: string;
   payload: Record<string, unknown>;
 };
@@ -20,14 +21,16 @@ export function startMessagingOutbox(namespace: Namespace, options: { intervalMs
     try {
       const rows = await sql.begin(async (tx) => {
         const locked = await tx<OutboxRow>`
-          SELECT id, event_id, conversation_id, event_type, payload
-          FROM im_outbox
-          WHERE published_at IS NULL
-            AND available_at <= NOW()
-            AND (locked_at IS NULL OR locked_at < NOW() - INTERVAL '1 minute')
-          ORDER BY id
+          SELECT o.id, o.event_id, o.conversation_id, o.event_type, o.payload,
+            c.tenant_id
+          FROM im_outbox o
+          LEFT JOIN im_conversations c ON c.id = o.conversation_id
+          WHERE o.published_at IS NULL
+            AND o.available_at <= NOW()
+            AND (o.locked_at IS NULL OR o.locked_at < NOW() - INTERVAL '1 minute')
+          ORDER BY o.id
           LIMIT 50
-          FOR UPDATE SKIP LOCKED
+          FOR UPDATE OF o SKIP LOCKED
         `;
         if (locked.rows.length > 0) {
           await tx`
@@ -42,10 +45,16 @@ export function startMessagingOutbox(namespace: Namespace, options: { intervalMs
       for (const row of rows) {
         try {
           if (row.conversation_id) {
-            namespace.to(`im:conversation:${row.conversation_id}`).emit(row.event_type, {
+            const event = {
               event_id: row.event_id,
               ...row.payload,
-            });
+            };
+            namespace.to(`im:conversation:${row.conversation_id}`).emit(row.event_type, event);
+            if (row.tenant_id) namespace.to(`tenant:${row.tenant_id}`).emit(row.event_type, event);
+            const targetStaffId = typeof row.payload.target_staff_id === 'string'
+              ? row.payload.target_staff_id
+              : null;
+            if (targetStaffId) namespace.to(`staff:${targetStaffId}`).emit(row.event_type, event);
           }
           await sql`
             UPDATE im_outbox
@@ -79,4 +88,3 @@ export function startMessagingOutbox(namespace: Namespace, options: { intervalMs
     clearInterval(timer);
   };
 }
-

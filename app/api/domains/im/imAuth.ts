@@ -31,6 +31,14 @@ export type ExternalMvpPrincipal = {
   tenantId?: string | null;
 };
 
+export type ImIntrospectionPrincipal = {
+  subject: string;
+  role: 'platform_admin' | 'tenant_admin' | 'tenant_staff';
+  tenantId: string | null;
+  tenantIds: string[];
+  scopes: string[];
+};
+
 type StaffRow = {
   id: string;
   username: string;
@@ -74,22 +82,47 @@ export function hasPermission(principal: ImStaffPrincipal, permission: string): 
   return principal.accountType === 'super_admin' || principal.permissions.includes(permission);
 }
 
+/**
+ * Resolve an independent IM access token for the Socket.IO gateway.
+ * The gateway receives only short-lived xtch claims; XT_MVP secrets never leave
+ * this process and are not needed by the mobile client.
+ */
+export async function introspectImAccessToken(token: string): Promise<ImIntrospectionPrincipal | null> {
+  const claims = verifyAccessToken(token);
+  if (!claims) return null;
+  const result = await sql<{ account_type: 'super_admin' | 'staff' }>`
+    SELECT account_type
+    FROM im_staff_accounts
+    WHERE id = ${claims.sub}::uuid AND status = 'active'
+  `;
+  const staff = result.rows[0];
+  if (!staff) return null;
+  return {
+    subject: claims.sub,
+    role: staff.account_type === 'super_admin' ? 'platform_admin' : 'tenant_staff',
+    tenantId: claims.tenantIds[0] ?? null,
+    tenantIds: claims.tenantIds,
+    scopes: claims.permissions,
+  };
+}
+
 export async function issueStaffTokens(
   staff: StaffRow,
   options: { ipHash?: string; userAgentHash?: string; externalRole?: string; tokenFamily?: string } = {},
 ) {
-  const permissionsResult = await sql<{ permission_code: string; scope_id: string | null }>`
-    SELECT permission_code, scope_id
+  const permissionsResult = await sql<{ permission_code: string; scope_type: 'global' | 'tenant'; scope_id: string | null }>`
+    SELECT permission_code, scope_type, scope_id
     FROM im_staff_permissions
     WHERE staff_id = ${staff.id}::uuid
       AND revoked_at IS NULL
   `;
-  const permissions = [...new Set(permissionsResult.rows.map((row) => row.permission_code))];
+  const permissions = [...new Set(permissionsResult.rows.map((row) => row.permission_code))] as string[];
   const tenantIds = [...new Set(
     permissionsResult.rows
+      .filter((row) => row.scope_type === 'tenant' && row.permission_code === 'im:conversation:read')
       .map((row) => row.scope_id)
       .filter((scopeId): scopeId is string => Boolean(scopeId)),
-  )];
+  )] as string[];
   const now = Math.floor(Date.now() / 1000);
   const claims: JwtClaims = {
     iss: 'xtch',

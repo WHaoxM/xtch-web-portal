@@ -8,6 +8,7 @@ export type MessagingSocketPrincipal = {
   subject: string;
   role: string;
   tenantId: string | null;
+  tenantIds?: string[];
   scopes: string[];
 };
 
@@ -118,14 +119,29 @@ export function createMessagingSocketServer(
                 AND i.revoked_at IS NULL
               WHERE c.id = ${conversationId}::uuid
             `
-          : await sql<{ id: string }>`
+          : principal.role === 'platform_admin'
+            ? await sql<{ id: string }>`
+                SELECT c.id
+                FROM im_conversations c
+                WHERE c.id = ${conversationId}::uuid
+              `
+            : await sql<{ id: string }>`
               SELECT c.id
               FROM im_conversations c
-              JOIN im_conversation_members m ON m.conversation_id = c.id
-                AND m.principal_type = 'staff'
-                AND m.principal_id = ${principal.subject}
-                AND m.left_at IS NULL
               WHERE c.id = ${conversationId}::uuid
+                AND (
+                  EXISTS (
+                    SELECT 1 FROM im_conversation_members m
+                    WHERE m.conversation_id = c.id
+                      AND m.principal_type = 'staff'
+                      AND m.principal_id = ${principal.subject}
+                      AND m.left_at IS NULL
+                  )
+                  OR (
+                    c.tenant_id = ANY(${principal.tenantIds ?? (principal.tenantId ? [principal.tenantId] : [])}::uuid[])
+                    AND 'im:conversation:read' = ANY(${principal.scopes}::text[])
+                  )
+                )
             `;
         if (!result.rows[0]) {
           acknowledge?.({ ok: false, error: 'Conversation access denied.' });
@@ -188,6 +204,9 @@ export function createRemoteMessagingAuthenticator(
           accept: 'application/json',
           authorization: `Bearer ${bearerToken}`,
           'content-type': 'application/json',
+          ...(process.env.MESSAGING_SOCKET_AUTH_SECRET
+            ? { 'x-im-introspection-secret': process.env.MESSAGING_SOCKET_AUTH_SECRET }
+            : {}),
         },
         body: '{}',
         signal: controller.signal,
@@ -207,10 +226,15 @@ export function createRemoteMessagingAuthenticator(
       if (!subject || !role) return null;
 
       const tenantValue = envelope.tenantId ?? envelope.tenant_id;
+      const rawTenantIds = envelope.tenantIds ?? envelope.tenant_ids;
+      const tenantIds = Array.isArray(rawTenantIds)
+        ? rawTenantIds.filter((tenant): tenant is string => typeof tenant === 'string')
+        : typeof tenantValue === 'string' ? [tenantValue] : [];
       return {
         subject,
         role,
         tenantId: typeof tenantValue === 'string' ? tenantValue : null,
+        tenantIds,
         scopes: Array.isArray(envelope.scopes)
           ? envelope.scopes.filter((scope): scope is string => typeof scope === 'string')
           : [],

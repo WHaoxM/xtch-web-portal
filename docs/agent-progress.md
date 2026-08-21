@@ -17,6 +17,18 @@
 - 本阶段已实现：`014_im_core` migration、`/api/im/public/session`、public conversation/message REST、identity link、`/api/im/auth/exchange|refresh|logout`、客服消息 REST、动态 IM 路由、访客 cookie Socket ACL、Socket.IO production attach 和 outbox worker；尚未在真实数据库/XT_MVP 环境执行 migration。
 - 后续确认项已追加实现：客服邀请/权限接口、claim/takeover/transfer assignment API、mobile 独立 IM token store/API/Socket client；mobile `pnpm typecheck` 通过。真实 migration 因本机 PostgreSQL `localhost:5432` 未启动而未执行，未触碰远程/生产数据库。
 
+## Current Goal（im-server-completion，2026-08-21）
+
+- 用户确认继续在 xtch-server 补齐移动客服工作台所需服务端能力。
+- 本阶段范围：客服会话列表/详情、已读游标、Socket token introspection、REST CORS/OPTIONS，以及 staff REST/Socket ACL 对齐。
+- 计划验证：IM 目标 TypeScript、Socket 测试、lint；真实生产迁移/部署仍由 main 的 CI/CD 执行。
+
+## Delivery（im-server-completion，2026-08-21）
+- 已改：客服会话列表/详情、已读游标、统一 staff 会话 ACL、分配目标校验、Socket token introspection、租户/客服房间 outbox 广播、IM REST CORS/OPTIONS、self-host 默认回源鉴权地址、部署环境示例。
+- 已验证：IM 目标 TypeScript 编译通过；IM Socket/CORS 测试 4/4 通过；变更文件 ESLint 通过；`node --check app/scripts/serve-selfhost.mjs` 通过；`git diff --check` 无内容错误（仅 CRLF 提示）。
+- 未验证：本机 PostgreSQL 未运行，未执行真实迁移/端到端消息流；生产部署由推送 main 后的 CI/CD 执行，需在部署环境填入 IM 密钥、XT_MVP 地址和明确 Origins。
+- 已交付：提交 `9d4dfe0` 已推送到 `origin/main`，等待 CI/CD 构建与部署。
+
 ## Current Goal（restart-xtch-server，2026-08-21）
 
 - 用户明确要求网站先恢复运行，暂不考虑支付；不伪造 Payoneer 凭据。

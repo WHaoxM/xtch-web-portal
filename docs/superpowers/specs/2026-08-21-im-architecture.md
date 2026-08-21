@@ -465,7 +465,8 @@ new/open(queue)
 - 文本消息限制 8KB；Socket buffer 64KB；附件走 S3 presign，不经过消息正文。
 - 所有客服查询强制 tenant scope；global 权限只授予显式 super_admin。
 - JWT access TTL 建议 10 分钟；refresh rotation；账号 suspend 后立即 revoke session，access 最多在 TTL 内失效。
-- Caddy 只需反代现有 3080；生产环境必须显式配置 `MESSAGING_SOCKET_ALLOWED_ORIGINS`，不配置时保持关闭。
+- Caddy 只需反代现有 3080；生产环境必须显式配置 `MESSAGING_SOCKET_ALLOWED_ORIGINS` 与 `IM_REST_ALLOWED_ORIGINS`（可使用同一组 origin），不配置时保持 Socket 关闭且 REST 不接受跨源 preflight。
+- `MESSAGING_SOCKET_AUTH_URL` 可省略，生产入口会默认回环到 `/api/im/auth/introspect`；若使用独立私网 introspection 服务，则必须使用 HTTPS，并可用 `MESSAGING_SOCKET_AUTH_SECRET` 做共享密钥保护。
 - 监控：outbox pending age、dead-letter count、message write latency、Socket connected/auth reject、补偿请求比例、每会话活跃客服数。
 - PostgreSQL 备份必须覆盖 messages/outbox/audit；恢复后先跑 migration，再启动 worker。
 
