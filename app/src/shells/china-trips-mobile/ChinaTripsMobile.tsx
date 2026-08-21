@@ -4108,7 +4108,6 @@ function WhatsAppShortcut() {
 function TabContent({
   activeTab,
   query,
-  draft,
   isSignedIn,
   authUser,
   customDraft,
@@ -4142,7 +4141,6 @@ function TabContent({
 }: {
   activeTab: MobileTab;
   query: string;
-  draft: GroupRequestDraft;
   isSignedIn: boolean;
   authUser: AuthUser | null;
   customDraft: CustomTripDraft;
@@ -5819,7 +5817,6 @@ export default function ChinaTripsMobile() {
               key={activeTab}
               activeTab={activeTab}
               query={query}
-              draft={draft}
               isSignedIn={isSignedIn}
               authUser={authUser}
               customDraft={customDraft}
