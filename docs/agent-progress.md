@@ -39,7 +39,7 @@
 - 用户要求门户官网和 China Trips 移动壳提供客户即时通讯入口。
 - 已实现：全局 `PublicImBubble`、访客 session/conversation/message client、Socket.IO visitor subscription + 5 秒 REST 补偿、桌面/移动响应式面板；修正开发环境访客 cookie 名称以兼容 HTTP。
 - 已验证：`npm run typecheck`、变更文件 ESLint、IM Socket/CORS 4/4、`npm run build` 通过；Playwright 浏览器未安装，未做截图验收。
-- 下一步：提交门户前端与 cookie 修复并推送 main。
+- 已交付：提交 `883845f` 已推送到 `origin/main`，等待 CI/CD 构建与部署。
 
 ## Current Goal（restart-xtch-server，2026-08-21）
 
