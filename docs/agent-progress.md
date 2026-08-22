@@ -1,5 +1,25 @@
 # Agent Progress
 
+## Current Goal（官网移动端体验 / 缓存 / IM 继承修复，2026-08-22）
+
+- 已定位：移动端 WhatsApp FAB 被最近提交改成只派发 IM 打开事件，原有询盘 gate/form 实际不可达；IM client 也未携带 Supabase access token，身份链接后匿名 identity 被撤销，导致消息历史无法稳定继承。
+- 处理中：恢复移动端 WhatsApp 询盘入口；IM 请求禁用缓存并携带登录 token；保留匿名 identity、支持已登录用户读取/发送继承会话；生产静态服务为 HTML/API 增加 no-cache/no-store，带 hash 的构建资源使用 immutable。
+- 已完成：恢复 `WhatsAppShortcut` 的 gate/short/long 表单；Public IM 全部静态 UI 文案保持英文；active conversation 写入本地会话记忆并在登录后调用 identity link；visitor identity 不再因 link 被撤销；消息读写同时允许已验证 Supabase identity；API/内容请求使用 no-store，生产静态服务按 HTML/hashed assets 设置缓存策略。
+- 已验证：`npm run typecheck`、`npm run lint`、`npm run build` 全部通过。
+- 待验证：真实生产 Caddy/Cloudflare 缓存头和两台设备登录后恢复同一 IM 会话；当前未执行真机/浏览器截图验收。
+
+## Current Goal（官网移动端 APK 打包，2026-08-22）
+
+- 已确认：仓库当前是 React + Vite Web 项目，没有 Android/Capacitor/TWA 原生工程或现成 APK 构建脚本。
+- 已确认：本机有 Java 17、Android SDK platform-tools/build-tools，但没有现成 Gradle 项目。
+- Web 生产构建已通过，产物为 `app/dist/local/`。
+- 已生成并保存主题图标：`app/public/android-launcher-icon-1024.png`（同步保留原始导出 `app/public/android-launcher-icon.png`）。图标采用深海军蓝背景、蓝青流动 S 标志和启动器安全留白。
+- 已验证：生成图像可读取，1024×1024 PNG；SHA-256 `CD22B7A78DF5E0D6EA5977C586DA90826A734B0AC0981C837345ABEF5A7E5E1D`。
+- 已完成：采用最小原生 Android WebView 壳，使用 release keystore 生成 `dist/android/syncing-travel-release.apk`。
+- 已验证：APK 包名 `com.xuntingtravel.app`、versionName `1.0.0`、target SDK 35；zipalign、APK v1/v2/v3 签名验证通过；签名证书 SHA-256 `bb2cd795f5bbb2aba4333d0ffc3af15d831f1a18fa49d1681d89909b134081f1`。
+- APK SHA-256：`82b9ed455ccde9cea2343085ac36ddaaf491bc338947c629233f417535e52b65`。
+- 未验证：当前没有连接 Android 真机/模拟器（`adb devices` 为空）；官网 HEAD 检查受本机 TLS 环境影响失败，APK 仍配置为线上 `https://www.xuntingtravel.com/china-trips`。
+
 ## Delivery（portal-mobile-im-entry-reuse，2026-08-22）
 
 - 按用户确认，移动端不新增聊天组件：复用现有右侧绿色客服按钮，点击后通过 IM 事件桥接打开已存在的 `PublicImBubble` 聊天窗口。

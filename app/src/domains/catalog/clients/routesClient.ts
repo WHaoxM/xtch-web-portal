@@ -143,7 +143,7 @@ export function toRouteTour(route: RouteRecord): RouteTour {
 
 export async function fetchRoutes(destinationSlug?: string): Promise<RouteTour[]> {
   const query = destinationSlug ? `?destination=${encodeURIComponent(destinationSlug)}` : '';
-  const response = await fetch(`/api/routes${query}`);
+  const response = await fetch(`/api/routes${query}`, { cache: 'no-store' });
   const result = (await response.json().catch(() => ({
     ok: false,
     error: 'Unexpected routes response.',

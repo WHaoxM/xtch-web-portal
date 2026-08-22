@@ -13,12 +13,14 @@ import {
   createPublicImConversation,
   establishPublicImSession,
   listPublicImMessages,
+  linkPublicImIdentity,
   sendPublicImMessage,
   PUBLIC_IM_OPEN_EVENT,
   type PublicImConversation,
   type PublicImMessage,
   type PublicImSource,
 } from '@/domains/im/publicImClient';
+import { subscribeAuthSession } from '@/domains/identity/traveler/authClient';
 import { brand } from '@/lib/siteData';
 
 type PublicImBubbleProps = { source: PublicImSource; showTrigger?: boolean };
@@ -27,6 +29,24 @@ type DeliveryState = 'pending' | 'failed';
 type UiMessage = PublicImMessage & { delivery?: DeliveryState; idempotencyKey?: string };
 
 const QUICK_PROMPTS = ['Help me plan a custom trip', 'I have destinations and dates'];
+const ACTIVE_CONVERSATION_STORAGE_KEY = 'xtch_public_im_active_conversation';
+
+function readRememberedConversationId(): string | null {
+  try {
+    const value = window.localStorage.getItem(ACTIVE_CONVERSATION_STORAGE_KEY)?.trim();
+    return value || null;
+  } catch {
+    return null;
+  }
+}
+
+function rememberConversationId(conversationId: string) {
+  try {
+    window.localStorage.setItem(ACTIVE_CONVERSATION_STORAGE_KEY, conversationId);
+  } catch {
+    // Private browsing/storage-disabled mode still works from the server session.
+  }
+}
 
 export default function PublicImBubble({ source, showTrigger = true }: PublicImBubbleProps) {
   const [open, setOpen] = useState(false);
@@ -38,6 +58,7 @@ export default function PublicImBubble({ source, showTrigger = true }: PublicImB
   const [error, setError] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState('');
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const [authRevision, setAuthRevision] = useState(0);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const panelRef = useRef<HTMLElement>(null);
@@ -47,6 +68,8 @@ export default function PublicImBubble({ source, showTrigger = true }: PublicImB
   const historyMarkerRef = useRef(false);
   const sessionAttemptRef = useRef(0);
   const wasOpenRef = useRef(false);
+
+  useEffect(() => subscribeAuthSession(() => setAuthRevision((value) => value + 1)), []);
 
   const unreadHint = useMemo(
     () => !open && messages.some((message) => message.sender_type === 'staff'),
@@ -159,10 +182,22 @@ export default function PublicImBubble({ source, showTrigger = true }: PublicImB
       setConnection('loading');
       setError(null);
       try {
-        const session = await establishPublicImSession();
+        let session = await establishPublicImSession();
         if (cancelled) return;
-        const selected = session.conversations[0] ?? await createPublicImConversation(source);
+        const rememberedId = readRememberedConversationId() ?? conversationIdRef.current;
+        let selected = session.conversations.find((item) => item.id === rememberedId) ?? session.conversations[0];
+        if (!selected && rememberedId && session.visitor.authenticatedUserId) {
+          try {
+            await linkPublicImIdentity(rememberedId);
+            session = await establishPublicImSession();
+            selected = session.conversations.find((item) => item.id === rememberedId) ?? session.conversations[0];
+          } catch {
+            // A stale conversation id must not prevent a fresh support conversation.
+          }
+        }
+        selected ??= await createPublicImConversation(source);
         if (cancelled) return;
+        rememberConversationId(selected.id);
         conversationIdRef.current = selected.id;
         setConversation(selected);
         const initial = await listPublicImMessages(selected.id);
@@ -202,7 +237,7 @@ export default function PublicImBubble({ source, showTrigger = true }: PublicImB
       socketRef.current?.socket.disconnect();
       socketRef.current = null;
     };
-  }, [open, source]);
+  }, [authRevision, open, source]);
 
   useEffect(() => {
     if (!open || !conversation) return;

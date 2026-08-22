@@ -1,4 +1,5 @@
 import { io, type Socket } from 'socket.io-client';
+import { getAccessToken } from '@/domains/identity/traveler/authClient';
 
 export type PublicImSource = 'portal_web' | 'portal_mobile';
 
@@ -40,11 +41,14 @@ function apiUrl(path: string): string {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const accessToken = await getAccessToken();
   const response = await fetch(apiUrl(path), {
     ...options,
+    cache: 'no-store',
     credentials: 'include',
     headers: {
       accept: 'application/json',
+      ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
       ...(options.body ? { 'content-type': 'application/json' } : {}),
       ...options.headers,
     },
@@ -66,6 +70,13 @@ export async function createPublicImConversation(source: PublicImSource): Promis
     { method: 'POST', body: JSON.stringify({ source }) },
   );
   return result.conversation;
+}
+
+export async function linkPublicImIdentity(conversationId: string): Promise<void> {
+  await request<PublicImPayload<{ conversationId: string }>>(
+    `/api/im/public/conversations/${encodeURIComponent(conversationId)}/identity/link`,
+    { method: 'POST' },
+  );
 }
 
 export async function listPublicImMessages(

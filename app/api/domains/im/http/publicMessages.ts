@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { sql } from '../../../platform/db';
+import { getUserFromRequest } from '../../identity/traveler/userAuth';
 import { getVisitorPrincipal } from '../visitorAuth';
 import { headerValue, type ImRequest, type ImResponse } from '../httpTypes';
 
@@ -27,6 +28,7 @@ export default async function handler(req: ImRequest, res: ImResponse) {
   }
   const conversationId = readConversationId(req.url);
   const visitor = await getVisitorPrincipal(req);
+  const authenticated = await getUserFromRequest(req);
   if (!conversationId || !visitor) {
     res.status(401).json({ ok: false, error: 'Messaging session and conversation are required.' });
     return;
@@ -48,8 +50,10 @@ export default async function handler(req: ImRequest, res: ImResponse) {
         FROM im_conversations c
         JOIN im_conversation_identities i ON i.conversation_id = c.id
         WHERE c.id = ${conversationId}::uuid
-          AND i.identity_type = 'visitor_session'
-          AND i.identity_subject = ${visitor.sessionId}
+          AND (
+            (i.identity_type = 'visitor_session' AND i.identity_subject = ${visitor.sessionId})
+            OR (i.identity_type = 'supabase_user' AND i.identity_subject = ${authenticated.ok ? authenticated.user.id : ''})
+          )
           AND i.revoked_at IS NULL
           AND c.status <> 'closed'
         FOR UPDATE OF c
@@ -117,6 +121,7 @@ export default async function handler(req: ImRequest, res: ImResponse) {
 async function listMessages(req: ImRequest, res: ImResponse) {
   const conversationId = readConversationId(req.url);
   const visitor = await getVisitorPrincipal(req);
+  const authenticated = await getUserFromRequest(req);
   if (!conversationId || !visitor) {
     res.status(401).json({ ok: false, error: 'Messaging session and conversation are required.' });
     return;
@@ -132,8 +137,10 @@ async function listMessages(req: ImRequest, res: ImResponse) {
       AND EXISTS (
         SELECT 1 FROM im_conversation_identities i
         WHERE i.conversation_id = m.conversation_id
-          AND i.identity_type = 'visitor_session'
-          AND i.identity_subject = ${visitor.sessionId}
+          AND (
+            (i.identity_type = 'visitor_session' AND i.identity_subject = ${visitor.sessionId})
+            OR (i.identity_type = 'supabase_user' AND i.identity_subject = ${authenticated.ok ? authenticated.user.id : ''})
+          )
           AND i.revoked_at IS NULL
       )
       AND m.seq > ${afterSeq}

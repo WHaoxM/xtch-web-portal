@@ -10,7 +10,7 @@ export type Category = {
 };
 
 export async function fetchCategories(scope: CategoryScope): Promise<Category[]> {
-  const response = await fetch(`/api/categories?scope=${scope}`);
+  const response = await fetch(`/api/categories?scope=${scope}`, { cache: 'no-store' });
   const result = (await response.json().catch(() => ({
     ok: false,
     error: 'Unexpected categories response.',

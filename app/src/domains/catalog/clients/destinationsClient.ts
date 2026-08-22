@@ -13,7 +13,7 @@ export type Destination = {
 };
 
 export async function fetchDestinations(): Promise<Destination[]> {
-  const response = await fetch('/api/destinations');
+  const response = await fetch('/api/destinations', { cache: 'no-store' });
   const result = (await response.json().catch(() => ({
     ok: false,
     error: 'Unexpected destinations response.',

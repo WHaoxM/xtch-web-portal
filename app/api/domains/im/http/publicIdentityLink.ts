@@ -50,7 +50,7 @@ export default async function handler(req: ImRequest, res: ImResponse) {
       `;
       await tx`
         UPDATE im_conversation_identities
-        SET revoked_at = NOW(), is_primary = false
+        SET is_primary = false
         WHERE conversation_id = ${conversationId}::uuid
           AND identity_type = 'visitor_session'
           AND identity_subject = ${visitor.sessionId}
@@ -91,4 +91,3 @@ function readConversationId(url: string | undefined): string | null {
 }
 
 class IdentityLinkError extends Error {}
-

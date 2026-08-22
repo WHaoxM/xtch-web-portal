@@ -195,6 +195,8 @@ function sendJsonError(res, statusCode, error) {
 }
 
 async function handleApi(req, res, apiPath) {
+  // APIs carry session state and live content; never let a browser/WebView reuse a stale response.
+  res.setHeader('cache-control', 'no-store, max-age=0');
   const modulePath = resolveLocalApiRoute(apiPath);
   const useRawBody = rawBodyRoutes.has(apiPath);
   const limitBytes = bodyLimitBytesForKind(useRawBody ? 'webhook' : 'json');
@@ -281,11 +283,22 @@ function safeJoinDist(urlPathname) {
   return abs;
 }
 
+function cacheControlForFile(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  if (ext === '.html') return 'no-cache, max-age=0, must-revalidate';
+  const normalized = filePath.replace(/\\/g, '/');
+  if (normalized.includes('/assets/') && /-[A-Za-z0-9_-]{8,}\.[^/]+$/.test(normalized)) {
+    return 'public, max-age=31536000, immutable';
+  }
+  return 'no-cache, max-age=0, must-revalidate';
+}
+
 function sendFile(res, filePath, statusCode = 200) {
   const ext = path.extname(filePath).toLowerCase();
   const type = MIME[ext] || 'application/octet-stream';
   res.statusCode = statusCode;
   res.setHeader('content-type', type);
+  res.setHeader('cache-control', cacheControlForFile(filePath));
   fs.createReadStream(filePath).pipe(res);
 }
 
@@ -335,6 +348,7 @@ function serveStatic(req, res, urlPathname) {
     if (req.method === 'HEAD') {
       res.statusCode = 200;
       res.setHeader('content-type', MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream');
+      res.setHeader('cache-control', cacheControlForFile(filePath));
       res.end();
       return;
     }

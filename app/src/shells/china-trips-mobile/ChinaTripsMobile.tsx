@@ -96,7 +96,6 @@ import {
   type FieldErrors,
 } from '@/lib/formErrors';
 import { submitInquiry } from '@/lib/inquiryClient';
-import { PUBLIC_IM_OPEN_EVENT } from '@/domains/im/publicImClient';
 import {
   buildInternationalPhone,
   DEFAULT_PHONE_COUNTRY_CODE,
@@ -3851,7 +3850,8 @@ function WhatsAppShortcut() {
   };
 
   const openFab = () => {
-    window.dispatchEvent(new Event(PUBLIC_IM_OPEN_EVENT));
+    resetForm();
+    setStep('gate');
   };
 
   const chooseGate = (alreadySubmitted: boolean) => {
@@ -3914,7 +3914,7 @@ function WhatsAppShortcut() {
       <button
         type="button"
         className="iosapp-whatsapp-fab"
-        aria-label="打开客服聊天窗口"
+        aria-label="Contact Syncing Travel on WhatsApp"
         onClick={openFab}
       >
         <MessageCircle size={20} />
@@ -4507,7 +4507,7 @@ export default function ChinaTripsMobile() {
 
     async function loadDepartures() {
       try {
-        const response = await fetch('/api/departures');
+        const response = await fetch('/api/departures', { cache: 'no-store' });
         const result = (await response.json().catch(() => ({ ok: false, error: 'Unexpected response.' }))) as
           | { ok: true; departures: Parameters<typeof mapApiDepartureToUi>[0][] }
           | { ok: false; error: string };
@@ -4531,7 +4531,7 @@ export default function ChinaTripsMobile() {
 
     async function loadFeaturedDepartures() {
       try {
-        const response = await fetch('/api/departures?featured=1');
+        const response = await fetch('/api/departures?featured=1', { cache: 'no-store' });
         const result = (await response.json().catch(() => ({ ok: false }))) as
           | { ok: true; departures: Parameters<typeof mapApiDepartureToUi>[0][] }
           | { ok: false; error?: string };
