@@ -1,6 +1,6 @@
 import { sql } from '../../../platform/db';
-import { canAccessConversation, tenantScopeCondition } from '../conversationAccess';
-import { authenticateStaffRequest, hasPermission, type ImStaffPrincipal } from '../imAuth';
+import { canAccessConversation } from '../conversationAccess';
+import { authenticateStaffRequest, hasGlobalPermission, hasPermission } from '../imAuth';
 import { type ImRequest, type ImResponse } from '../httpTypes';
 
 type Cursor = { updatedAt: string; id: string };
@@ -31,13 +31,10 @@ export default async function handler(req: ImRequest, res: ImResponse) {
     return;
   }
 
-  const statusFilter = status && ['open', 'pending', 'closed'].includes(status)
-    ? sql`AND c.status = ${status}`
-    : sql`AND c.status <> 'closed'`;
-  const scopeFilter = buildScopeFilter(scope, auth.principal);
-  const cursorFilter = cursor
-    ? sql`AND (c.updated_at, c.id) < (${cursor.updatedAt}::timestamptz, ${cursor.id}::uuid)`
-    : sql``;
+  const normalizedStatus = status && ['open', 'pending', 'closed'].includes(status) ? status : null;
+  const globalRead = hasGlobalPermission(auth.principal, 'im:conversation:read');
+  const cursorUpdatedAt = cursor?.updatedAt ?? null;
+  const cursorId = cursor?.id ?? null;
 
   try {
     const result = await sql<{
@@ -79,11 +76,40 @@ export default async function handler(req: ImRequest, res: ImResponse) {
         ORDER BY m.seq DESC
         LIMIT 1
       ) lm ON TRUE
-      WHERE TRUE
-        ${statusFilter}
-        ${tenantScopeCondition(auth.principal)}
-        ${scopeFilter}
-        ${cursorFilter}
+      WHERE (
+          (${normalizedStatus}::text IS NULL AND c.status <> 'closed')
+          OR c.status = ${normalizedStatus}::text
+        )
+        AND (
+          ${globalRead}::boolean
+          OR c.tenant_id = ANY(${auth.principal.tenantIds}::uuid[])
+        )
+        AND (
+          ${scope}::text = 'all'
+          OR (
+            ${scope}::text = 'mine'
+            AND EXISTS (
+              SELECT 1 FROM im_conversation_members m
+              WHERE m.conversation_id = c.id
+                AND m.principal_type = 'staff'
+                AND m.principal_id = ${auth.principal.staffId}
+                AND m.left_at IS NULL
+            )
+          )
+          OR (
+            ${scope}::text = 'queue'
+            AND NOT EXISTS (
+              SELECT 1 FROM im_conversation_assignments a
+              WHERE a.conversation_id = c.id
+                AND a.assignment_role = 'primary'
+                AND a.status = 'active'
+            )
+          )
+        )
+        AND (
+          ${cursorUpdatedAt}::timestamptz IS NULL
+          OR (c.updated_at, c.id) < (${cursorUpdatedAt}::timestamptz, ${cursorId}::uuid)
+        )
       ORDER BY c.updated_at DESC, c.id DESC
       LIMIT ${limit + 1}
     `;
@@ -99,27 +125,6 @@ export default async function handler(req: ImRequest, res: ImResponse) {
     console.error('IM conversation list failed:', error instanceof Error ? error.message : error);
     res.status(500).json({ ok: false, error: 'Unable to list conversations.' });
   }
-}
-
-function buildScopeFilter(scope: string, principal: ImStaffPrincipal) {
-  if (scope === 'mine') {
-    return sql`
-      AND EXISTS (
-        SELECT 1 FROM im_conversation_members m
-        WHERE m.conversation_id = c.id
-          AND m.principal_type = 'staff'
-          AND m.principal_id = ${principal.staffId}
-          AND m.left_at IS NULL
-      )
-    `;
-  }
-  if (scope === 'all') return sql``;
-  return sql`
-    AND NOT EXISTS (
-      SELECT 1 FROM im_conversation_assignments a
-      WHERE a.conversation_id = c.id AND a.assignment_role = 'primary' AND a.status = 'active'
-    )
-  `;
 }
 
 function parseCursor(value: string | null): Cursor | null {

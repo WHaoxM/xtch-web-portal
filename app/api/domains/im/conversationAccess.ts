@@ -19,30 +19,24 @@ export async function canAccessConversation(
       ? 'im:message:send'
       : 'im:assignment:claim';
   if (!hasPermission(principal, permission)) return false;
-  if (hasGlobalPermission(principal, permission)) return true;
+  const globalAccess = hasGlobalPermission(principal, permission);
+  const tenantRead = mode === 'read';
 
   const result = await sql<{ id: string }>`
     SELECT c.id
     FROM im_conversations c
     WHERE c.id = ${conversationId}::uuid
       AND (
-        EXISTS (
+        ${globalAccess}::boolean
+        OR EXISTS (
           SELECT 1 FROM im_conversation_members m
           WHERE m.conversation_id = c.id
             AND m.principal_type = 'staff'
             AND m.principal_id = ${principal.staffId}
             AND m.left_at IS NULL
         )
-        OR (
-          ${mode === 'read' ? sql`c.tenant_id = ANY(${principal.tenantIds}::uuid[])` : sql`FALSE`}
-        )
+        OR (${tenantRead}::boolean AND c.tenant_id = ANY(${principal.tenantIds}::uuid[]))
       )
   `;
   return Boolean(result.rows[0]);
-}
-
-export function tenantScopeCondition(principal: ImStaffPrincipal) {
-  if (hasGlobalPermission(principal, 'im:conversation:read')) return sql``;
-  if (principal.tenantIds.length === 0) return sql`AND FALSE`;
-  return sql`AND c.tenant_id = ANY(${principal.tenantIds}::uuid[])`;
 }
