@@ -12,6 +12,7 @@
 - 按 `.ulpi/design/public-im-chat.md` 完成聊天面板重设计：移动端底部 Sheet、平板/桌面锚定面板、route marker、快捷问题、消息发送状态、重试、断线/离线/错误状态、WhatsApp 备用入口。
 - 增加焦点回收、Escape/Tab trap、popstate 关闭和 safe-area composer；发送重试复用同一 idempotency key。
 - 已验证：`npm run typecheck`、`npm run lint`、`npm run build`、`git diff --check` 通过；未做真实生产截图和端到端客服往返。
+- 阻塞：`git push origin HEAD:main` 因 GitHub TLS 连接失败未完成；本地提交 `d460e28`、`36bb149` 已保留，待网络恢复后再推送。
 
 ## Delivery（portal-public-im-entry-fix，2026-08-21）
 
