@@ -1,5 +1,12 @@
 # Agent Progress
 
+## Current Goal（官网移动端共享 Public IM 气泡，2026-08-22）
+
+- 目标：让移动端入口直接打开官网同一套 Public IM 气泡，复用 visitor cookie、会话 ID、消息历史和登录身份继承机制。
+- 已改：在移动端页头和详情/表单返回栏增加共享聊天入口，通过现有 `PUBLIC_IM_OPEN_EVENT` 打开全局 `PublicImBubble`；WhatsApp 询盘 FAB 与表单流程保持不变。
+- 已验证：`npm run typecheck`、`npm run lint`、`npm run build`、`git diff --check` 均通过；生产构建生成 `app/dist/local/`。
+- 待验证：真实生产部署后的真机点击与客服消息往返。
+
 ## Current Goal（官网移动端体验 / 缓存 / IM 继承修复，2026-08-22）
 
 - 已定位：移动端 WhatsApp FAB 被最近提交改成只派发 IM 打开事件，原有询盘 gate/form 实际不可达；IM client 也未携带 Supabase access token，身份链接后匿名 identity 被撤销，导致消息历史无法稳定继承。

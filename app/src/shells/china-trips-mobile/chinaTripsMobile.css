@@ -2866,7 +2866,7 @@ span.iosapp-provider-mark {
   top: 0;
   z-index: 5;
   display: grid;
-  grid-template-columns: 44px 1fr 44px;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
   align-items: center;
   min-height: 54px;
   width: min(100%, 430px);
@@ -2888,6 +2888,13 @@ span.iosapp-provider-mark {
   color: var(--ios-blue);
   padding: 0;
   text-decoration: none;
+}
+
+.iosapp-nav-bar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
 }
 
 .iosapp-nav-bar-home:active {

@@ -96,6 +96,7 @@ import {
   type FieldErrors,
 } from '@/lib/formErrors';
 import { submitInquiry } from '@/lib/inquiryClient';
+import { PUBLIC_IM_OPEN_EVENT } from '@/domains/im/publicImClient';
 import {
   buildInternationalPhone,
   DEFAULT_PHONE_COUNTRY_CODE,
@@ -164,6 +165,10 @@ function openWhatsAppAfterInquiry() {
   const base = brand.whatsappHref;
   const href = base.includes('?') ? `${base}&text=${text}` : `${base}?text=${text}`;
   window.open(href, '_blank', 'noopener,noreferrer');
+}
+
+function openSharedPublicIm() {
+  window.dispatchEvent(new Event(PUBLIC_IM_OPEN_EVENT));
 }
 type BookingConfirmedStatus = 'loading' | 'ready' | 'error';
 type MyOrdersStatus = 'loading' | 'ready' | 'error';
@@ -468,6 +473,14 @@ function HeaderChromeActions() {
         onClick={() => navigate(-1)}
       >
         <ChevronLeft size={22} strokeWidth={2.25} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        className="iosapp-round-button"
+        aria-label="Open chat"
+        onClick={openSharedPublicIm}
+      >
+        <MessageCircle size={18} strokeWidth={2.25} aria-hidden="true" />
       </button>
       <Link to="/" className="iosapp-round-button" aria-label="Back to website homepage">
         <Home size={18} strokeWidth={2.25} aria-hidden="true" />
@@ -2771,9 +2784,14 @@ function BackBar({ title, onBack }: { title: string; onBack: () => void }) {
         <ChevronLeft size={24} aria-hidden="true" />
       </button>
       <strong>{title}</strong>
-      <Link to="/" className="iosapp-nav-bar-home" aria-label="Back to website homepage">
-        <Home size={20} strokeWidth={2.25} aria-hidden="true" />
-      </Link>
+      <div className="iosapp-nav-bar-actions">
+        <button type="button" onClick={openSharedPublicIm} aria-label="Open chat">
+          <MessageCircle size={19} strokeWidth={2.25} aria-hidden="true" />
+        </button>
+        <Link to="/" className="iosapp-nav-bar-home" aria-label="Back to website homepage">
+          <Home size={20} strokeWidth={2.25} aria-hidden="true" />
+        </Link>
+      </div>
     </header>
   );
 }
