@@ -26,7 +26,7 @@ type ConnectionState = 'loading' | 'ready' | 'reconnecting' | 'offline' | 'error
 type DeliveryState = 'pending' | 'failed';
 type UiMessage = PublicImMessage & { delivery?: DeliveryState; idempotencyKey?: string };
 
-const QUICK_PROMPTS = ['我想定制一条路线', '我已有目的地和日期'];
+const QUICK_PROMPTS = ['Help me plan a custom trip', 'I have destinations and dates'];
 
 export default function PublicImBubble({ source, showTrigger = true }: PublicImBubbleProps) {
   const [open, setOpen] = useState(false);
@@ -149,7 +149,7 @@ export default function PublicImBubble({ source, showTrigger = true }: PublicImB
     const timeout = window.setTimeout(() => {
       if (!cancelled && attempt === sessionAttemptRef.current) {
         setConnection('error');
-        setError('连接客服超时，请重试。');
+        setError('Chat connection timed out. Please try again.');
         setLoading(false);
       }
     }, 10000);
@@ -188,7 +188,7 @@ export default function PublicImBubble({ source, showTrigger = true }: PublicImB
       } catch (cause) {
         if (!cancelled) {
           setConnection('error');
-          setError(cause instanceof Error ? cause.message : '暂时无法连接客服。');
+          setError(cause instanceof Error ? cause.message : 'Chat is temporarily unavailable.');
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -225,7 +225,7 @@ export default function PublicImBubble({ source, showTrigger = true }: PublicImB
   }
 
   function appendMessage(message: PublicImMessage) {
-    if (message.sender_type === 'staff') setAnnouncement(`客服回复：${message.body}`);
+    if (message.sender_type === 'staff') setAnnouncement(`Support reply: ${message.body}`);
     setMessages((current) => {
       const withoutLocal = current.filter(
         (item) => !(item.delivery && item.sender_type === 'visitor' && item.body === message.body),
@@ -265,9 +265,9 @@ export default function PublicImBubble({ source, showTrigger = true }: PublicImB
       if (!retryMessage) setDraft('');
     } catch (cause) {
       setMessages((current) => current.map((item) => item.id === localId ? { ...item, delivery: 'failed' } : item));
-      const failure = cause instanceof Error ? cause.message : '消息未发送，请重试。';
+      const failure = cause instanceof Error ? cause.message : 'Message not sent. Please try again.';
       setError(failure);
-      setAnnouncement(`消息发送失败：${failure}`);
+      setAnnouncement(`Message failed to send: ${failure}`);
     } finally {
       setSendingId(null);
     }
@@ -285,28 +285,28 @@ export default function PublicImBubble({ source, showTrigger = true }: PublicImB
 
   return (
     <div className={`public-im-root ${open ? 'is-open' : ''}`}>
-      {open && <button type="button" className="public-im-backdrop" aria-label="关闭客服聊天" onClick={close} />}
+      {open && <button type="button" className="public-im-backdrop" aria-label="Close chat" onClick={close} />}
       {open && (
         <section ref={panelRef} className="public-im-panel" role="dialog" aria-modal="true" aria-labelledby="public-im-title">
           <header className="public-im-header">
             <div className="public-im-header-main">
               <span className="public-im-route-mark" aria-hidden="true"><MapPin size={17} /></span>
               <div>
-                <h2 id="public-im-title">联系客服</h2>
+                <h2 id="public-im-title">Travel support</h2>
                 <p className={`public-im-status is-${connection}`}><span /> {status}</p>
               </div>
             </div>
-            <button type="button" className="public-im-close" onClick={close} aria-label="关闭客服聊天"><X size={20} /></button>
+            <button type="button" className="public-im-close" onClick={close} aria-label="Close chat"><X size={20} /></button>
           </header>
 
-          <div className="public-im-messages" aria-label="客服消息">
+          <div className="public-im-messages" aria-label="Chat messages">
             <div className="sr-only" aria-live="polite">{announcement}</div>
-            {loading && <div className="public-im-loading" aria-label="正在连接客服"><span /><span /><span /></div>}
+            {loading && <div className="public-im-loading" aria-label="Connecting to chat"><span /><span /><span /></div>}
             {!loading && messages.length === 0 && !unavailable && (
               <div className="public-im-empty-state">
                 <span className="public-im-empty-marker" aria-hidden="true"><MapPin size={18} /></span>
-                <p>告诉我们目的地、日期或大概想法。</p>
-                <div className="public-im-prompts" aria-label="快捷问题">
+                <p>Tell us your destination, dates, or rough idea.</p>
+                <div className="public-im-prompts" aria-label="Quick prompts">
                   {QUICK_PROMPTS.map((prompt) => (
                     <button key={prompt} type="button" onClick={() => setDraft(prompt)}>{prompt}</button>
                   ))}
@@ -323,17 +323,17 @@ export default function PublicImBubble({ source, showTrigger = true }: PublicImB
                 <div key={message.id} className={`public-im-message ${message.sender_type === 'visitor' ? 'is-visitor' : 'is-staff'} ${message.delivery ? `is-${message.delivery}` : ''}`}>
                   {showAuthor && <span className="public-im-message-author">Syncing Travel</span>}
                   <p>{message.body}</p>
-                  <time>{message.delivery === 'pending' ? '发送中…' : message.delivery === 'failed' ? '未发送' : formatMessageTime(message.created_at)}</time>
-                  {message.delivery === 'failed' && <button type="button" className="public-im-retry" onClick={(event) => void submitMessage(event, message)}>重试</button>}
+                  <time>{message.delivery === 'pending' ? 'Sending…' : message.delivery === 'failed' ? 'Not sent' : formatMessageTime(message.created_at)}</time>
+                  {message.delivery === 'failed' && <button type="button" className="public-im-retry" onClick={(event) => void submitMessage(event, message)}>Retry</button>}
                 </div>
               );
             })}
             {unavailable && (
               <div className="public-im-error-state" role="alert">
-                <p>{error || (connection === 'offline' ? '当前处于离线状态。' : '暂时无法连接客服。')}</p>
+                <p>{error || (connection === 'offline' ? 'You are offline.' : 'Chat is temporarily unavailable.')}</p>
                 <div>
-                  <button type="button" onClick={() => { setError(null); setOpen(false); window.setTimeout(() => setOpen(true), 0); }}><RefreshCw size={14} /> 重试连接</button>
-                  <a href={brand.whatsappHref} target="_blank" rel="noreferrer">打开 WhatsApp</a>
+                  <button type="button" onClick={() => { setError(null); setOpen(false); window.setTimeout(() => setOpen(true), 0); }}><RefreshCw size={14} /> Try again</button>
+                  <a href={brand.whatsappHref} target="_blank" rel="noreferrer">Open WhatsApp</a>
                 </div>
               </div>
             )}
@@ -342,19 +342,18 @@ export default function PublicImBubble({ source, showTrigger = true }: PublicImB
           <form className="public-im-composer" onSubmit={(event) => void submitMessage(event)}>
             {error && !unavailable && <p className="public-im-error" role="status">{error}</p>}
             <div className="public-im-input-row">
-              <textarea ref={composerRef} value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={handleDraftKeyDown} placeholder="输入消息，开始规划你的路线" aria-label="输入消息" rows={1} maxLength={8000} disabled={loading || !conversation || sendingId !== null || unavailable || connection === 'reconnecting'} />
-              <button type="submit" aria-label="发送消息" disabled={!draft.trim() || loading || !conversation || sendingId !== null || unavailable || connection === 'reconnecting'}><Send size={17} /></button>
+            <textarea ref={composerRef} value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={handleDraftKeyDown} placeholder="Write a message" aria-label="Write a message" rows={1} maxLength={8000} disabled={loading || !conversation || sendingId !== null || unavailable || connection === 'reconnecting'} />
+              <button type="submit" aria-label="Send message" disabled={!draft.trim() || loading || !conversation || sendingId !== null || unavailable || connection === 'reconnecting'}><Send size={17} /></button>
             </div>
-            <p className="public-im-hint">按 Enter 发送 · Shift + Enter 换行{draft.length > 7500 ? ` · ${draft.length}/8000` : ''}</p>
+            <p className="public-im-hint">Enter to send · Shift + Enter for a new line{draft.length > 7500 ? ` · ${draft.length}/8000` : ''}</p>
           </form>
         </section>
       )}
 
       {showTrigger && (
-        <button ref={triggerRef} type="button" className={`public-im-trigger ${open ? 'is-open' : ''}`} onClick={open ? close : openPanel} aria-label={open ? '关闭客服聊天' : '打开客服聊天窗口'} aria-expanded={open}>
+        <button ref={triggerRef} type="button" className={`public-im-trigger ${open ? 'is-open' : ''}`} onClick={open ? close : openPanel} aria-label={open ? 'Close chat' : 'Open chat'} aria-expanded={open}>
           <span className="public-im-trigger-icon">{open ? <X size={20} /> : <MessageCircle size={20} />}</span>
-          {!open && <span className="public-im-trigger-copy"><strong>联系客服</strong><small>在线为你规划旅程</small></span>}
-          {!open && unreadHint && <i aria-label="有新的客服回复" />}
+          {!open && unreadHint && <i aria-label="New chat reply" />}
         </button>
       )}
     </div>
@@ -368,11 +367,11 @@ function uniqueMessages(messages: UiMessage[]): UiMessage[] {
 }
 
 function statusCopy(state: ConnectionState): string {
-  if (state === 'loading') return '正在连接';
-  if (state === 'reconnecting') return '连接中断，正在重试';
-  if (state === 'offline') return '当前离线';
-  if (state === 'error') return '暂时无法连接';
-  return '在线';
+  if (state === 'loading') return 'Connecting';
+  if (state === 'reconnecting') return 'Reconnecting';
+  if (state === 'offline') return 'Offline';
+  if (state === 'error') return 'Unavailable';
+  return 'Online';
 }
 
 function formatMessageTime(value: string): string {
