@@ -24,6 +24,7 @@ import {
   parseMessagingSocketOrigins,
 } from './messagingSocket.ts';
 import { startMessagingOutbox } from './messagingOutbox.ts';
+import { startMessagingRetention } from './messagingRetention.ts';
 import { handleMessagingCors, parseMessagingRestOrigins } from './messagingCors.ts';
 import { detectLanIPv4, resolvePublicOrigin } from '../api/platform/publicOrigin.ts';
 import {
@@ -461,6 +462,7 @@ function main() {
       allowedOrigins,
     });
     startMessagingOutbox(messagingSocket.namespace);
+    startMessagingRetention();
     messagingSocketEnabled = true;
   }
 

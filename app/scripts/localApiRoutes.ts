@@ -13,6 +13,7 @@ export const localApiRoutes: Record<string, string> = {
   '/api/im/staff/invite': '/api/im/staff-invite.ts',
   '/api/im/staff/permissions': '/api/im/staff-permissions.ts',
   '/api/im/conversations/assign': '/api/im/assignment.ts',
+  '/api/im/conversations/status': '/api/im/conversation-status.ts',
   '/api/im/conversations': '/api/im/conversations.ts',
   '/api/im/public/session': '/api/im/public-session.ts',
   '/api/im/public/conversations': '/api/im/public-conversations.ts',
@@ -66,6 +67,10 @@ const dynamicApiRoutes: Array<{ pattern: RegExp; modulePath: string }> = [
   {
     pattern: /^\/api\/im\/conversations\/[^/]+\/read$/,
     modulePath: '/api/im/read-cursor.ts',
+  },
+  {
+    pattern: /^\/api\/im\/conversations\/[^/]+\/status$/,
+    modulePath: '/api/im/conversation-status.ts',
   },
   {
     pattern: /^\/api\/im\/conversations\/[^/]+$/,

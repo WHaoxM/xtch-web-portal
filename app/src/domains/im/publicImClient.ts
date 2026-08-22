@@ -108,7 +108,7 @@ export async function sendPublicImMessage(
 
 export function connectPublicImSocket(
   onMessage: (message: PublicImMessage) => void,
-): { socket: Socket; subscribe: (conversationId: string) => void } | null {
+): { socket: Socket; subscribe: (conversationId: string) => Promise<void> } | null {
   if (typeof window === 'undefined') return null;
   const origin = configuredBase || window.location.origin;
   const socket = io(`${origin}/im`, {
@@ -126,9 +126,29 @@ export function connectPublicImSocket(
   });
   return {
     socket,
-    subscribe: (conversationId) => {
-      socket.emit('conversation:subscribe', { conversationId });
-    },
+    subscribe: (conversationId) => new Promise((resolve, reject) => {
+      if (!socket.connected) {
+        reject(new Error('Live chat is not connected yet.'));
+        return;
+      }
+      socket.timeout(5000).emit(
+        'conversation:subscribe',
+        { conversationId },
+        (timeoutError: Error | null, result: unknown) => {
+          if (timeoutError) {
+            reject(new Error('Live chat subscription timed out.'));
+            return;
+          }
+          if (!isRecord(result) || result.ok !== true) {
+            reject(new Error(isRecord(result) && typeof result.error === 'string'
+              ? result.error
+              : 'Live chat subscription failed.'));
+            return;
+          }
+          resolve();
+        },
+      );
+    }),
   };
 }
 

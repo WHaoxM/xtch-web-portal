@@ -130,7 +130,7 @@ async function resolveStaff(external: Awaited<ReturnType<typeof introspectXtMvpT
   }
   if (!staff) return { staff: null, demoProvisioned: false };
 
-  for (const permissionCode of ['im:conversation:read', 'im:message:send', 'im:assignment:claim']) {
+  for (const permissionCode of ['im:conversation:read', 'im:conversation:close', 'im:message:send', 'im:assignment:claim']) {
     await sql`
       INSERT INTO im_staff_permissions (staff_id, permission_code, scope_type, scope_id)
       VALUES (${staff.id}::uuid, ${permissionCode}, 'global', NULL)

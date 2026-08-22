@@ -203,6 +203,10 @@ export default function PublicImBubble({ source, showTrigger = true }: PublicImB
         const initial = await listPublicImMessages(selected.id);
         if (cancelled) return;
         replaceMessages(initial);
+        // REST history is the bootstrap path. A slow/unavailable Socket.IO
+        // connection must not turn a usable chat into a false timeout.
+        window.clearTimeout(timeout);
+        setConnection(navigator.onLine ? 'ready' : 'offline');
         const socket = connectPublicImSocket((message) => {
           if (message.conversation_id !== conversationIdRef.current) return;
           appendMessage(message);
@@ -210,8 +214,10 @@ export default function PublicImBubble({ source, showTrigger = true }: PublicImB
         });
         socketRef.current = socket;
         socket?.socket.on('connect', () => {
-          setConnection('ready');
-          socket.subscribe(selected.id);
+          void socket.subscribe(selected.id).then(
+            () => setConnection('ready'),
+            () => setConnection(navigator.onLine ? 'reconnecting' : 'offline'),
+          );
         });
         socket?.socket.on('disconnect', () => {
           if (!navigator.onLine) setConnection('offline');
@@ -219,7 +225,6 @@ export default function PublicImBubble({ source, showTrigger = true }: PublicImB
         });
         socket?.socket.on('connect_error', () => setConnection('reconnecting'));
         socket?.socket.connect();
-        setConnection(navigator.onLine ? 'ready' : 'offline');
       } catch (cause) {
         if (!cancelled) {
           setConnection('error');

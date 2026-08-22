@@ -1,5 +1,32 @@
 # Agent Progress
 
+## Current Goal（IM 会话生命周期与登录留存，2026-08-22）
+
+- 已确认：匿名访客会话登录后通过 `public/.../identity/link` 绑定 Supabase 身份，已有会话不会被撤销；已验证身份的会话不参与匿名清理。
+- 已实现：新增客服会话状态接口 `POST /api/im/conversations/:id/status`，支持 `open`、`pending`、`closed`，带 `expectedVersion` 乐观并发校验；关闭会结束当前客服分配，重开不会伪造恢复原分配；所有变更写入 audit/outbox。
+- 已实现：新增匿名会话保留 worker。关闭超过 `IM_ANONYMOUS_RETENTION_DAYS`（默认 30 天）且没有已验证门户身份的会话会解除访客身份与 cookie 访问权，但保留消息和审计事实；登录用户会话不自动清理。
+- 已补齐：已关闭会话收到访客新消息时事务内自动重开，并写入 `conversation.reopen` 审计与实时事件；客服关闭后客户不会被永久卡死。
+- 已同步：移动端 `im-http.ts` 增加 `setImConversationStatus`，可直接消费生命周期接口。
+- 未完成：门户当前没有翻译 provider 或翻译契约；本次未伪造自动翻译结果，需先确定/接入实际翻译服务后再扩展 message translation 字段。
+- 已验证：门户 `npm run typecheck`、`npm run lint`、`npm run build`，移动端 `tsc --noEmit` 均通过。
+- 运行边界：清理 worker 当前随 `MESSAGING_SOCKET_ENABLED=true` 的 selfhost 进程启动；未开启 IM 的环境不会自动匿名化数据。
+- 待验证：真实数据库连接/生产 worker 运行、客服权限授予与移动端状态按钮端到端验收。
+
+## Current Goal（mobile-public-im-entry-parity，2026-08-22）
+
+- 用户确认：China Trips 移动端右下角必须与桌面官网使用同一 Public IM 页面和会话操作；顶部聊天图标也打开同一实例。
+- 已改：App 在移动壳也显示唯一的 `PublicImBubble` trigger；删除移动端旧 `WhatsAppShortcut` 表单、FAB 及对应 CSS，避免 WhatsApp 与门户 IM 两套入口混淆；保留询盘表单内的 WhatsApp 联系偏好/其他业务入口。
+- 已验证：本地 `npm run typecheck`、`npm run lint`、`npm run build`；cloud-vps 构建/prerender 45/45；`xtch-app` active、`NRestarts=0`；线上新资源 `index-TCSgTMXU.js`；VPS main 提交 `58dafa6`，工作树干净。
+- 未验证：当前浏览器工具无法设置 390px 视口，未完成真机/390px 截图验收；组件 CSS 已使用移动底部 Sheet 和底部安全区规则。
+
+## Current Goal（public-im-timeout-stability，2026-08-22）
+
+- 根因：Public IM 面板的 10 秒 bootstrap timeout 在 REST 历史已经成功后仍可能触发；Socket.IO 订阅也未等待服务端 ack，慢连接会被误报为整体聊天超时。
+- 已改：REST 历史成功即清除 bootstrap timeout 并进入可用状态；Socket 订阅改为 5 秒 ack Promise，连接/订阅失败降级为 reconnecting，保留 REST 轮询补偿。
+- 已验证：本地 `npm run typecheck`、`npm run lint`、`npm run build`；VPS cloud-vps 构建/prerender 45/45；线上资源 `index-Bgd74h4J.js`；连续 20 次 public session 成功；Socket.IO 握手成功；`xtch-app` active、`NRestarts=0`；浏览器打开官网后聊天面板连续保持 Online。
+- 已上线：cloud-vps `/opt/xtch-web-portal` 已构建并重启 `xtch-app`。
+- 已提交：VPS `main` 工作树提交 `4582ff2`，工作树干净；本地 Git 元数据目录仍无写权限，尚未同步到 GitHub origin。
+
 ## Current Goal（官网移动端共享 Public IM 气泡，2026-08-22）
 
 - 目标：让移动端入口直接打开官网同一套 Public IM 气泡，复用 visitor cookie、会话 ID、消息历史和登录身份继承机制。

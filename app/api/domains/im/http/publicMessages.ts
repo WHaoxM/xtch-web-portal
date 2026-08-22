@@ -45,8 +45,9 @@ export default async function handler(req: ImRequest, res: ImResponse) {
 
   try {
     const message = await sql.begin(async (tx) => {
-      const conversation = await tx<{ last_message_seq: number }>`
+      const conversation = await tx<{ last_message_seq: number; status: string; version: number }>`
         SELECT c.last_message_seq
+          , c.status, c.version
         FROM im_conversations c
         JOIN im_conversation_identities i ON i.conversation_id = c.id
         WHERE c.id = ${conversationId}::uuid
@@ -55,11 +56,36 @@ export default async function handler(req: ImRequest, res: ImResponse) {
             OR (i.identity_type = 'supabase_user' AND i.identity_subject = ${authenticated.ok ? authenticated.user.id : ''})
           )
           AND i.revoked_at IS NULL
-          AND c.status <> 'closed'
         FOR UPDATE OF c
       `;
       const current = conversation.rows[0];
       if (!current) throw new PublicMessageError('Conversation is not available to this browser session.', 403);
+
+      if (current.status === 'closed') {
+        await tx`
+          UPDATE im_conversations
+          SET status = 'open', closed_at = NULL, updated_at = NOW(), version = version + 1
+          WHERE id = ${conversationId}::uuid
+        `;
+        await tx`
+          INSERT INTO im_audit_events (
+            actor_type, actor_id, action, conversation_id, target_type, target_id,
+            before_state, after_state
+          ) VALUES (
+            'visitor', ${visitor.sessionId}, 'conversation.reopen', ${conversationId}::uuid,
+            'conversation', ${conversationId},
+            ${JSON.stringify({ status: 'closed', version: current.version })}::jsonb,
+            ${JSON.stringify({ status: 'open', reason: 'visitor_message' })}::jsonb
+          )
+        `;
+        await tx`
+          INSERT INTO im_outbox (aggregate_type, aggregate_id, conversation_id, event_type, payload)
+          VALUES (
+            'conversation', ${conversationId}::uuid, ${conversationId}::uuid, 'conversation.updated',
+            ${JSON.stringify({ event: 'conversation.updated', conversation_id: conversationId, patch: { status: 'open' }, reason: 'visitor_message' })}::jsonb
+          )
+        `;
+      }
 
       const existing = await tx<MessageRow>`
         SELECT id, conversation_id, seq, client_message_id, sender_type, sender_id,
