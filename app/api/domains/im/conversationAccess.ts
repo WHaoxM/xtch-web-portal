@@ -1,5 +1,5 @@
 import { sql } from '../../platform/db';
-import { hasPermission, type ImStaffPrincipal } from './imAuth';
+import { hasGlobalPermission, hasPermission, type ImStaffPrincipal } from './imAuth';
 
 export type ConversationAccessMode = 'read' | 'write' | 'assign';
 
@@ -19,7 +19,7 @@ export async function canAccessConversation(
       ? 'im:message:send'
       : 'im:assignment:claim';
   if (!hasPermission(principal, permission)) return false;
-  if (principal.accountType === 'super_admin') return true;
+  if (hasGlobalPermission(principal, permission)) return true;
 
   const result = await sql<{ id: string }>`
     SELECT c.id
@@ -42,7 +42,7 @@ export async function canAccessConversation(
 }
 
 export function tenantScopeCondition(principal: ImStaffPrincipal) {
-  if (principal.accountType === 'super_admin') return sql``;
+  if (hasGlobalPermission(principal, 'im:conversation:read')) return sql``;
   if (principal.tenantIds.length === 0) return sql`AND FALSE`;
   return sql`AND c.tenant_id = ANY(${principal.tenantIds}::uuid[])`;
 }

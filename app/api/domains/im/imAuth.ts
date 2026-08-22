@@ -10,6 +10,7 @@ export type ImStaffPrincipal = {
   displayName: string;
   accountType: 'super_admin' | 'staff';
   permissions: string[];
+  globalPermissions: string[];
   tenantIds: string[];
 };
 
@@ -21,6 +22,7 @@ type JwtClaims = {
   exp: number;
   iat: number;
   permissions: string[];
+  globalPermissions: string[];
   tenantIds: string[];
 };
 
@@ -73,6 +75,7 @@ export async function authenticateStaffRequest(req: ImRequest): Promise<
       displayName: staff.display_name,
       accountType: staff.account_type,
       permissions: claims.permissions,
+      globalPermissions: claims.globalPermissions ?? [],
       tenantIds: claims.tenantIds,
     },
   };
@@ -80,6 +83,10 @@ export async function authenticateStaffRequest(req: ImRequest): Promise<
 
 export function hasPermission(principal: ImStaffPrincipal, permission: string): boolean {
   return principal.accountType === 'super_admin' || principal.permissions.includes(permission);
+}
+
+export function hasGlobalPermission(principal: ImStaffPrincipal, permission: string): boolean {
+  return principal.accountType === 'super_admin' || principal.globalPermissions.includes(permission);
 }
 
 /**
@@ -117,6 +124,11 @@ export async function issueStaffTokens(
       AND revoked_at IS NULL
   `;
   const permissions = [...new Set(permissionsResult.rows.map((row) => row.permission_code))] as string[];
+  const globalPermissions = [...new Set(
+    permissionsResult.rows
+      .filter((row) => row.scope_type === 'global')
+      .map((row) => row.permission_code),
+  )] as string[];
   if (staff.account_type !== 'super_admin' && !permissions.includes('im:conversation:read')) {
     throw new ImAccessDeniedError();
   }
@@ -135,6 +147,7 @@ export async function issueStaffTokens(
     iat: now,
     exp: now + ACCESS_TTL_SECONDS,
     permissions,
+    globalPermissions,
     tenantIds,
   };
   const accessToken = signAccessToken(claims);

@@ -1,5 +1,5 @@
 import { sql } from '../../../platform/db';
-import { authenticateStaffRequest, hasPermission } from '../imAuth';
+import { authenticateStaffRequest, hasGlobalPermission, hasPermission } from '../imAuth';
 import { type ImRequest, type ImResponse } from '../httpTypes';
 
 export default async function handler(req: ImRequest, res: ImResponse) {
@@ -41,7 +41,7 @@ export default async function handler(req: ImRequest, res: ImResponse) {
       if (!current.rows[0]) throw new AssignmentError('Conversation is unavailable.', 404);
       const conversationRow = current.rows[0];
       if (
-        auth.principal.accountType !== 'super_admin' &&
+        !hasGlobalPermission(auth.principal, 'im:assignment:claim') &&
         (!conversationRow.tenant_id || !auth.principal.tenantIds.includes(conversationRow.tenant_id))
       ) {
         throw new AssignmentError('Conversation is outside your tenant scope.', 403);

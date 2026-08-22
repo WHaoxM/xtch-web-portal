@@ -31,16 +31,14 @@ export default async function handler(req: ImRequest, res: ImResponse) {
       return;
     }
 
-    const result = await sql<StaffRow>`
-      SELECT id, username, display_name, account_type, external_role
-      FROM im_staff_accounts
-      WHERE external_provider = 'xt_mvp'
-        AND external_subject = ${external.subject}
-        AND status = 'active'
-    `;
-    const staff = result.rows[0];
+    const { staff, demoProvisioned } = await resolveStaff(external);
     if (!staff) {
-      await writeExchangeAudit('auth.exchange.denied', external.subject, req, 'no_local_mapping');
+      await writeExchangeAudit(
+        'auth.exchange.denied',
+        external.subject,
+        req,
+        isDemoAdmin(external) ? 'demo_admin_disabled' : 'no_local_mapping',
+      );
       res.status(403).json({ ok: false, error: 'This XT_MVP account is not enabled for IM.' });
       return;
     }
@@ -51,7 +49,7 @@ export default async function handler(req: ImRequest, res: ImResponse) {
       userAgentHash: hashToken(headerValue(req.headers['user-agent']) || 'unknown'),
       externalRole: external.role,
     });
-    await writeExchangeAudit('auth.exchange', staff.id, req, 'success');
+    await writeExchangeAudit('auth.exchange', staff.id, req, demoProvisioned ? 'demo_admin_bootstrapped' : 'success');
     res.status(200).json({
       ok: true,
       access_token: issued.accessToken,
@@ -76,6 +74,75 @@ export default async function handler(req: ImRequest, res: ImResponse) {
     console.error('IM auth exchange failed:', error instanceof Error ? error.message : error);
     res.status(503).json({ ok: false, error: 'IM identity service is temporarily unavailable.' });
   }
+}
+
+async function resolveStaff(external: Awaited<ReturnType<typeof introspectXtMvpToken>>): Promise<{
+  staff: StaffRow | null;
+  demoProvisioned: boolean;
+}> {
+  if (!external) return { staff: null, demoProvisioned: false };
+  const mapped = await sql<StaffRow>`
+    SELECT id, username, display_name, account_type, external_role
+    FROM im_staff_accounts
+    WHERE external_provider = 'xt_mvp'
+      AND external_subject = ${external.subject}
+      AND status = 'active'
+  `;
+  if (mapped.rows[0]) return { staff: mapped.rows[0], demoProvisioned: false };
+  if (!isDemoAdmin(external) || process.env.XTCH_IM_DEMO_ADMIN_ENABLED !== 'true') {
+    return { staff: null, demoProvisioned: false };
+  }
+
+  const existing = await sql<StaffRow & { external_provider: string | null; external_subject: string | null }>`
+    SELECT id, username, display_name, account_type, external_role, external_provider, external_subject
+    FROM im_staff_accounts
+    WHERE LOWER(username) = 'demo_admin'
+    LIMIT 1
+  `;
+  const row = existing.rows[0];
+  if (row?.external_subject && row.external_subject !== external.subject) {
+    return { staff: null, demoProvisioned: false };
+  }
+
+  let staff: StaffRow | null = row
+    ? (await sql<StaffRow>`
+        UPDATE im_staff_accounts
+        SET status = 'active', external_provider = 'xt_mvp', external_subject = ${external.subject},
+          external_role = ${external.role}, updated_at = NOW()
+        WHERE id = ${row.id}::uuid AND account_type = 'staff'
+        RETURNING id, username, display_name, account_type, external_role
+      `).rows[0] ?? null
+    : (await sql<StaffRow>`
+        INSERT INTO im_staff_accounts (
+          username, display_name, status, account_type, external_provider, external_subject, external_role
+        ) VALUES ('demo_admin', 'Demo Admin', 'active', 'staff', 'xt_mvp', ${external.subject}, ${external.role})
+        ON CONFLICT DO NOTHING
+        RETURNING id, username, display_name, account_type, external_role
+      `).rows[0] ?? null;
+
+  if (!staff) {
+    const retry = await sql<StaffRow>`
+      SELECT id, username, display_name, account_type, external_role
+      FROM im_staff_accounts
+      WHERE LOWER(username) = 'demo_admin' AND status = 'active' AND account_type = 'staff'
+    `;
+    staff = retry.rows[0] ?? null;
+  }
+  if (!staff) return { staff: null, demoProvisioned: false };
+
+  for (const permissionCode of ['im:conversation:read', 'im:message:send', 'im:assignment:claim']) {
+    await sql`
+      INSERT INTO im_staff_permissions (staff_id, permission_code, scope_type, scope_id)
+      VALUES (${staff.id}::uuid, ${permissionCode}, 'global', NULL)
+      ON CONFLICT DO NOTHING
+    `;
+  }
+  return { staff, demoProvisioned: true };
+}
+
+function isDemoAdmin(external: { username?: string; role: string }): boolean {
+  return external.username?.trim().toLowerCase() === 'demo_admin'
+    && external.role.trim().toLowerCase() === 'tenant_admin';
 }
 
 async function writeExchangeAudit(
