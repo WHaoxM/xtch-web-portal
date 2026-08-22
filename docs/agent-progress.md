@@ -7,6 +7,12 @@
 - 已验证：`npm run typecheck`、`npm run lint`、`npm run build` 通过；构建输出包含移动端 IM 事件桥接。
 - 待验证：真实生产部署后的真机点击与客服消息往返。
 
+## Delivery（public-im-chat-redesign，2026-08-22）
+
+- 按 `.ulpi/design/public-im-chat.md` 完成聊天面板重设计：移动端底部 Sheet、平板/桌面锚定面板、route marker、快捷问题、消息发送状态、重试、断线/离线/错误状态、WhatsApp 备用入口。
+- 增加焦点回收、Escape/Tab trap、popstate 关闭和 safe-area composer；发送重试复用同一 idempotency key。
+- 已验证：`npm run typecheck`、`npm run lint`、`npm run build`、`git diff --check` 通过；未做真实生产截图和端到端客服往返。
+
 ## Delivery（portal-public-im-entry-fix，2026-08-21）
 
 - 修复门户聊天入口被内容预加载门禁遮挡的问题：内容仍在加载或加载失败时，公开 IM 气泡仍可显示并打开窗口。

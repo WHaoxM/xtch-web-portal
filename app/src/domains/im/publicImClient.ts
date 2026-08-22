@@ -79,12 +79,16 @@ export async function listPublicImMessages(
   return result.items;
 }
 
-export async function sendPublicImMessage(conversationId: string, body: string): Promise<PublicImMessage> {
+export async function sendPublicImMessage(
+  conversationId: string,
+  body: string,
+  idempotencyKey?: string,
+): Promise<PublicImMessage> {
   const result = await request<PublicImPayload<{ message: PublicImMessage }>>(
     `/api/im/public/conversations/${encodeURIComponent(conversationId)}/messages`,
     {
       method: 'POST',
-      headers: { 'idempotency-key': crypto.randomUUID() },
+      headers: { 'idempotency-key': idempotencyKey ?? crypto.randomUUID() },
       body: JSON.stringify({ body, contentType: 'text' }),
     },
   );
