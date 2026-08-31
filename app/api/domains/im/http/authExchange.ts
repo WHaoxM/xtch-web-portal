@@ -88,7 +88,12 @@ async function resolveStaff(external: Awaited<ReturnType<typeof introspectXtMvpT
       AND external_subject = ${external.subject}
       AND status = 'active'
   `;
-  if (mapped.rows[0]) return { staff: mapped.rows[0], demoProvisioned: false };
+  if (mapped.rows[0]) {
+    // demo_admin 可能早于新增权限存在。每次 exchange 都对齐其固定权限集合，
+    // 避免旧账号永久缺少后来加入的会话生命周期能力。
+    if (isDemoAdmin(external)) await ensureDemoAdminPermissions(mapped.rows[0].id);
+    return { staff: mapped.rows[0], demoProvisioned: false };
+  }
   if (!isDemoAdmin(external) || process.env.XTCH_IM_DEMO_ADMIN_ENABLED !== 'true') {
     return { staff: null, demoProvisioned: false };
   }
@@ -130,14 +135,18 @@ async function resolveStaff(external: Awaited<ReturnType<typeof introspectXtMvpT
   }
   if (!staff) return { staff: null, demoProvisioned: false };
 
+  await ensureDemoAdminPermissions(staff.id);
+  return { staff, demoProvisioned: true };
+}
+
+async function ensureDemoAdminPermissions(staffId: string): Promise<void> {
   for (const permissionCode of ['im:conversation:read', 'im:conversation:close', 'im:message:send', 'im:assignment:claim']) {
     await sql`
       INSERT INTO im_staff_permissions (staff_id, permission_code, scope_type, scope_id)
-      VALUES (${staff.id}::uuid, ${permissionCode}, 'global', NULL)
+      VALUES (${staffId}::uuid, ${permissionCode}, 'global', NULL)
       ON CONFLICT DO NOTHING
     `;
   }
-  return { staff, demoProvisioned: true };
 }
 
 function isDemoAdmin(external: { username?: string; role: string }): boolean {

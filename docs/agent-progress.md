@@ -2,6 +2,11 @@
 
 ## Current Goal（IM 会话生命周期与登录留存，2026-08-22）
 
+### 生产权限修复（2026-08-31）
+
+- 修复已映射的 `demo_admin` 在新增 `im:conversation:close` 后不会补齐权限的问题：每次 XT_MVP exchange 都幂等对齐该受控演示管理员的固定 IM 权限集合。
+- 生产库已先备份客服账号、权限与审计表，再补入缺失的关闭权限并记录 `permission.repair` 审计；普通客服权限仍只允许由管理员显式授予。
+
 - 已确认：匿名访客会话登录后通过 `public/.../identity/link` 绑定 Supabase 身份，已有会话不会被撤销；已验证身份的会话不参与匿名清理。
 - 已实现：新增客服会话状态接口 `POST /api/im/conversations/:id/status`，支持 `open`、`pending`、`closed`，带 `expectedVersion` 乐观并发校验；关闭会结束当前客服分配，重开不会伪造恢复原分配；所有变更写入 audit/outbox。
 - 已实现：新增匿名会话保留 worker。关闭超过 `IM_ANONYMOUS_RETENTION_DAYS`（默认 30 天）且没有已验证门户身份的会话会解除访客身份与 cookie 访问权，但保留消息和审计事实；登录用户会话不自动清理。
