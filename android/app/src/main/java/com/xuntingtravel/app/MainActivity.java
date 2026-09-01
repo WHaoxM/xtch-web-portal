@@ -3,6 +3,7 @@ package com.xuntingtravel.app;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
@@ -18,6 +19,8 @@ import android.webkit.WebViewClient;
 
 public final class MainActivity extends Activity {
     private static final String START_URL = "https://www.xuntingtravel.com/china-trips";
+    private static final String OFFICIAL_HOST = "www.xuntingtravel.com";
+    private static final String CHINA_TRIPS_PATH = "/china-trips";
     private WebView webView;
 
     @Override
@@ -31,11 +34,9 @@ public final class MainActivity extends Activity {
         configureWebView(webView);
         setContentView(webView);
 
-        if (savedInstanceState == null) {
-            webView.loadUrl(START_URL);
-        } else {
-            webView.restoreState(savedInstanceState);
-        }
+        // The Android app is deliberately a single-surface wrapper. Do not
+        // restore an arbitrary prior WebView page after process recreation.
+        webView.loadUrl(START_URL);
     }
 
     private static void configureWebView(WebView view) {
@@ -48,7 +49,7 @@ public final class MainActivity extends Activity {
         settings.setDisplayZoomControls(false);
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        settings.setUserAgentString(settings.getUserAgentString() + " SyncingTravelAndroid/1.0.0");
+        settings.setUserAgentString(settings.getUserAgentString() + " SyncingTravelAndroid/1.0.1");
 
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(view, true);
@@ -57,12 +58,24 @@ public final class MainActivity extends Activity {
         view.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest request) {
+                if (!request.isForMainFrame()) {
+                    return false;
+                }
                 return handleUrl(v, request.getUrl());
             }
 
             @Override
             public boolean shouldOverrideUrlLoading(WebView v, String url) {
                 return handleUrl(v, Uri.parse(url));
+            }
+
+            @Override
+            public void onPageStarted(WebView v, String url, Bitmap favicon) {
+                if (!isChinaTripsUrl(Uri.parse(url))) {
+                    v.loadUrl(START_URL);
+                    return;
+                }
+                super.onPageStarted(v, url, favicon);
             }
 
             @Override
@@ -80,7 +93,11 @@ public final class MainActivity extends Activity {
     private static boolean handleUrl(WebView view, Uri uri) {
         String scheme = uri.getScheme();
         if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) {
-            view.loadUrl(uri.toString());
+            if (isChinaTripsUrl(uri)) {
+                view.loadUrl(uri.toString());
+            } else {
+                view.loadUrl(START_URL);
+            }
             return true;
         }
         try {
@@ -91,6 +108,14 @@ public final class MainActivity extends Activity {
         return true;
     }
 
+    private static boolean isChinaTripsUrl(Uri uri) {
+        if (!"https".equalsIgnoreCase(uri.getScheme()) || !OFFICIAL_HOST.equalsIgnoreCase(uri.getHost())) {
+            return false;
+        }
+        String path = uri.getPath();
+        return CHINA_TRIPS_PATH.equals(path) || (CHINA_TRIPS_PATH + "/").equals(path);
+    }
+
     @Override
     public void onBackPressed() {
         if (webView != null && webView.canGoBack()) {
@@ -98,14 +123,6 @@ public final class MainActivity extends Activity {
         } else {
             super.onBackPressed();
         }
-    }
-
-    @Override
-    protected void onSaveInstanceState(Bundle outState) {
-        if (webView != null) {
-            webView.saveState(outState);
-        }
-        super.onSaveInstanceState(outState);
     }
 
     @Override

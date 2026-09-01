@@ -1,5 +1,12 @@
 # Agent Progress
 
+## Delivery（Android APK China Trips 单页锁定，2026-09-01）
+
+- 已改：Android WebView 只允许加载 `https://www.xuntingtravel.com/china-trips`（保留查询参数与末尾斜杠）；任何其它 HTTP(S) 页面都重定向回该入口，进程重建也不再恢复任意旧页面。
+- 保留：`tel:`、`mailto:`、WhatsApp 等非 HTTP(S) 外部协议交给系统处理，不在 APK 内打开其它网页。
+- 已重新打包：版本 `1.0.1`、Version Code `2`，可覆盖旧的 `1.0.0` / Code `1` APK；v1/v2/v3 签名与 zipalign 校验通过。
+- 待验证：真机安装后依次点击站内首页、桌面路线、支付/外链，确认 WebView 均回到 China Trips，外部协议由系统处理。
+
 ## Current Goal（IM 会话生命周期与登录留存，2026-08-22）
 
 ### 生产权限修复（2026-08-31）
