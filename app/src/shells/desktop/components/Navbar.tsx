@@ -397,6 +397,13 @@ export default function Navbar() {
                   />
                 </Link>
               ))}
+              <a
+                href="/downloads/syncing-travel.apk"
+                download
+                className={`relative whitespace-nowrap text-[16px] font-bold transition-colors duration-300 ${navTextClass}`}
+              >
+                Download App
+              </a>
             </div>
 
             <div className="hidden items-center gap-5 pt-3 lg:flex">
@@ -499,6 +506,14 @@ export default function Navbar() {
                 {link.label}
               </Link>
             ))}
+            <a
+              href="/downloads/syncing-travel.apk"
+              download
+              onClick={() => setMobileOpen(false)}
+              className="block rounded-lg px-4 py-3 text-[15px] text-[#444] transition-colors hover:bg-gray-50"
+            >
+              Download App
+            </a>
           </div>
 
           <div className="mt-auto border-t border-[#D6D6D6] pt-6">

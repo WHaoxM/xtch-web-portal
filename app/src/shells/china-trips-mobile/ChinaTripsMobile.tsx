@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Compass,
+  Download,
   Home,
   LogOut,
   Mail,
@@ -146,6 +147,24 @@ function markInquirySubmitted() {
 
 function openSharedPublicIm() {
   window.dispatchEvent(new Event(PUBLIC_IM_OPEN_EVENT));
+}
+
+type AndroidUpdateBridge = {
+  checkForUpdates: () => void;
+};
+
+function isAndroidAppWrapper() {
+  if (typeof window === 'undefined') return false;
+  const bridge = (window as typeof window & { SyncingTravelAndroid?: AndroidUpdateBridge }).SyncingTravelAndroid;
+  return typeof bridge?.checkForUpdates === 'function';
+}
+
+function checkForAndroidAppUpdates() {
+  if (typeof window === 'undefined') return false;
+  const bridge = (window as typeof window & { SyncingTravelAndroid?: AndroidUpdateBridge }).SyncingTravelAndroid;
+  if (!bridge || typeof bridge.checkForUpdates !== 'function') return false;
+  bridge.checkForUpdates();
+  return true;
 }
 type BookingConfirmedStatus = 'loading' | 'ready' | 'error';
 type MyOrdersStatus = 'loading' | 'ready' | 'error';
@@ -2576,6 +2595,8 @@ function MeTab({
   onSignIn: (provider: AuthProvider) => void;
   onOpenMyOrders: () => void;
 }) {
+  const showAndroidUpdateEntry = isAndroidAppWrapper();
+
   return (
     <motion.div variants={tabPanelVariants} initial="initial" animate="animate" exit="exit">
       <motion.div variants={fadeUpItem}>
@@ -2591,6 +2612,18 @@ function MeTab({
             <p>View reserve requests, bookings, and planner messages from one account.</p>
           </div>
           <SignInOptions onSignIn={onSignIn} />
+          {showAndroidUpdateEntry && (
+            <button type="button" className="iosapp-settings-row" onClick={checkForAndroidAppUpdates}>
+              <span className="iosapp-settings-icon">
+                <Download size={19} />
+              </span>
+              <span>
+                <strong>Check for app updates</strong>
+                <small>Look for the latest Syncing Travel APK</small>
+              </span>
+              <ChevronRight size={18} />
+            </button>
+          )}
           <Link to="/" className="iosapp-settings-row iosapp-settings-row-link">
             <span className="iosapp-settings-icon">
               <Home size={19} />
@@ -2631,6 +2664,24 @@ function MeTab({
               </span>
               <ChevronRight size={18} />
             </motion.button>
+            {showAndroidUpdateEntry && (
+              <motion.button
+                type="button"
+                className="iosapp-settings-row"
+                onClick={checkForAndroidAppUpdates}
+                variants={listRowVariants}
+                whileTap={tapScale}
+              >
+                <span className="iosapp-settings-icon">
+                  <Download size={19} />
+                </span>
+                <span>
+                  <strong>Check for app updates</strong>
+                  <small>Look for the latest Syncing Travel APK</small>
+                </span>
+                <ChevronRight size={18} />
+              </motion.button>
+            )}
             <Link to="/" className="iosapp-settings-row iosapp-settings-row-link">
               <span className="iosapp-settings-icon">
                 <Home size={19} />

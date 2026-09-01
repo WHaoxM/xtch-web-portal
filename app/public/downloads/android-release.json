@@ -1,0 +1,7 @@
+{
+    "versionCode":  3,
+    "versionName":  "1.0.2",
+    "apkUrl":  "https://www.xuntingtravel.com/downloads/syncing-travel.apk",
+    "sha256":  "3d17e86430f96a29d96cf9ff50bbcda0377dc18e17da7244b1e3e315610543ca",
+    "releaseNotes":  "Keeps the Android app focused on China Trips and adds in-app update checks."
+}

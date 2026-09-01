@@ -17,3 +17,14 @@ powershell -ExecutionPolicy Bypass -File .\android\build-release.ps1
 ```
 
 The release keystore is deliberately kept outside Git. Never lose or rotate it after publishing: Android updates must use the same signing key.
+
+## Website download and update checks
+
+Each release build also copies the signed APK and its version manifest into the website static assets:
+
+- `app/public/downloads/syncing-travel.apk`
+- `app/public/downloads/android-release.json`
+
+The Android wrapper checks that manifest at startup and exposes **Check for app updates** in the China Trips **Me** tab. When `versionCode` in the manifest is newer than the installed APK, the user is prompted to download the signed package from the official website.
+
+For every publishable update, increase both `VersionName` and `VersionCode` when running `build-release.ps1`; `VersionCode` must always be higher than the previous release so Android permits an in-place upgrade.

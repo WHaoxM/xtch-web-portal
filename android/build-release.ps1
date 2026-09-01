@@ -1,6 +1,6 @@
 param(
-    [string]$VersionName = '1.0.1',
-    [int]$VersionCode = 2
+    [string]$VersionName = '1.0.2',
+    [int]$VersionCode = 3
 )
 
 $ErrorActionPreference = 'Stop'
@@ -13,6 +13,9 @@ $platformJar = Join-Path $sdkRoot 'platforms\android-35\android.jar'
 $srcRoot = Join-Path $androidRoot 'app\src\main'
 $workRoot = Join-Path $androidRoot 'build\release'
 $outputDir = Join-Path $repoRoot 'dist\android'
+$publicDownloadsDir = Join-Path $repoRoot 'app\public\downloads'
+$publicApk = Join-Path $publicDownloadsDir 'syncing-travel.apk'
+$releaseManifest = Join-Path $publicDownloadsDir 'android-release.json'
 $keystore = Join-Path $androidRoot 'keystore\syncing-travel-release.jks'
 $storePassword = $env:SYNCING_TRAVEL_KEYSTORE_PASSWORD
 $keyPassword = if ($env:SYNCING_TRAVEL_KEY_PASSWORD) { $env:SYNCING_TRAVEL_KEY_PASSWORD } else { $storePassword }
@@ -23,7 +26,7 @@ foreach ($required in @($buildTools, $platformJar, $keystore)) {
 if (-not $storePassword) { throw 'Set SYNCING_TRAVEL_KEYSTORE_PASSWORD before building.' }
 
 Remove-Item -LiteralPath $workRoot -Recurse -Force -ErrorAction SilentlyContinue
-New-Item -ItemType Directory -Force -Path $workRoot, $outputDir | Out-Null
+New-Item -ItemType Directory -Force -Path $workRoot, $outputDir, $publicDownloadsDir | Out-Null
 $compiled = Join-Path $workRoot 'resources.zip'
 $unsigned = Join-Path $workRoot 'unsigned.apk'
 $aligned = Join-Path $workRoot 'aligned.apk'
@@ -75,4 +78,21 @@ if ($LASTEXITCODE -ne 0) { throw 'apksigner failed.' }
 & (Join-Path $buildTools 'apksigner.bat') verify --verbose (Join-Path $outputDir 'syncing-travel-release.apk')
 if ($LASTEXITCODE -ne 0) { throw 'APK signature verification failed.' }
 
+Copy-Item -LiteralPath (Join-Path $outputDir 'syncing-travel-release.apk') -Destination $publicApk -Force
+$sha256 = (Get-FileHash -LiteralPath $publicApk -Algorithm SHA256).Hash.ToLowerInvariant()
+$manifest = [ordered]@{
+    versionCode = $VersionCode
+    versionName = $VersionName
+    apkUrl = 'https://www.xuntingtravel.com/downloads/syncing-travel.apk'
+    sha256 = $sha256
+    releaseNotes = 'Keeps the Android app focused on China Trips and adds in-app update checks.'
+}
+[System.IO.File]::WriteAllText(
+    $releaseManifest,
+    (($manifest | ConvertTo-Json) + [Environment]::NewLine),
+    [System.Text.UTF8Encoding]::new($false)
+)
+
 Write-Output "APK: $(Join-Path $outputDir 'syncing-travel-release.apk')"
+Write-Output "Website download: $publicApk"
+Write-Output "Update manifest: $releaseManifest"

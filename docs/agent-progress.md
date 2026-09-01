@@ -1,5 +1,13 @@
 # Agent Progress
 
+## Delivery（Android APK 更新检查与官网入口，2026-09-01）
+
+- 已实现：APK 启动时通过官网同域 `downloads/android-release.json` 自动检查更新；China Trips 的 Android Me 页新增手动 **Check for app updates** 入口。只信任 HTTPS 官方域名下的 APK 地址。
+- 已实现：每次 `android/build-release.ps1` 会将签名 APK 复制到 `app/public/downloads/syncing-travel.apk` 并生成版本、SHA-256、下载链接清单；自托管服务补充 APK MIME 类型。
+- 已实现：官网桌面导航栏在 About 后新增 **Download App**，移动抽屉菜单也提供下载入口。
+- 已打包：`1.0.2` / Version Code `3`；manifest SHA-256 与 APK 一致，zipalign 与 v1/v2/v3 签名验证通过。
+- 待验证：推送/部署到 main 后，在真机上验证 1.0.1 自动发现 1.0.2、手动入口、浏览器下载及 Android 的未知来源安装授权流程。
+
 ## Delivery（Android APK China Trips 单页锁定，2026-09-01）
 
 - 已改：Android WebView 只允许加载 `https://www.xuntingtravel.com/china-trips`（保留查询参数与末尾斜杠）；任何其它 HTTP(S) 页面都重定向回该入口，进程重建也不再恢复任意旧页面。
