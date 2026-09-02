@@ -6,7 +6,7 @@
 - 已改：APK 内的品牌与 Home 图标统一回到 China Trips 首页；页头返回箭头在没有可用 WebView 历史时回退到 China Trips 首页；Me 页移除“Back to website”。Android WebView 仍只允许加载 `/china-trips`。
 - 已打包：正式包 `1.0.3` / Version Code `4`，`app/public/downloads/android-release.json` 已写入同版本、官方 HTTPS 下载地址和 APK SHA-256。
 - 已验证：`npm run build`、`npm run lint`、`git diff --check` 通过；APK 包名 `com.xuntingtravel.app`，zipalign 通过，v1/v2/v3 签名通过，manifest SHA-256 与 APK 一致。
-- 待验证：推送/部署到 main 后，使用真机确认首页、详情、Me 和系统返回栈均不会离开 China Trips，且 1.0.2 自动发现 1.0.3。
+- 已发布：提交 `1438556` 已推送 `origin/main`；GitHub Actions `33600131117` 成功完成 cloud-vps 部署，官网 manifest 与 APK 下载端点均返回 200。首次推送任务因历史 APK 文件归属为 root 而无法覆盖，已将 downloads 目录改回 deploy 可写后重跑成功。`n- 待验证：使用真机确认首页、详情、Me 和系统返回栈均不会离开 China Trips，且 1.0.2 自动发现 1.0.3。
 
 ## Delivery（Android APK 更新检查与官网入口，2026-09-01）
 
