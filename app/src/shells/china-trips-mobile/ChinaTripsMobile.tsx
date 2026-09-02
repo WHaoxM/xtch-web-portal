@@ -166,6 +166,18 @@ function checkForAndroidAppUpdates() {
   bridge.checkForUpdates();
   return true;
 }
+
+function androidHomePath() {
+  return '/china-trips?app_home=1';
+}
+
+function goBackOrAndroidHome(navigate: ReturnType<typeof useNavigate>) {
+  if (isAndroidAppWrapper() && window.history.length <= 1) {
+    navigate(androidHomePath(), { replace: true });
+    return;
+  }
+  navigate(-1);
+}
 type BookingConfirmedStatus = 'loading' | 'ready' | 'error';
 type MyOrdersStatus = 'loading' | 'ready' | 'error';
 type AuthStatus = 'idle' | 'loading' | 'message' | 'error';
@@ -459,6 +471,8 @@ function FilterRail<T extends string>({
 
 function HeaderChromeActions() {
   const navigate = useNavigate();
+  const androidApp = isAndroidAppWrapper();
+  const homePath = androidApp ? androidHomePath() : '/';
 
   return (
     <div className="iosapp-header-actions">
@@ -466,19 +480,21 @@ function HeaderChromeActions() {
         type="button"
         className="iosapp-round-button"
         aria-label="Go back"
-        onClick={() => navigate(-1)}
+        onClick={() => goBackOrAndroidHome(navigate)}
       >
         <ChevronLeft size={22} strokeWidth={2.25} aria-hidden="true" />
       </button>
-      <button
-        type="button"
-        className="iosapp-round-button"
-        aria-label="Open chat"
-        onClick={openSharedPublicIm}
-      >
-        <MessageCircle size={18} strokeWidth={2.25} aria-hidden="true" />
-      </button>
-      <Link to="/" className="iosapp-round-button" aria-label="Back to website homepage">
+      {!androidApp && (
+        <button
+          type="button"
+          className="iosapp-round-button"
+          aria-label="Open chat"
+          onClick={openSharedPublicIm}
+        >
+          <MessageCircle size={18} strokeWidth={2.25} aria-hidden="true" />
+        </button>
+      )}
+      <Link to={homePath} className="iosapp-round-button" aria-label="Go to China Trips home">
         <Home size={18} strokeWidth={2.25} aria-hidden="true" />
       </Link>
     </div>
@@ -494,10 +510,12 @@ function AppHeader({
   subtitle?: string;
   trailing?: React.ReactNode;
 }) {
+  const homePath = isAndroidAppWrapper() ? androidHomePath() : '/';
+
   return (
     <header className="iosapp-header">
       <div>
-        <Link to="/" className="iosapp-header-brand">
+        <Link to={homePath} className="iosapp-header-brand">
           Syncing Travel
         </Link>
         {subtitle && subtitle !== 'Syncing Travel' ? <p>{subtitle}</p> : null}
@@ -2624,16 +2642,18 @@ function MeTab({
               <ChevronRight size={18} />
             </button>
           )}
-          <Link to="/" className="iosapp-settings-row iosapp-settings-row-link">
-            <span className="iosapp-settings-icon">
-              <Home size={19} />
-            </span>
-            <span>
-              <strong>Back to website</strong>
-              <small>Return to Syncing Travel homepage</small>
-            </span>
-            <ChevronRight size={18} />
-          </Link>
+          {!showAndroidUpdateEntry && (
+            <Link to="/" className="iosapp-settings-row iosapp-settings-row-link">
+              <span className="iosapp-settings-icon">
+                <Home size={19} />
+              </span>
+              <span>
+                <strong>Back to website</strong>
+                <small>Return to Syncing Travel homepage</small>
+              </span>
+              <ChevronRight size={18} />
+            </Link>
+          )}
         </motion.section>
       ) : (
         <motion.div className="iosapp-me-signed" variants={fadeUpItem}>
@@ -2682,16 +2702,18 @@ function MeTab({
                 <ChevronRight size={18} />
               </motion.button>
             )}
-            <Link to="/" className="iosapp-settings-row iosapp-settings-row-link">
-              <span className="iosapp-settings-icon">
-                <Home size={19} />
-              </span>
-              <span>
-                <strong>Back to website</strong>
-                <small>Return to Syncing Travel homepage</small>
-              </span>
-              <ChevronRight size={18} />
-            </Link>
+            {!showAndroidUpdateEntry && (
+              <Link to="/" className="iosapp-settings-row iosapp-settings-row-link">
+                <span className="iosapp-settings-icon">
+                  <Home size={19} />
+                </span>
+                <span>
+                  <strong>Back to website</strong>
+                  <small>Return to Syncing Travel homepage</small>
+                </span>
+                <ChevronRight size={18} />
+              </Link>
+            )}
             <motion.button
               type="button"
               className="iosapp-settings-row"
@@ -2806,6 +2828,9 @@ function MyOrdersView({
 }
 
 function BackBar({ title, onBack }: { title: string; onBack: () => void }) {
+  const androidApp = isAndroidAppWrapper();
+  const homePath = androidApp ? androidHomePath() : '/';
+
   return (
     <header className="iosapp-nav-bar">
       <button type="button" onClick={onBack} aria-label="Go back">
@@ -2813,10 +2838,12 @@ function BackBar({ title, onBack }: { title: string; onBack: () => void }) {
       </button>
       <strong>{title}</strong>
       <div className="iosapp-nav-bar-actions">
-        <button type="button" onClick={openSharedPublicIm} aria-label="Open chat">
-          <MessageCircle size={19} strokeWidth={2.25} aria-hidden="true" />
-        </button>
-        <Link to="/" className="iosapp-nav-bar-home" aria-label="Back to website homepage">
+        {!androidApp && (
+          <button type="button" onClick={openSharedPublicIm} aria-label="Open chat">
+            <MessageCircle size={19} strokeWidth={2.25} aria-hidden="true" />
+          </button>
+        )}
+        <Link to={homePath} className="iosapp-nav-bar-home" aria-label="Go to China Trips home">
           <Home size={20} strokeWidth={2.25} aria-hidden="true" />
         </Link>
       </div>
@@ -4064,6 +4091,16 @@ export default function ChinaTripsMobile() {
   }, [otpResendIn]);
 
   const isSignedIn = Boolean(authUser);
+
+  useEffect(() => {
+    if (searchParams.get('app_home') !== '1') return;
+
+    const next = new URLSearchParams(searchParams);
+    next.delete('app_home');
+    setSearchParams(next, { replace: true });
+    setActiveTab('home');
+    setActiveView('tabs');
+  }, [searchParams, setSearchParams]);
 
   const selectedDestination = destinationMeta.find((destination) => destination.slug === draft.destinationSlug);
   const selectedRoute = routeTours.find((tour) => tour.slug === draft.routeSlug);

@@ -41,6 +41,10 @@ function getMiniAppViewportSnapshot() {
   return window.matchMedia(MINI_APP_MAX_WIDTH_QUERY).matches;
 }
 
+function isAndroidAppWrapper() {
+  return typeof navigator !== 'undefined' && navigator.userAgent.includes('SyncingTravelAndroid/');
+}
+
 function App() {
   const location = useLocation();
   const isAdminRoute = location.pathname === '/admin';
@@ -121,7 +125,7 @@ function App() {
   const hideSiteChrome =
     isAdminRoute || isAuthCallbackRoute || (isChinaTripsRoute && isMiniAppViewport);
   const publicImSource = isChinaTripsRoute && isMiniAppViewport ? 'portal_mobile' : 'portal_web';
-  const showPublicIm = !isAdminRoute && !isAuthCallbackRoute;
+  const showPublicIm = !isAndroidAppWrapper() && !isAdminRoute && !isAuthCallbackRoute;
 
   if (!authReady) return null;
 

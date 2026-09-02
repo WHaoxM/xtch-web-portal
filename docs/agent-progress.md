@@ -1,5 +1,13 @@
 # Agent Progress
 
+## Delivery（Android APK 正式发布壳收口，2026-09-02）
+
+- 已改：仅在 `SyncingTravelAndroid` APK 壳中完全不挂载官网 Public IM 气泡，并隐藏移动壳页头和返回栏的聊天入口；普通官网移动端保持原有客服入口。
+- 已改：APK 内的品牌与 Home 图标统一回到 China Trips 首页；页头返回箭头在没有可用 WebView 历史时回退到 China Trips 首页；Me 页移除“Back to website”。Android WebView 仍只允许加载 `/china-trips`。
+- 已打包：正式包 `1.0.3` / Version Code `4`，`app/public/downloads/android-release.json` 已写入同版本、官方 HTTPS 下载地址和 APK SHA-256。
+- 已验证：`npm run build`、`npm run lint`、`git diff --check` 通过；APK 包名 `com.xuntingtravel.app`，zipalign 通过，v1/v2/v3 签名通过，manifest SHA-256 与 APK 一致。
+- 待验证：推送/部署到 main 后，使用真机确认首页、详情、Me 和系统返回栈均不会离开 China Trips，且 1.0.2 自动发现 1.0.3。
+
 ## Delivery（Android APK 更新检查与官网入口，2026-09-01）
 
 - 已实现：APK 启动时通过官网同域 `downloads/android-release.json` 自动检查更新；China Trips 的 Android Me 页新增手动 **Check for app updates** 入口。只信任 HTTPS 官方域名下的 APK 地址。
