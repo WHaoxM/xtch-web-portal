@@ -1,6 +1,6 @@
 param(
-    [string]$VersionName = '1.0.3',
-    [int]$VersionCode = 4
+    [string]$VersionName = '1.0.4',
+    [int]$VersionCode = 5
 )
 
 $ErrorActionPreference = 'Stop'
@@ -85,7 +85,7 @@ $manifest = [ordered]@{
     versionName = $VersionName
     apkUrl = 'https://www.xuntingtravel.com/downloads/syncing-travel.apk'
     sha256 = $sha256
-    releaseNotes = 'Keeps the APK inside China Trips and removes website-only navigation and chat entry points.'
+    releaseNotes = 'Fixes the APK back arrow so it always returns to the China Trips home screen.'
 }
 [System.IO.File]::WriteAllText(
     $releaseManifest,

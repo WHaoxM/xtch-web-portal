@@ -172,7 +172,7 @@ function androidHomePath() {
 }
 
 function goBackOrAndroidHome(navigate: ReturnType<typeof useNavigate>) {
-  if (isAndroidAppWrapper() && window.history.length <= 1) {
+  if (isAndroidAppWrapper()) {
     navigate(androidHomePath(), { replace: true });
     return;
   }

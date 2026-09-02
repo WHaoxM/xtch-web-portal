@@ -1,5 +1,13 @@
 # Agent Progress
 
+## Delivery（Android 返回箭头空白修复，2026-09-02）
+
+- 根因：APK 壳的页头返回箭头仍会调用 `navigate(-1)`；WebView 历史栈可回到初始空白文档，而非 China Trips。
+- 已改：仅在 Android APK 中，页头返回箭头不再读取或离开 WebView 历史，直接以 replace 方式回到 `/china-trips` 的移动端 Home 状态；浏览器版仍维持标准 `navigate(-1)`。
+- 已打包：`1.0.4` / Version Code `5`；更新清单说明此修复，APK SHA-256 `5483437228fe10dd9eb7889a28e9706ac415ed83b7a299e2e1c07c25a8eda69b`。
+- 已验证：`npm run build`、`npm run lint`、`git diff --check` 通过；APK 包名、zipalign、v1/v2/v3 签名与更新清单 SHA-256 已核验。
+- 待验证：发布后使用真机点开任意 APK 内页面的页头返回箭头，确认始终回到 China Trips Home 且无空白页。
+
 ## Delivery（Android APK 正式发布壳收口，2026-09-02）
 
 - 已改：仅在 `SyncingTravelAndroid` APK 壳中完全不挂载官网 Public IM 气泡，并隐藏移动壳页头和返回栏的聊天入口；普通官网移动端保持原有客服入口。

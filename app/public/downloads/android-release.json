@@ -1,7 +1,7 @@
 {
-    "versionCode":  4,
-    "versionName":  "1.0.3",
-    "apkUrl":  "https://www.xuntingtravel.com/downloads/syncing-travel.apk",
-    "sha256":  "e0c37f25224656261e377ecb904a58a1a38b8402ec573f30393998eae8af52b8",
-    "releaseNotes":  "Keeps the APK inside China Trips and removes website-only navigation and chat entry points."
+  "versionCode": 5,
+  "versionName": "1.0.4",
+  "apkUrl": "https://www.xuntingtravel.com/downloads/syncing-travel.apk",
+  "sha256": "5483437228fe10dd9eb7889a28e9706ac415ed83b7a299e2e1c07c25a8eda69b",
+  "releaseNotes": "Fixes the APK back arrow so it always returns to the China Trips home screen."
 }
