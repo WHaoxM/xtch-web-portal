@@ -1,5 +1,20 @@
 # Agent Progress
 
+## Current Goal（文数智旅部署与真实联调，2026-09-07）
+- 用户已在交接发布顺序后明确“开始实施”；范围为后端迁移/部署、受控测试线索及客服联调，通过后再发布文数智旅官网。
+- 已读：本次接入交接、agent-context/workflows/gotchas/task-board、cloud-vps 运维入口、015 迁移与 wenshu 接口、现有发布脚本。
+- 验证目标：核对生产来源和恢复条件 → 真实数据库迁移/入库去重 → 两访客隔离及既有权限客服收发 → 前端发布与线上验收。
+- 初始状态：后端接入变更未提交，当前分支 hotfix/im-close-permission，HEAD 936ee40；尚未在本轮改动生产或发布。
+- 下一步：只读核实 VPS 可达性、代码基线、生产备份与消息 worker；保持游客询盘、支付、客服权限不变。
+- 本轮预检：GitHub main = 936ee40f6ccfcdf1c7d3c969d77d5f69a3af285e，与本地 HEAD 相同；最近生产部署 33603958533 对应该提交且成功（此为 CI 记录，不替代主机运行时核验）。
+- 本轮复验：后端 4 项测试、官网 66 页检查及 6 项前端测试、git diff --check 通过；线上带允许 Origin 的 OPTIONS /api/wenshu?action=lead 仍为 404。
+- 阻塞：使用当前默认 SSH 身份连接 deploy@103.201.130.12 返回 Permission denied (publickey,password)，尚无法核验生产备份/迁移基线/worker；已请求用户提供既有 SSH 别名或专用密钥路径，不请求私钥内容。
+- 停点：未提交或 push，未触发 CI，未迁移生产库，未发布官网。GitHub 授权可用，但现有 CI 不含本次数据库备份及业务联调门禁，因此不先 push 绕过预检。取得正确 SSH 入口后从备份与运行基线核对继续。
+- 阻塞已解除：用户指定 ssh xtch-server，可连接为 root；生产 HEAD 同为 936ee40，xtch-app active。工作树只有既有未跟踪 backups/ 和 env/cloud-vps/.env.bak-20260831-073555，不删除或纳入提交。继续备份/隔离迁移验证，正式部署使用现有 deploy 用户入口。
+- 发布前验证完成：生产配置指向 127.0.0.1:5432/xtch_prod；已应用迁移至 014；MESSAGING_SOCKET_ENABLED=true。备份位于 VPS /opt/xtch-release-backups/wenshu-20260907/（权限 700），包含 xtch_prod.dump、source-936ee40.tar.gz、dist-cloud-vps；dump SHA-256=77569339f8e15cb45eca85129ff4e173766a012b9d18265388c278ed747f6220。
+- 使用备份恢复 schema 到独立 xtch_wenshu_verify_20260907，实际运行 015 两次、真实插入测试线索并核验 IM 来源约束，全部通过；隔离库已删除。原生产数据未用于本地测试。
+- 本轮重新完整 build/lint 通过（仅既有 Browserslist/chunk 提示）。下一步将仅本次接入变更推送既有 main→cloud-vps CI，随后真实业务验证；官网仍等待联调门禁。
+
 ## Delivery（Android 返回箭头空白修复，2026-09-02）
 
 - 根因：APK 壳的页头返回箭头仍会调用 `navigate(-1)`；WebView 历史栈可回到初始空白文档，而非 China Trips。
@@ -1802,3 +1817,18 @@ ChinaTripsMobile 接入 Motion（只用 Motion，不做 Anime.js）：首页 sta
 ## 不需要另开长交接文档
 
 新任务写 `Current Goal` + 更新 task board Owns 即可。
+
+## 文数智旅接入（2026-09-07，开始）
+- 已读：AGENTS、agent-context/workflows/gotchas/task-board、IM public 会话/消息接口及询盘字段。
+- 拟新增独立 B2B 留资表与受限跨站入口；复用 IM 消息存储、身份绑定和现有客服权限。
+- 不改游客询盘模型，不读取/修改生产数据，不自动部署。
+
+## 文数智旅接入（2026-09-07，本地实现完成，待部署验证）
+- 新增 `/api/wenshu?action=lead|session|messages`，专用来源白名单、不接受管理端凭据；访客 token 仅用于其文数智旅会话。
+- `015_wenshu_integration`：独立 `wenshu_leads`（含 company_address）、请求限流表、IM 来源增加 wenshuzhilv。没有迁移或修改生产库。
+- 前端改动在相邻 product_wenshuzhilv 项目；表单+人工客服共用接口。数据管理仅新增数据库表，不新建 CRM UI。
+- 验证：门户完整 build/lint；新增后端 4 项隔离/验证测试；官网 66 页检查及 6 项前端测试（含模拟真人消息收发、去重和安全文本渲染）。测试使用模拟数据库/网络，不等价于真实数据库端到端验收。
+- 线上只发了一次无数据 OPTIONS 请求，目前新路由返回 404，尚未部署。
+- 发布顺序（需明确授权）：确认生产备份/目标 → 执行 015 迁移 → 部署门户后端（保留现有 IM 权限、启用既有消息 worker）→ 验证白名单预检 → 测试线索入库与两位访客隔离/真实客服回复 → 发布官网。
+- 环境项：WENSHU_ALLOWED_ORIGINS 默认仅允许文数智旅现有 Sites 域；本地测试需显式追加 localhost，不用通配符。IM 不依赖跨站 cookie，临时 token 放 sessionStorage，刷新保留，关闭标签页后清除；1 天到期。
+- 待验证：015 在隔离 PostgreSQL 的执行、客服端现有权限下可见/可回复、跨站浏览器端到端和移动端布局。保持原有生产版本，未 push/发布。

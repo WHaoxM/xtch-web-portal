@@ -4,6 +4,7 @@
  * Public URL keys stay stable; file paths may nest under api/admin/<area>/.
  */
 export const localApiRoutes: Record<string, string> = {
+  '/api/wenshu': '/api/wenshu.ts',
   '/api/im/auth/exchange': '/api/im/auth-exchange.ts',
   '/api/im/auth/introspect': '/api/im/auth-introspect.ts',
   '/api/im/auth/refresh': '/api/im/auth-refresh.ts',

@@ -6,6 +6,7 @@
 
 | Gotcha | 正确处理 |
 |---|---|
+| 本机连接正式 VPS | 使用用户确认的 `ssh xtch-server`（已配置身份）；不要假定裸 `ssh deploy@103.201.130.12` 可认证。该别名登录为 root，部署脚本仍须以 deploy 用户运行；不读取或输出私钥。 |
 | 根目录也可 `npm run …` | 仓库根 `package.json` 会 `--prefix app` 转发；仍须写 `npm run deploy:serve`（不是裸 `deploy:serve`）。带参数：`npm run deploy:serve -- --target win11-home` |
 | Agent 反复 `npm run dev` 导致端口变成 3001/3002 | 本地 Vite 固定 `3000`（`strictPort: true`）。需要新开时直接 `npm run dev`（会先跑 `scripts/free-dev-port.mjs` 释放占用）；不要手动换端口。已有健康的 3000 服务时优先复用，勿重复启动 |
 | 开发与生产端口分开 | Vite/`npm run dev` → `:3000`；`deploy:serve` → `:3080`（`SELFHOST_PORT` 可覆盖）。Caddy 反代 `127.0.0.1:3080`。勿把两边都写 3000，否则同机并行会抢端口，且 `free-dev-port` 会误杀生产进程 |

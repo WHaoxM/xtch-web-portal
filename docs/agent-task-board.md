@@ -179,3 +179,19 @@
 | review-needed | 已完成局部工作，需要 Coordinator 或用户检查 |
 | verified | 已按约定验证 |
 | done | 已完成并可交接 |
+
+## 文数智旅接入（2026-09-07，进行中）
+- Owns: app/api/domains/wenshu/**、app/api/wenshu.ts、文数智旅专用迁移。
+- May Touch: app/scripts/localApiRoutes.ts（新增接入路由）、本任务交接文档。
+- Must Not Touch: 支付、原游客询盘、客服权限与生产环境配置。
+- 目标：公司地址随合作线索入库；复用人工客服消息与权限；只本地实现与验证，生产部署另行确认。
+
+文数智旅接入阶段状态：本地实现及构建/单元测试完成；无并行文件冲突；等待数据库和线上双端验收，未部署。May Touch 补记 app/package.json（仅 test:wenshu 测试命令）。
+
+## 文数智旅部署接续（2026-09-07）
+- 状态：working；用户已明确开始实施上述发布顺序。
+- Owns：文数智旅专用后端/015 迁移的发布验证、本任务交接。
+- May Touch：既有部署入口及受控验收产物；相邻 product_wenshuzhilv 本次接入版本的发布。
+- Must Not Touch：无关修改、游客询盘/支付模型、现有客服权限、非本任务生产业务数据。
+- 验收门禁：后端真实入库/客服双向联调通过前不发布官网。
+- 当前状态：blocked（部署 SSH 默认身份被拒绝）；等候既有 SSH 别名/专用密钥路径。GitHub 可访问，未触发发布；本轮测试复验通过。
