@@ -62,9 +62,9 @@ async function saveLead(req: ImRequest, res: ImResponse) {
   try { lead = readLead(req.body); if (!validId(requestId)) throw new Error('Invalid request ID.'); }
   catch { res.status(400).json({ ok: false, error: 'Please check your phone and company address.' }); return; }
   const result = await sql<{ id: string }>`INSERT INTO wenshu_leads
-    (request_id, name, phone, company, company_address, business_type, entry, page_url)
+    (request_id, name, phone, company, company_address, business_type, entry, page_url, message, email)
     VALUES (${requestId}::uuid, ${lead.name}, ${lead.phone}, ${lead.company}, ${lead.companyAddress},
-      ${lead.businessType}, ${lead.entry}, ${lead.pageUrl})
+      ${lead.businessType}, ${lead.entry}, ${lead.pageUrl}, ${lead.message}, ${lead.email})
     ON CONFLICT (request_id) DO UPDATE SET request_id = EXCLUDED.request_id RETURNING id`;
   res.status(201).json({ ok: true, id: result.rows[0].id });
 }

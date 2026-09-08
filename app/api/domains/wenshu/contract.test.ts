@@ -13,6 +13,9 @@ test('exact origin only; phone and company address required and bounded', () => 
   assert.throws(() => readLead({ phone: 'abc', company_address: '地址' }));
   assert.throws(() => readLead({ phone: '13800000000', company_address: 'x'.repeat(501) }));
   assert.equal(readLead({ phone: '13800000000', company_address: ' 成都 ' }).companyAddress, '成都');
+  assert.equal(readLead({ phone: '13800000000', company_address: '成都', message: '需要接待方案', email: 'sales@example.com' }).message, '需要接待方案');
+  assert.throws(() => readLead({ phone: '13800000000', company_address: '成都', message: 'x'.repeat(8001) }));
+  assert.throws(() => readLead({ phone: '13800000000', company_address: '成都', email: 'x'.repeat(321) }));
   assert.equal(validSessionToken('ws_' + 'a'.repeat(64)), true);
   assert.equal(validSessionToken('staff-token'), false);
 });
@@ -50,6 +53,21 @@ test('lead only acknowledged with persisted receipt; address is parameterized', 
   const broken = (async () => { throw new Error('DB unavailable'); }) as unknown as typeof sql;
   await createHandler(broken)({ method: 'POST', url: '/api/wenshu?action=lead', headers: { origin: WENSHU_ORIGIN } }, failure.res);
   assert.equal(failure.state.status, 503); assert.equal(failure.state.body.ok, false);
+});
+
+test('offline message details are persisted with the lead receipt', async () => {
+  const calls: unknown[][] = [];
+  const db = (async (parts: TemplateStringsArray, ...values: unknown[]) => {
+    calls.push(values);
+    return { rows: parts.join('').includes('request_limits') ? [{ count: 1 }] : [{ id: 'offline-lead-id' }] };
+  }) as unknown as typeof sql;
+  const r = response();
+  await createHandler(db)({ method: 'POST', url: '/api/wenshu?action=lead', headers: {
+    origin: WENSHU_ORIGIN, 'idempotency-key': '00000000-0000-4000-8000-000000000002',
+  }, body: { phone: '13800000000', company_address: '成都测试地址', message: '请安排英文导游', email: 'sales@example.com' } }, r.res);
+  assert.equal(r.state.status, 201);
+  assert(calls[1].includes('请安排英文导游'));
+  assert(calls[1].includes('sales@example.com'));
 });
 
 test('conversation substitution denied; staff authorization and cookies not forwarded', async () => {

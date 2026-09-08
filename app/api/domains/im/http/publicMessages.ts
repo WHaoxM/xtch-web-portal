@@ -173,7 +173,25 @@ async function listMessages(req: ImRequest, res: ImResponse) {
     ORDER BY m.seq ASC
     LIMIT ${limit}
   `;
-  res.status(200).json({ ok: true, items: result.rows, nextAfterSeq: result.rows.at(-1)?.seq ?? afterSeq });
+  // Return lifecycle state with every poll. Without this, a staff-side close is
+  // invisible to the cross-site visitor until the token expires.
+  const conversation = await sql<{ status: string; closed_at: string | null }>`
+    SELECT c.status, c.closed_at
+    FROM im_conversations c
+    WHERE c.id = ${conversationId}::uuid
+      AND EXISTS (
+        SELECT 1 FROM im_conversation_identities i
+        WHERE i.conversation_id = c.id
+          AND (
+            (i.identity_type = 'visitor_session' AND i.identity_subject = ${visitor.sessionId})
+            OR (i.identity_type = 'supabase_user' AND i.identity_subject = ${authenticated.ok ? authenticated.user.id : ''})
+          )
+          AND i.revoked_at IS NULL
+      )
+  `;
+  const state = conversation.rows[0] ?? { status: 'open', closed_at: null };
+  res.status(200).json({ ok: true, items: result.rows, nextAfterSeq: result.rows.at(-1)?.seq ?? afterSeq,
+    conversation: { status: state.status, closedAt: state.closed_at } });
 }
 
 function readConversationId(url: string | undefined): string | null {

@@ -14,10 +14,13 @@ export function readLead(value: unknown) {
     return text;
   }
   const phone = field('phone', 40, true);
-  if (!/^\+?[\d ()-]{6,40}$/.test(phone)) throw new Error('Invalid phone.');
+  if (!/^\+?[\d ()-]{6,40}$/.test(phone) || phone.replace(/\D/g, '').length < 6) throw new Error('Invalid phone.');
+  const email = field('email', 320);
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Invalid email.');
   return { phone, name: field('name', 100), company: field('company', 200),
     companyAddress: field('company_address', 500, true), businessType: field('business_type', 100),
-    pageUrl: field('page_url', 2048), entry: field('source', 100) };
+    pageUrl: field('page_url', 2048), entry: field('source', 100),
+    message: field('message', 8000), email };
 }
 export function validSessionToken(token: string): boolean {
   return /^ws_[a-f0-9]{64}$/.test(token);
