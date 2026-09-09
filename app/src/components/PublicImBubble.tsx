@@ -246,6 +246,8 @@ export default function PublicImBubble({ source, showTrigger = true }: PublicImB
 
   useEffect(() => {
     if (!open || !conversation) return;
+    // Socket.IO is the primary path; 2s REST reconciliation keeps a visitor
+    // responsive when a proxy blocks WebSocket without creating a request storm.
     const timer = window.setInterval(async () => {
       try {
         const next = await listPublicImMessages(conversation.id, lastSeqRef.current);
@@ -254,7 +256,7 @@ export default function PublicImBubble({ source, showTrigger = true }: PublicImB
       } catch {
         if (navigator.onLine) setConnection('reconnecting');
       }
-    }, 5000);
+    }, 2000);
     return () => window.clearInterval(timer);
   }, [conversation, open]);
 
@@ -268,7 +270,15 @@ export default function PublicImBubble({ source, showTrigger = true }: PublicImB
     if (message.sender_type === 'staff') setAnnouncement(`Support reply: ${message.body}`);
     setMessages((current) => {
       const withoutLocal = current.filter(
-        (item) => !(item.delivery && item.sender_type === 'visitor' && item.body === message.body),
+        (item) => {
+          if (!item.delivery || item.sender_type !== 'visitor' || message.sender_type !== 'visitor') return true;
+          // Prefer the idempotency key; body-only matching could delete a
+          // different pending message when a visitor sends the same text twice.
+          if (item.client_message_id && message.client_message_id) {
+            return item.client_message_id !== message.client_message_id;
+          }
+          return item.body !== message.body;
+        },
       );
       const next = uniqueMessages([...withoutLocal, message]);
       lastSeqRef.current = Math.max(lastSeqRef.current, message.seq);
@@ -279,7 +289,10 @@ export default function PublicImBubble({ source, showTrigger = true }: PublicImB
   async function submitMessage(event: FormEvent, retryMessage?: UiMessage) {
     event.preventDefault();
     const body = retryMessage?.body ?? draft.trim();
-    if (!body || !conversation || sendingId || connection === 'error' || connection === 'offline' || connection === 'reconnecting') return;
+    // REST writes remain valid while Socket.IO reconnects. Blocking the
+    // composer here made a transient socket issue look like the whole chat was
+    // unavailable, even though the server could still accept the message.
+    if (!body || !conversation || sendingId || connection === 'error' || connection === 'offline') return;
     const clientMessageId = retryMessage?.idempotencyKey ?? crypto.randomUUID();
     const localId = retryMessage?.id ?? `local-${clientMessageId}`;
     const pending: UiMessage = {
@@ -382,8 +395,8 @@ export default function PublicImBubble({ source, showTrigger = true }: PublicImB
           <form className="public-im-composer" onSubmit={(event) => void submitMessage(event)}>
             {error && !unavailable && <p className="public-im-error" role="status">{error}</p>}
             <div className="public-im-input-row">
-            <textarea ref={composerRef} value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={handleDraftKeyDown} placeholder="Write a message" aria-label="Write a message" rows={1} maxLength={8000} disabled={loading || !conversation || sendingId !== null || unavailable || connection === 'reconnecting'} />
-              <button type="submit" aria-label="Send message" disabled={!draft.trim() || loading || !conversation || sendingId !== null || unavailable || connection === 'reconnecting'}><Send size={17} /></button>
+            <textarea ref={composerRef} value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={handleDraftKeyDown} placeholder="Write a message" aria-label="Write a message" rows={1} maxLength={8000} disabled={loading || !conversation || sendingId !== null || unavailable} />
+              <button type="submit" aria-label="Send message" disabled={!draft.trim() || loading || !conversation || sendingId !== null || unavailable}><Send size={17} /></button>
             </div>
             <p className="public-im-hint">Enter to send · Shift + Enter for a new line{draft.length > 7500 ? ` · ${draft.length}/8000` : ''}</p>
           </form>
