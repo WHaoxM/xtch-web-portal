@@ -73,7 +73,14 @@ export async function login(req: ImRequest, res: ImResponse) {
     refresh_token: issued.refreshToken,
     token_type: 'bearer',
     expires_in: issued.expiresIn,
-    staff: { id: staff.id, username: staff.username, display_name: staff.display_name, permissions: issued.permissions },
+    staff: {
+      id: staff.id,
+      username: staff.username,
+      display_name: staff.display_name,
+      account_type: staff.account_type,
+      permissions: issued.permissions,
+      tenant_ids: issued.tenantIds,
+    },
   });
 }
 

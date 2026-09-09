@@ -154,8 +154,10 @@ import {
   type DashboardCardKey,
 } from '@/lib/dashboardOpsCopy';
 import { cn } from '@/lib/utils';
+import { ImReceptionWorkspace } from './components/ImReceptionWorkspace';
 
 type AdminTab =
+  | 'reception'
   | 'dashboard'
   | 'orders'
   | 'inquiries'
@@ -181,7 +183,10 @@ type AdminNavGroup = {
 const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
   {
     title: '',
-    items: [{ value: 'dashboard', label: '工作台' }],
+    items: [
+      { value: 'dashboard', label: '工作台' },
+      { value: 'reception', label: '智能接待' },
+    ],
   },
   {
     title: '交易',
@@ -4279,6 +4284,21 @@ export default function Admin() {
   const activeLabel =
     ADMIN_NAV_ITEMS.find((item) => item.value === activeTab)?.label ?? 'Admin';
   const roleLabel = adminRoleLabel(adminRole);
+
+  // Reception is an operational surface, not a card inside the content shell.
+  // Render it as a true viewport workspace so the operator gets the same
+  // full-screen experience as the live queue, without the old browser-frame
+  // presentation used by the showcase artwork.
+  if (activeTab === 'reception') {
+    return (
+      <ImReceptionWorkspace
+        adminToken={session.accessToken}
+        operatorEmail={session.user.email}
+        onExit={() => setActiveTab('dashboard')}
+        onSignOut={handleSignOut}
+      />
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-background">
