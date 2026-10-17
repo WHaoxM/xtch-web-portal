@@ -41,7 +41,6 @@ export const localApiRoutes: Record<string, string> = {
   '/api/admin/dashboard': '/api/admin/booking/dashboard.ts',
 
   '/api/admin/inquiries': '/api/admin/inquiry/inquiries.ts',
-  '/api/admin/wenshu-leads': '/api/admin/inquiry/wenshu-leads.ts',
 
   '/api/admin/departures': '/api/admin/catalog/departures.ts',
   '/api/admin/custom-trip-form': '/api/admin/catalog/custom-trip-form.ts',

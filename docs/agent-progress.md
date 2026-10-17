@@ -1,11 +1,5 @@
 # Agent Progress
 
-## Current Goal（文数智旅线索接收，2026-10-17）
-- 用户已确认收件邮箱并同意邮件提醒与管理后台列表并行实施；真实收件邮箱仅存生产环境变量，不提交仓库。生产 `www.xuntingtravel.com/api/wenshu?action=lead` 已有持久化回执，但此前无邮件通知或线索列表。
-- 新工作树 `D:\AGeneral Workspace\xjch2026\xtch-web-portal-wenshu-impl` 基于 GitHub/生产 `main` `cafc052`，不改动原有脏工作树。已实现通知状态迁移、Resend 提醒、数据库发送占用防并发重发、Admin 线索列表/详情/人工重试及相关测试；线索详情限管理员并记录审计。
-- 本地 `test:wenshu` 12 项、`typecheck`、`lint`、`build`、`git diff --check` 通过。生产 `xtch-app` 当前 active，HEAD `cafc052`；未更改生产数据库、环境或服务。
-- 阻断发布：生产现有 Resend API key 已配置，但从服务器向 Resend 提交邮件请求得到 Cloudflare HTTP 403 / 1010。用空 JSON 请求能到达 Resend 并得到 422，故不能把当前发信通道认定为可用。为防止上线后表单持续失败，尚未合入 `main`、迁移或部署。需先修复发信通道并用无客户资料的测试邮件验证，然后备份、发布、测试线索、核对收件箱。
-
 ## Current Goal（文数智旅部署与真实联调，2026-09-07）
 - 用户已在交接发布顺序后明确“开始实施”；范围为后端迁移/部署、受控测试线索及客服联调，通过后再发布文数智旅官网。
 - 已读：本次接入交接、agent-context/workflows/gotchas/task-board、cloud-vps 运维入口、015 迁移与 wenshu 接口、现有发布脚本。

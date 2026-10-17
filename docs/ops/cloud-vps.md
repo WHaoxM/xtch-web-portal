@@ -90,11 +90,8 @@ bash deploy/cloud-vps/grant-xtch-read-access.sh   # 再次收紧 .env 为 640
 | `TRUST_PROXY` | `1`（仅 Caddy 后） |
 | `VITE_SUPABASE_*` | **Prod** Supabase |
 | `ADMIN_OPS_EMAIL_ALLOWLIST` / `ADMIN_TECH_EMAIL_ALLOWLIST` | 真实运营/技术邮箱 |
-| `WENSHU_LEAD_TO_EMAIL` | 文数智旅官网表单线索提醒邮箱，须配合已验证的 `INQUIRY_FROM_EMAIL` 和 `RESEND_API_KEY` |
 
 生产启动还会按角色 2 规则校验库名/桶名/占位符/bypass（见 `scripts/env/validateTargetEnv.ts`）。
-
-文数智旅线索由 `POST /api/wenshu?action=lead` 写入 `wenshu_leads`，再通过 Resend 向 `WENSHU_LEAD_TO_EMAIL` 发提醒；仅邮件平台接受后表单返回成功。若发送失败，线索仍保存在库中，表单得到可重试错误。管理员在 `/admin` →「文数智旅线索」查看记录与通知状态，打开详情后可手动重试；“邮件平台已接收”不等于收件箱最终投递。浏览器端重试沿用同一 `Idempotency-Key`，服务端通过数据库发送占用标记避免并发重复发信。若平台已接受但回写数据库失败，人工重试仍可能重复发信，应先按回执编号核对。上线验收须用标记清楚的测试线索核对数据库状态，并请收件人检查收件箱/垃圾箱；不要在日志或 Git 中记录真实联系人资料和密钥。
 
 ### 5. 空库 migrate + 构建
 

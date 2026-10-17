@@ -98,8 +98,6 @@ npx tsx ../scripts/env/check-target-env.ts cloud-vps
 if [[ "$WITH_LINT" -eq 1 ]]; then
   log "lint"
   npm run lint
-  log "Wenshu lead contract tests"
-  npm run test:wenshu
 fi
 
 if [[ "$WITH_UNIT_TESTS" -eq 1 ]]; then
