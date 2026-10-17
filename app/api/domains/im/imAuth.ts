@@ -67,13 +67,13 @@ type StaffPermissionRow = {
 };
 
 export function resolveStaffPermissionSets(rows: StaffPermissionRow[], sourceScopeEnforced: boolean) {
-  const tokenPermissions = [...new Set(rows
+  const tokenPermissions = sourceScopeEnforced ? [] : [...new Set(rows
     .filter((row) => row.scope_type !== 'source')
     .map((row) => row.permission_code))];
-  const globalPermissions = [...new Set(rows
+  const globalPermissions = sourceScopeEnforced ? [] : [...new Set(rows
     .filter((row) => row.scope_type === 'global')
     .map((row) => row.permission_code))];
-  const tenantIds = [...new Set(rows
+  const tenantIds = sourceScopeEnforced ? [] : [...new Set(rows
     .filter((row) => row.scope_type === 'tenant' && row.permission_code === 'im:conversation:read')
     .map((row) => row.scope_id)
     .filter((scopeId): scopeId is string => Boolean(scopeId)))];
@@ -126,9 +126,9 @@ export async function authenticateStaffRequest(req: ImRequest): Promise<
       accountType: staff.account_type,
       // Source grants are live database data, never flattened into long-lived token permissions.
       // Otherwise a source-only permission could become a broad legacy membership grant.
-      permissions: claims.permissions,
-      globalPermissions: claims.globalPermissions ?? [],
-      tenantIds: claims.tenantIds,
+      permissions: staff.source_scope_enforced ? [] : claims.permissions,
+      globalPermissions: staff.source_scope_enforced ? [] : claims.globalPermissions ?? [],
+      tenantIds: staff.source_scope_enforced ? [] : claims.tenantIds,
       sourceScopeEnforced: staff.source_scope_enforced,
       sourcePermissions,
     },
@@ -136,12 +136,15 @@ export async function authenticateStaffRequest(req: ImRequest): Promise<
 }
 
 export function hasPermission(principal: ImStaffPrincipal, permission: string): boolean {
+  if (principal.sourceScopeEnforced) {
+    return imSourceScopedPermissionSet.has(permission) && principal.sourcePermissions.includes(permission);
+  }
   return principal.accountType === 'super_admin'
-    || principal.permissions.includes(permission)
-    || (principal.sourceScopeEnforced && imSourceScopedPermissionSet.has(permission) && principal.sourcePermissions.includes(permission));
+    || principal.permissions.includes(permission);
 }
 
 export function hasGlobalPermission(principal: ImStaffPrincipal, permission: string): boolean {
+  if (principal.sourceScopeEnforced) return false;
   return principal.accountType === 'super_admin' || principal.globalPermissions.includes(permission);
 }
 

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { hasPermission, isActiveImStaffStatus, resolveStaffPermissionSets, type ImStaffPrincipal } from './imAuth';
+import { hasGlobalPermission, hasPermission, isActiveImStaffStatus, resolveStaffPermissionSets, type ImStaffPrincipal } from './imAuth';
 
 test('staff status gate fails closed immediately when the account is no longer active', () => {
   assert.equal(isActiveImStaffStatus('active'), true);
@@ -22,17 +22,19 @@ test('source-only permissions are never flattened into JWT claims for legacy acc
   assert.deepEqual(sets.sourcePermissions, []);
 });
 
-test('source-enforced accounts receive source permission codes separately from broad JWT grants', () => {
+test('source-enforced accounts do not retain old global or tenant grants in generated token permission sets', () => {
   const sets = resolveStaffPermissionSets([
     { permission_code: 'im:conversation:read', scope_type: 'source', scope_id: null },
     { permission_code: 'im:message:send', scope_type: 'source', scope_id: null },
     { permission_code: 'im:staff:manage', scope_type: 'global', scope_id: null },
+    { permission_code: 'im:conversation:read', scope_type: 'tenant', scope_id: 'tenant-1' },
   ], true);
 
-  assert.deepEqual(sets.tokenPermissions, ['im:staff:manage']);
-  assert.deepEqual(sets.permissions, ['im:staff:manage', 'im:conversation:read', 'im:message:send']);
+  assert.deepEqual(sets.tokenPermissions, []);
+  assert.deepEqual(sets.permissions, ['im:conversation:read', 'im:message:send']);
   assert.deepEqual(sets.sourcePermissions, ['im:conversation:read', 'im:message:send']);
-  assert.deepEqual(sets.globalPermissions, ['im:staff:manage']);
+  assert.deepEqual(sets.globalPermissions, []);
+  assert.deepEqual(sets.tenantIds, []);
 });
 
 test('source-only management or unrelated permission codes are not elevated into the staff API', () => {
@@ -61,4 +63,23 @@ test('source-only action codes are recognized only while the account is source-e
   assert.equal(hasPermission({ ...principal, sourcePermissions: ['im:staff:manage'] }, 'im:staff:manage'), false);
   assert.equal(hasPermission({ ...principal, sourcePermissions: [] }, 'im:message:send'), false);
   assert.equal(hasPermission({ ...principal, sourceScopeEnforced: false }, 'im:message:send'), false);
+});
+
+test('source enforcement ignores super-admin and historical global or tenant permission claims', () => {
+  const principal: ImStaffPrincipal = {
+    staffId: 'staff-1',
+    username: 'agent',
+    displayName: 'Agent',
+    accountType: 'super_admin',
+    permissions: ['im:staff:manage', 'im:conversation:read'],
+    globalPermissions: ['im:staff:manage', 'im:conversation:read'],
+    tenantIds: ['tenant-1'],
+    sourceScopeEnforced: true,
+    sourcePermissions: ['im:conversation:read'],
+  };
+
+  assert.equal(hasPermission(principal, 'im:conversation:read'), true, 'current database source grant is honored');
+  assert.equal(hasPermission(principal, 'im:staff:manage'), false, 'legacy JWT/global grant is ignored');
+  assert.equal(hasGlobalPermission(principal, 'im:conversation:read'), false);
+  assert.equal(hasGlobalPermission(principal, 'im:staff:manage'), false);
 });

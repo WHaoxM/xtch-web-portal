@@ -1,6 +1,6 @@
 import { sql } from '../../../platform/db';
 import { IM_CONVERSATION_SOURCES } from '../conversationAccess';
-import { authenticateStaffRequest, hasPermission, hashToken, IM_SOURCE_SCOPED_PERMISSION_CODES, randomToken } from '../imAuth';
+import { authenticateStaffRequest, hasPermission, hashToken, IM_SOURCE_SCOPED_PERMISSION_CODES, randomToken, type ImStaffPrincipal } from '../imAuth';
 import { type ImRequest, type ImResponse } from '../httpTypes';
 
 export default async function handler(req: ImRequest, res: ImResponse) {
@@ -9,7 +9,7 @@ export default async function handler(req: ImRequest, res: ImResponse) {
     res.status(auth.status).json({ ok: false, error: auth.error });
     return;
   }
-  if (!hasPermission(auth.principal, 'im:staff:manage')) {
+  if (!canManageStaffAdmin(auth.principal)) {
     res.status(403).json({ ok: false, error: 'Staff management permission required.' });
     return;
   }
@@ -26,6 +26,10 @@ export default async function handler(req: ImRequest, res: ImResponse) {
     return;
   }
   res.status(405).json({ ok: false, error: 'Method not allowed.' });
+}
+
+export function canManageStaffAdmin(principal: ImStaffPrincipal): boolean {
+  return !principal.sourceScopeEnforced && hasPermission(principal, 'im:staff:manage');
 }
 
 async function invite(req: ImRequest, res: ImResponse, grantedBy: string) {

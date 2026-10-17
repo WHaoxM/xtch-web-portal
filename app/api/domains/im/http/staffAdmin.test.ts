@@ -1,6 +1,41 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { parseStaffPermissionScope } from './staffAdmin';
+import { canManageStaffAdmin, parseStaffPermissionScope } from './staffAdmin';
+import { type ImStaffPrincipal } from '../imAuth';
+
+const principal = (overrides: Partial<ImStaffPrincipal> = {}): ImStaffPrincipal => ({
+  staffId: '123e4567-e89b-42d3-a456-426614174000',
+  username: 'agent',
+  displayName: 'Agent',
+  accountType: 'staff',
+  permissions: [],
+  globalPermissions: [],
+  tenantIds: [],
+  sourceScopeEnforced: false,
+  sourcePermissions: [],
+  ...overrides,
+});
+
+test('source-enforced staff cannot use staff administration even with a super-admin or global manage permission', () => {
+  assert.equal(canManageStaffAdmin(principal({
+    accountType: 'super_admin',
+    sourceScopeEnforced: true,
+  })), false);
+  assert.equal(canManageStaffAdmin(principal({
+    permissions: ['im:staff:manage'],
+    globalPermissions: ['im:staff:manage'],
+    sourceScopeEnforced: true,
+  })), false);
+});
+
+test('legacy staff administration authorization is unchanged', () => {
+  assert.equal(canManageStaffAdmin(principal({ accountType: 'super_admin' })), true);
+  assert.equal(canManageStaffAdmin(principal({
+    permissions: ['im:staff:manage'],
+    globalPermissions: ['im:staff:manage'],
+  })), true);
+  assert.equal(canManageStaffAdmin(principal()), false);
+});
 
 test('permission scope defaults to global only when scopeType is omitted', () => {
   assert.deepEqual(parseStaffPermissionScope({}), {

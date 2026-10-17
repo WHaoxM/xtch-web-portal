@@ -4,16 +4,16 @@
 
 迁移 `023_im_staff_source_scope` 为客服账号增加可选 `source_scope_enforced`，并为 IM 权限增加 `scope_type='source'` / `scope_source`。新列默认关闭，因此未显式启用范围约束的现有客服账号继续使用原来的全局、租户及会话成员权限。
 
-启用后，账号对会话的每项操作都必须有该会话 `source` 对应的未撤销授权；全局权限、租户权限、超级管理员身份或既有会话成员关系都不能跨过来源边界。允许使用的会话来源来自服务端白名单：`portal_web`、`portal_mobile`、`xt_mvp_mobile`、`wenshuzhilv`。不同操作分别检查其权限码：
+启用后，账号对会话的每项操作都必须有该会话 `source` 对应的未撤销授权；全局权限、租户权限、超级管理员身份或既有会话成员关系都不能跨过来源边界。来源受限账号也不能调用客服账号/权限管理接口，即使账号仍有 `super_admin` 身份或旧的全局 `im:staff:manage` 权限；如需调整其授权或关闭 enforcement，必须由另一位未启用来源限制且有管理权限的管理员操作。允许使用的会话来源来自服务端白名单：`portal_web`、`portal_mobile`、`xt_mvp_mobile`、`wenshuzhilv`。不同操作分别检查其权限码：
 
 - 查看会话/消息/附件：`im:conversation:read`
 - 认领、接手、转交：对应 `im:assignment:claim`、`im:assignment:takeover`、`im:assignment:transfer`
 - 发送文字或附件：`im:message:send`
 - 关闭、重开或更新状态：`im:conversation:close`
 
-来源授权保存在数据库中，并在每次客服 API 请求中读取；修改授权或禁用账号对后续请求即时生效。来源权限不会被压平成长期 JWT 全局权限；启用来源范围的账号只可通过 HTTP 工作台轮询，队列约每 4 秒刷新、会话消息约每 2.5 秒刷新，不加入 Socket.IO 房间。旧账号未启用来源限制时保留原有实时行为。
+来源授权保存在数据库中，并在每次客服 API 请求中读取；修改授权或禁用账号对后续请求即时生效。来源范围账号的权限判断忽略超级管理员身份及旧 JWT 中的全局/租户权限；认证会剥离既有 token 里的这类 claims，新签发 token 也不包含全局权限或租户范围，只凭当前数据库加载的来源权限代码进入 ACL，再按会话精确来源复核。启用来源范围的账号只可通过 HTTP 工作台轮询，队列约每 4 秒刷新、会话消息约每 2.5 秒刷新，不加入 Socket.IO 房间。旧账号未启用来源限制时保留原有实时行为。
 
-客服 access token 当前有效期为 10 分钟，refresh token 最长 30 天。来源权限和 enforcement 标记在每次请求查当前数据库状态，因此来源撤销/缩小无需等 access token 过期；refresh token 只负责续发会话，不会把来源权限提升为全局权限。已有旧账号的全局/租户 JWT claims 仍沿用原有生命周期。账号 `disabled`/`suspended` 会在请求级数据库检查中立即拒绝，即使客户端仍持有未过期的 access token。
+客服 access token 当前有效期为 10 分钟，refresh token 最长 30 天。来源权限和 enforcement 标记在每次请求查当前数据库状态，因此来源撤销/缩小无需等 access token 过期；refresh token 只负责续发会话，不会把来源权限提升为全局权限。未启用来源限制的旧账号全局/租户 JWT claims 仍沿用原有生命周期；来源受限账号即使持有启用前签发的旧 access token，也会在服务端认证时剥离这些 claims。账号 `disabled`/`suspended` 会在请求级数据库检查中立即拒绝，即使客户端仍持有未过期的 access token。
 
 ## 启用流程（变更发布后）
 
@@ -21,7 +21,7 @@
 
 1. 先完成数据库备份，再运行应用迁移；检查 `im_staff_accounts.source_scope_enforced` 默认值为 `false`，权限表支持 `scope_source`。
 2. 通过受控的客服权限管理接口，先给经确认的账号授予精确来源授权。来源范围必须使用小写白名单值，例如 `wenshuzhilv`；来源授权不能省略动作权限码。
-3. 至少授予一个来源范围的 `im:conversation:read` 后，调用客服权限管理接口的 `set-source-scope` 操作启用该账号。该步骤会写审计事件；启用前若没有来源读取授权，服务端返回冲突且不修改账号。
+3. 至少授予一个来源范围的 `im:conversation:read` 后，由另一位未启用来源限制且有 `im:staff:manage` 权限的管理员调用客服权限管理接口的 `set-source-scope` 操作启用该账号。该步骤会写审计事件；启用前若没有来源读取授权，服务端返回冲突且不修改账号。来源限制一旦启用，目标账号不能再自行关闭 enforcement。
 4. 通过客服工作台验证：账号只看到授权来源；在授权来源内，按已授予权限验证查看、认领、发送、附件访问、状态变更；从另一个来源的会话 URL/API 发起同样操作应返回拒绝或不可见。
 5. 撤销单项来源权限或将账号设为 `disabled`/`suspended` 后，立即重复越权请求；应失败。确认来源范围账号走轮询而非 websocket。
 

@@ -1,5 +1,13 @@
 # Agent Progress
 
+## Current Goal 续修（IM source-scoped staffAdmin 防绕过，2026-10-17）
+- Coordinator 复审发现来源受限账号如仍有旧全局 `im:staff:manage` 或 `super_admin`，现有 staffAdmin 门禁允许其关闭自己的 enforcement。
+- 修复：staffAdmin 统一拒绝所有 `sourceScopeEnforced=true` 调用；权限检查对受限账号仅接受当前数据库加载的白名单 source permission code，忽略 `super_admin`、旧 global/tenant claims；`hasGlobalPermission` 对受限账号恒 false。认证会剥离旧 access token 的 broad claims，新签 token permission sets 也不含 global/tenant scopes。
+- 测试：staffAdmin 拒绝 source-scoped super_admin 与旧 global manage，同时保留 legacy super_admin/global manage；IM auth 测试 global/tenant claims 清空、旧 token claim 被忽略、精确 source 权限可用。先确认新增用例在旧实现下失败，再修复通过。
+- 文档：`docs/ops/shared/im-staff-source-scope.md` 说明来源客服不能管理/解锁自身 scope，需未受限管理员操作；说明旧 claims 忽略和新 token 不包含 global/tenant grants。
+- 验证：聚焦 IM 测试 26/26、`npm run typecheck`、`npm run lint`、`npm run build`、`git diff --check` 均通过。构建仅报告已有 Browserslist 数据旧与 bundle chunk 较大告警；sitemap/manifest 无 diff。
+- 未执行数据库集成或生产操作；未改 quick-login、XT_MVP exchange、生产账号/授权、数据库或部署；待独立本地提交。
+
 ## Current Goal 续修（IM 旧账号授权兼容回归，2026-10-17）
 - Coordinator 复审 `fda7314` 发现：旧 `source_scope_enforced=false` 账号的会话状态路径必须保留原有 close permission + read ACL 双门槛（tenant read / global read / active membership）；assignment takeover/transfer 必须保留 action permission + legacy global claim 或 tenant scope 的行为。
 - 修复：legacy close 在共享 ACL 中复用旧 read 权限/全局 read、成员、tenant read 判定；assignment 只对 source-enforced 账号做动作级来源 ACL 预检，legacy 账号继续由事务内原 global claim 或 tenant gate 授权。来源账号预检与事务内精确 grant 检查未放宽。
