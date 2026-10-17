@@ -155,12 +155,14 @@ import {
 } from '@/lib/dashboardOpsCopy';
 import { cn } from '@/lib/utils';
 import { ImReceptionWorkspace } from './components/ImReceptionWorkspace';
+import { WenshuLeadsPanel } from './components/WenshuLeadsPanel';
 
 type AdminTab =
   | 'reception'
   | 'dashboard'
   | 'orders'
   | 'inquiries'
+  | 'wenshu-leads'
   | 'departures'
   | 'destinations'
   | 'routes'
@@ -193,6 +195,7 @@ const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     items: [
       { value: 'orders', label: '订单' },
       { value: 'inquiries', label: '询盘' },
+      { value: 'wenshu-leads', label: '文数智旅线索' },
       { value: 'departures', label: '班期' },
     ],
   },
@@ -4392,6 +4395,9 @@ export default function Admin() {
                 token={session.accessToken}
                 initialStatusFilter={seededListFilters.inquiries ?? 'open'}
               />
+            </TabsContent>
+            <TabsContent value="wenshu-leads" className="mt-0">
+              <WenshuLeadsPanel token={session.accessToken} />
             </TabsContent>
             <TabsContent value="departures" className="mt-0">
               <DeparturesPanel token={session.accessToken} />
