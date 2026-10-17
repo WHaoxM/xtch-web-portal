@@ -5,7 +5,8 @@
 - 新工作树 `D:\AGeneral Workspace\xjch2026\xtch-web-portal-wenshu-impl` 基于 GitHub/生产 `main` `cafc052`，不改动原有脏工作树。已实现通知状态迁移、Resend 提醒、数据库发送占用防并发重发、Admin 线索列表/详情/人工重试及相关测试；线索详情限管理员并记录审计。
 - 本地 `test:wenshu` 12 项、`typecheck`、`lint`、`build`、`git diff --check` 通过。生产 `xtch-app` 当前 active，HEAD `cafc052`；未更改生产数据库、环境或服务。
 - 阻断发布：先前 Python 预检得到 Cloudflare HTTP 403 / 1010；改用生产实际 Node `fetch` 后，Resend 明确返回 HTTP 403：配置中的 `neutronm.store` 发件域名未验证。该 API key 的域名列表为空；`INQUIRY_FROM_EMAIL` 与 `BOOKING_FROM_EMAIL` 均使用此未验证域名。已在同一 Resend 账号创建专用 `mail.xuntingtravel.com` 域名（ID `41184936-f52a-43da-8e31-5ccf9c15bbbc`），状态 `not_started`；DNS 记录保存在 VPS `/opt/xtch-release-backups/resend-mail-xuntingtravel-domain.json`，尚未更改 Cloudflare DNS。
-- 用户进一步要求 Resend 修复且 QQ SMTP 作为备用。服务器已验证 `smtp.qq.com:465` TLS 连接成功；备用发信代码和 env example 正在补充。需要 Cloudflare DNS 配置与 QQ 邮箱 SMTP 授权码后，才能无客户资料测试两条通道。为防止上线后表单持续失败，尚未合入 `main`、迁移或部署。
+- 用户进一步要求 Resend 修复且 QQ SMTP 作为备用。服务器已验证 `smtp.qq.com:465` TLS 连接成功；备用发信代码和 env example 已补充。需要 Cloudflare DNS 配置与 QQ 邮箱 SMTP 授权码后，才能无客户资料测试两条通道；当前备用版尚未合入 `main` 或部署。
+- 运行事件：PR #10 在邮件通道未就绪时被合并并自动部署到生产 `bb80a70`，当时 `WENSHU_LEAD_TO_EMAIL` 尚未配置，新线索会留档但表单返回 503。已将该 merge 的反向提交 `fcd8b8c` 推送 `main`，恢复原有表单行为；自动部署正在完成。生产库的 017 迁移已应用且为加列迁移，不回滚数据。后续记录 `notification_provider` 必须使用新 018 迁移，不能修改已执行的 017 期望重跑。
 
 ## Current Goal（文数智旅部署与真实联调，2026-09-07）
 - 用户已在交接发布顺序后明确“开始实施”；范围为后端迁移/部署、受控测试线索及客服联调，通过后再发布文数智旅官网。
