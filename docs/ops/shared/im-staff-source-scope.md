@@ -15,6 +15,14 @@
 
 客服 access token 当前有效期为 10 分钟，refresh token 最长 30 天。来源权限和 enforcement 标记在每次请求查当前数据库状态，因此来源撤销/缩小无需等 access token 过期；refresh token 只负责续发会话，不会把来源权限提升为全局权限。未启用来源限制的旧账号全局/租户 JWT claims 仍沿用原有生命周期；来源受限账号即使持有启用前签发的旧 access token，也会在服务端认证时剥离这些 claims。账号 `disabled`/`suspended` 会在请求级数据库检查中立即拒绝，即使客户端仍持有未过期的 access token。
 
+## Admin quick-login SSO（显式 opt-in）
+
+`POST /api/im/auth/exchange` 接受现有管理端 `aq1.` 快捷登录 bearer token，并复用 `/api/admin/*` 的签名、到期、当前配置邮箱和 admin allowlist 验证。随后只查找精确预配置的 IM 映射：`external_provider='admin_quick'`、`external_subject` 等于规范化后的 quick-login 邮箱、`status='active'`、`account_type='staff'`、`source_scope_enforced=true`。签发前还会再次读取并验证这些 live 字段；如账号停用、映射变更或来源限制关闭，exchange 拒绝。无匹配时返回拒绝，不创建账号、不自动写权限，也不按 admin tech/ops 角色映射 IM 权限。来源权限必须由获准的客服管理员单独预配置，例如只授予 `wenshuzhilv` 的来源读取/发送/认领权限。
+
+该 SSO 只返回 10 分钟 IM access token，不返回 refresh token，也不插入 `im_staff_sessions` 行；工作台遇到 access token 401 后使用原管理端 `aq1.` token 重新 exchange。`aq1.` 本身仍按现有 admin quick-login 机制有效（默认最长 12 小时），并受当前 allowlist/配置邮箱校验；它不是 IM refresh token。损坏/过期的 `aq1.` 会留在 admin exchange 分支并 fail closed，不会被当成 XT_MVP token 尝试。此路径的审计记录只写 reason、账号 ID（若已匹配）、IP/UA hash，不写 bearer/access/refresh token 或邮箱。现有 XT_MVP exchange 和本地客服账号密码登录保持各自原有路径。
+
+此实现不创建、不启用、不授权任何生产账号。若以后业务方选择此方案，应先确认发布及迁移 023，再由获授权管理员通过客服管理流程建立来源 grants 并启用来源 enforcement，最后由另一位未受来源限制的管理员通过受控账号管理流程完成 `admin_quick` ↔ 完全匹配邮箱的显式绑定。不得通过管理员角色、allowlist 或快速登录请求自动创建/授权 IM 账号。若决定撤销该身份入口，应删除显式映射或将 IM 账号设为 `disabled`；不要仅关闭 enforcement 来撤销身份，因为这会改变旧账号权限语义。已签发的 IM access token 本身最长 10 分钟，管理 `aq1.` token 则直到其到期、配置邮箱/allowlist 变化或密码轮换才无法再次 exchange。
+
 ## 启用流程（变更发布后）
 
 本次代码变更不会创建、启用或授予任何生产账号。待业务方选择身份方案并由管理员确认具体账号后：

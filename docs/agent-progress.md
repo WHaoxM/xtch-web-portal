@@ -1,5 +1,17 @@
 # Agent Progress
 
+## Current Goal（管理账号 opt-in IM SSO，2026-10-17）
+- Coordinator 要求先准备“沿用现有管理账号”的推荐方案，但用户尚未选择；本轮仅实现代码，不创建/授权生产账号，启用必须依赖数据库中已配置的显式 `admin_quick` 映射。
+- 目标：仅通过既有 admin `aq1.` 验签与 allowlist 验证后，精确匹配 active、staff、`external_provider='admin_quick'`、`external_subject=email`、`source_scope_enforced=true` 账号签发 10 分钟 IM access token；不自动建号、不授予全局权限、不向浏览器返回/持久化 30 天 refresh token，也不为 SSO 创建 session 行。
+- XT_MVP exchange 保持原行为；非 `aq1.` 凭据走既有 XT_MVP 校验，损坏/过期 `aq1.` 不回退到 XT_MVP。现有本地客服账号密码登录需保持不变。
+- 验证目标：aq1 有效/过期/篡改、精确映射无记录/跨邮箱/disabled/non-source/super_admin、source grant permissions、旧 XT_MVP dispatch、无 refresh-session 的短 token 续交换；typecheck/lint/build/focused tests。真实 DB 端到端交由 Coordinator 审查时执行。
+- 当前基线：`codex/wenshu-chat-multimodal`，HEAD `3fba2fd`；未推送、未部署。
+- 实现：`/api/im/auth/exchange` 根据 `aq1.` 前缀固定进入 admin verifier 分支；在现有 admin HMAC/TTL/current email/allowlist 验证后，仅查询 `admin_quick` exact-email、active、ordinary staff、`source_scope_enforced=true` 映射。无匹配不 provisioning、不自动授权；签发前用第二次 live DB 查询复核状态、账号类型、provider/subject 与 enforcement，避免 lookup/issue 间撤销竞态。受限账号只接受实时 source permissions，不输出旧 global/tenant claims。
+- SSO 只返回 10 分钟 access token、不创建 `im_staff_sessions`、不返回 refresh token；客户端 401 后使用同一 `aq1.` 重新交换。本地客服密码登录与 XT_MVP exchange 路径保持不变；损坏/过期 aq1 不会 fallback。审计只记事件原因、账号 ID 及 IP/UA hash，不记 bearer/access/refresh token。
+- 测试：有效/过期/篡改 aq1 经现有 verifier、XT_MVP 分支、无映射/跨邮箱/disabled/non-source/super_admin 拒绝、source 读/发送权限过滤 global/tenant grants、issue 时 mapping 状态复核、600 秒且不插 session、客户端 401 后重新 exchange 共 32 项聚焦回归全过。先前新增长无 refresh 的测试先因无 DB 注入而红，接入可注入 SqlClient 的签发函数及无 refresh 选项后变绿；aq1 verifier 先确认已有 handler 可用。
+- 验证命令：在 `app/` 下 `npx tsx --test api/domains/im/http/authExchange.test.ts api/domains/im/imAuth.test.ts api/domains/im/http/staffAdmin.test.ts api/domains/im/conversationAccess.test.ts scripts/messagingOutbox.test.ts scripts/messagingSocket.test.ts src/domains/im/staffImClient.test.mjs`（32/32）；`npm run typecheck`、`npm run lint`、`npm run build`、`git diff --check` 均通过。build 有既有 Browserslist 数据过期与 bundle 大小提示；生成 sitemap/route manifest 无变更。
+- 运维说明补充 SSO 的明确 mapping 字段、未来 opt-in 步骤与撤销边界。未创建生产账号/授权、未运行真实 DB 集成、未推送或部署；待 Coordinator 审阅后再决定后续 E2E/发布。
+
 ## Current Goal 续修（IM source-scoped staffAdmin 防绕过，2026-10-17）
 - Coordinator 复审发现来源受限账号如仍有旧全局 `im:staff:manage` 或 `super_admin`，现有 staffAdmin 门禁允许其关闭自己的 enforcement。
 - 修复：staffAdmin 统一拒绝所有 `sourceScopeEnforced=true` 调用；权限检查对受限账号仅接受当前数据库加载的白名单 source permission code，忽略 `super_admin`、旧 global/tenant claims；`hasGlobalPermission` 对受限账号恒 false。认证会剥离旧 access token 的 broad claims，新签 token permission sets 也不含 global/tenant scopes。

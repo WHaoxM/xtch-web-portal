@@ -1,6 +1,6 @@
 import { io, type Socket } from 'socket.io-client';
 
-const configuredBase = (import.meta.env.VITE_IM_API_BASE_URL ?? '').trim().replace(/\/$/, '');
+const configuredBase = (import.meta.env?.VITE_IM_API_BASE_URL ?? '').trim().replace(/\/$/, '');
 
 function apiUrl(path: string): string {
   return `${configuredBase}${path}`;

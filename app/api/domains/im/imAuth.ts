@@ -1,8 +1,8 @@
 import crypto from 'node:crypto';
-import { sql } from '../../platform/db';
+import { sql, type SqlClient } from '../../platform/db';
 import { bearerToken, type ImRequest } from './httpTypes';
 
-const ACCESS_TTL_SECONDS = 10 * 60;
+export const IM_ACCESS_TTL_SECONDS = 10 * 60;
 export const IM_SOURCE_SCOPED_PERMISSION_CODES = [
   'im:conversation:read',
   'im:assignment:claim',
@@ -175,19 +175,43 @@ export async function introspectImAccessToken(token: string): Promise<ImIntrospe
 
 export async function issueStaffTokens(
   staff: Pick<StaffRow, 'id' | 'account_type'>,
-  options: { ipHash?: string; userAgentHash?: string; externalRole?: string; tokenFamily?: string } = {},
+  options: {
+    ipHash?: string;
+    userAgentHash?: string;
+    externalRole?: string;
+    tokenFamily?: string;
+    createRefreshSession?: boolean;
+    adminQuickEmail?: string;
+  } = {},
+  database: SqlClient = sql,
 ) {
-  const permissionsResult = await sql<{
+  const permissionsResult = await database<{
     permission_code: string | null;
     scope_type: 'global' | 'tenant' | 'source' | null;
     scope_id: string | null;
     source_scope_enforced: boolean;
+    status: string;
+    current_account_type: 'super_admin' | 'staff';
+    external_provider: string | null;
+    external_subject: string | null;
   }>`
-    SELECT p.permission_code, p.scope_type, p.scope_id, a.source_scope_enforced
+    SELECT p.permission_code, p.scope_type, p.scope_id, a.source_scope_enforced,
+      a.status, a.account_type AS current_account_type, a.external_provider, a.external_subject
     FROM im_staff_accounts a
     LEFT JOIN im_staff_permissions p ON p.staff_id = a.id AND p.revoked_at IS NULL
     WHERE a.id = ${staff.id}::uuid
   `;
+  if (options.adminQuickEmail !== undefined) {
+    const current = permissionsResult.rows[0];
+    const expectedEmail = options.adminQuickEmail.trim().toLowerCase();
+    if (!current || !expectedEmail || current.status !== 'active' ||
+        current.current_account_type !== 'staff' ||
+        current.external_provider !== 'admin_quick' ||
+        current.external_subject !== expectedEmail ||
+        current.source_scope_enforced !== true) {
+      throw new ImAccessDeniedError();
+    }
+  }
   const activeRows = permissionsResult.rows.filter((row): row is typeof row & { permission_code: string; scope_type: 'global' | 'tenant' | 'source' } =>
     Boolean(row.permission_code && row.scope_type),
   );
@@ -203,27 +227,32 @@ export async function issueStaffTokens(
     sub: staff.id,
     jti: crypto.randomUUID(),
     iat: now,
-    exp: now + ACCESS_TTL_SECONDS,
+    exp: now + IM_ACCESS_TTL_SECONDS,
     permissions: permissionSets.tokenPermissions,
     globalPermissions: permissionSets.globalPermissions,
     tenantIds: permissionSets.tenantIds,
   };
   const accessToken = signAccessToken(claims);
-  const refreshToken = randomToken();
-  const sessionResult = await sql<{ id: string }>`
-    INSERT INTO im_staff_sessions (
-      staff_id, token_family, refresh_token_hash, expires_at, created_ip_hash, user_agent_hash
-    ) VALUES (
-      ${staff.id}::uuid,
-      ${(options.tokenFamily ?? crypto.randomUUID())}::uuid,
-      ${hashToken(refreshToken)},
-      NOW() + INTERVAL '30 days',
-      ${options.ipHash ?? null},
-      ${options.userAgentHash ?? null}
-    )
-    RETURNING id
-  `;
-  await sql`
+  let refreshToken: string | null = null;
+  let sessionId: string | null = null;
+  if (options.createRefreshSession !== false) {
+    refreshToken = randomToken();
+    const sessionResult = await database<{ id: string }>`
+      INSERT INTO im_staff_sessions (
+        staff_id, token_family, refresh_token_hash, expires_at, created_ip_hash, user_agent_hash
+      ) VALUES (
+        ${staff.id}::uuid,
+        ${(options.tokenFamily ?? crypto.randomUUID())}::uuid,
+        ${hashToken(refreshToken)},
+        NOW() + INTERVAL '30 days',
+        ${options.ipHash ?? null},
+        ${options.userAgentHash ?? null}
+      )
+      RETURNING id
+    `;
+    sessionId = sessionResult.rows[0]?.id ?? null;
+  }
+  await database`
     UPDATE im_staff_accounts
     SET last_login_at = NOW(), updated_at = NOW(), external_role = COALESCE(${options.externalRole ?? null}, external_role)
     WHERE id = ${staff.id}::uuid
@@ -232,8 +261,8 @@ export async function issueStaffTokens(
   return {
     accessToken,
     refreshToken,
-    sessionId: sessionResult.rows[0]?.id ?? null,
-    expiresIn: ACCESS_TTL_SECONDS,
+    sessionId,
+    expiresIn: IM_ACCESS_TTL_SECONDS,
     permissions: permissionSets.permissions,
     tenantIds: permissionSets.tenantIds,
   };

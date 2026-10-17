@@ -1,4 +1,6 @@
 import { sql } from '../../../platform/db';
+import { requireAdminAuth } from '../../identity/admin/adminAuth';
+import { isAdminQuickLoginToken } from '../../identity/admin/adminQuickLogin';
 import { bearerToken, getClientIp, headerValue, type ImRequest, type ImResponse } from '../httpTypes';
 import { hashToken, ImAccessDeniedError, introspectXtMvpToken, issueStaffTokens } from '../imAuth';
 
@@ -18,7 +20,12 @@ export default async function handler(req: ImRequest, res: ImResponse) {
 
   const token = bearerToken(req);
   if (!token) {
-    res.status(401).json({ ok: false, error: 'XT_MVP authentication required.' });
+    res.status(401).json({ ok: false, error: 'Admin or XT_MVP authentication required.' });
+    return;
+  }
+
+  if (classifyImExchangeCredential(token) === 'admin_quick') {
+    await exchangeAdminQuickLogin(req, res);
     return;
   }
 
@@ -72,6 +79,98 @@ export default async function handler(req: ImRequest, res: ImResponse) {
       return;
     }
     console.error('IM auth exchange failed:', error instanceof Error ? error.message : error);
+    res.status(503).json({ ok: false, error: 'IM identity service is temporarily unavailable.' });
+  }
+}
+
+export function classifyImExchangeCredential(token: string): 'admin_quick' | 'xt_mvp' {
+  return isAdminQuickLoginToken(token) ? 'admin_quick' : 'xt_mvp';
+}
+
+export type AdminQuickMappingCandidate = StaffRow & {
+  external_provider: string | null;
+  external_subject: string | null;
+  status: string;
+  source_scope_enforced: boolean;
+};
+
+export function resolveAdminQuickLoginStaff(email: string, candidate: AdminQuickMappingCandidate | null): StaffRow | null {
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail || !candidate ||
+      candidate.external_provider !== 'admin_quick' ||
+      candidate.external_subject !== normalizedEmail ||
+      candidate.status !== 'active' ||
+      candidate.account_type !== 'staff' ||
+      candidate.source_scope_enforced !== true) {
+    return null;
+  }
+  return {
+    id: candidate.id,
+    username: candidate.username,
+    display_name: candidate.display_name,
+    account_type: candidate.account_type,
+    external_role: candidate.external_role,
+  };
+}
+
+async function exchangeAdminQuickLogin(req: ImRequest, res: ImResponse) {
+  let matchedStaffId: string | null = null;
+  try {
+    // This is the same HMAC, expiry, configured-email, and current allowlist gate used by /api/admin/*.
+    const admin = await requireAdminAuth(req);
+    if (!admin.ok) {
+      await writeExchangeAudit('auth.exchange.denied', null, req, 'admin_quick_auth_failed');
+      res.status(admin.status).json({ ok: false, error: admin.error });
+      return;
+    }
+
+    const mapping = await sql<AdminQuickMappingCandidate>`
+      SELECT id, username, display_name, account_type, external_role,
+        external_provider, external_subject, status, source_scope_enforced
+      FROM im_staff_accounts
+      WHERE external_provider = 'admin_quick'
+        AND external_subject = ${admin.email}
+        AND status = 'active'
+        AND account_type = 'staff'
+        AND source_scope_enforced = TRUE
+      LIMIT 1
+    `;
+    const staff = resolveAdminQuickLoginStaff(admin.email, mapping.rows[0] ?? null);
+    if (!staff) {
+      await writeExchangeAudit('auth.exchange.denied', null, req, 'admin_quick_no_explicit_mapping');
+      res.status(403).json({ ok: false, error: 'This admin account is not explicitly enabled for IM.' });
+      return;
+    }
+    matchedStaffId = staff.id;
+
+    const issued = await issueStaffTokens(staff, {
+      ipHash: hashToken(getClientIp(req)),
+      userAgentHash: hashToken(headerValue(req.headers['user-agent']) || 'unknown'),
+      createRefreshSession: false,
+      adminQuickEmail: admin.email,
+    });
+    await writeExchangeAudit('auth.exchange', staff.id, req, 'admin_quick_sso_success');
+    res.status(200).json({
+      ok: true,
+      access_token: issued.accessToken,
+      token_type: 'bearer',
+      expires_in: issued.expiresIn,
+      staff: {
+        id: staff.id,
+        username: staff.username,
+        display_name: staff.display_name,
+        account_type: staff.account_type,
+        permissions: issued.permissions,
+        tenant_ids: issued.tenantIds,
+      },
+    });
+  } catch (error) {
+    if (error instanceof ImAccessDeniedError) {
+      await writeExchangeAudit('auth.exchange.denied', matchedStaffId, req, 'im_access_not_enabled');
+      res.status(403).json({ ok: false, error: error.message });
+      return;
+    }
+    console.error('IM admin quick-login exchange failed:', error instanceof Error ? error.message : error);
     res.status(503).json({ ok: false, error: 'IM identity service is temporarily unavailable.' });
   }
 }
