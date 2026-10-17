@@ -20,6 +20,7 @@
 
 | Agent | Goal | Owns | May Touch | Must Not Touch | Status | Last Update |
 |---|---|---|---|---|---|---|
+| Codex (wenshu-lead-inbox) | 文数智旅表单线索邮件提醒与 Admin 列表 | `app/api/domains/wenshu/**`；`app/api/admin/inquiry/wenshu-leads.ts`；`app/api/migrations/017*`；`app/src/shells/admin/**`（仅新线索入口）；`app/scripts/localApiRoutes.ts`；`app/package.json`；`deploy/cloud-vps/deploy-from-main.sh`；相关 env example、ops、progress/task-board | 只读核查生产 Resend/DB/服务；通过既有发布流程操作 | 付款、订单、共享网关路由、生产现有数据删除、其他 Agent 工作树 | working（代码测试通过；发信预检 403，未上线） | 2026-10-17 |
 | Codex (vps-boot-restart) | Persist cloud-vps boot enablement and crash restart for `xtch-app`, then push to `main` | `deploy/cloud-vps/deploy-from-main.sh`; `docs/ops/cloud-vps.md`; `docs/agent-progress.md`; `docs/agent-task-board.md` | VPS service enable/status | Payment, database, DNS, Caddy behavior | done（ddaa5b5；VPS 已启用） | 2026-08-21 |
 | Codex (restart-xtch-server) | Restart production website on user-requested `xtch-server`, then verify service and public HTTPS | `docs/agent-progress.md`; `docs/agent-task-board.md` | Production service state: `xtch-app` only | Source, deployment artifacts, database, Caddy, DNS, environment | done（676d55f；健康检查通过） | 2026-08-21 |
 | Auto (fix-prerender-spa-shell) | prerender 干净 SPA 壳 + 等正确 canonical，修 tour 16 CD 失败 | `app/scripts/prerender.mjs`；shells Seo（seoReady 顺序）；gotchas/progress/task-board | — | 改路线内容事实；跳过失败路由 | done（Actions 绿） | 2026-07-30 |
