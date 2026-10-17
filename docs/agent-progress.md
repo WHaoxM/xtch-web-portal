@@ -1,6 +1,8 @@
 # Agent Progress
 
 ## Current Goal（文数智旅线索接收，2026-10-17）
+- 2026-10-17 续做：`main` 回滚提交 `fcd8b8c` 的自动部署已成功；公网测试线索再次得到正常回执。新工作树 `D:\AGeneral Workspace\xjch2026\xtch-web-portal-wenshu-mail-ready` 从该回滚基线重新挑选三项功能提交，草稿 PR #11（`codex/wenshu-mail-ready`，HEAD `16591e1`）已推送，**不得在邮件通道验证前合并**。本工作树 15 项 Wenshu 测试、typecheck、lint、build 通过，工作树干净。
+- 发信阻塞仍在：`mail.xuntingtravel.com` 的四条 Cloudflare DNS 记录尚未添加（公网查无记录），所以 Resend 域名未验证；QQ SMTP TLS 可达但尚无授权码/实发测试。DNS 填写清单位于工作区外 `D:\AGeneral Workspace\xjch2026\resend-mail-xuntingtravel-dns-20261017.md`。用户已表示可以生成 QQ SMTP 授权码，待安全输入与收件箱确认。现有询价与订单确认也使用未验证的 `neutronm.store` 发件域；是否将 QQ 备用覆盖两者，已请用户确认，确认前不改它们的发送逻辑。
 - 用户已确认收件邮箱并同意邮件提醒与管理后台列表并行实施；真实收件邮箱仅存生产环境变量，不提交仓库。生产 `www.xuntingtravel.com/api/wenshu?action=lead` 已有持久化回执，但此前无邮件通知或线索列表。
 - 新工作树 `D:\AGeneral Workspace\xjch2026\xtch-web-portal-wenshu-impl` 基于 GitHub/生产 `main` `cafc052`，不改动原有脏工作树。已实现通知状态迁移、Resend 提醒、数据库发送占用防并发重发、Admin 线索列表/详情/人工重试及相关测试；线索详情限管理员并记录审计。
 - 本地 `test:wenshu` 12 项、`typecheck`、`lint`、`build`、`git diff --check` 通过。生产 `xtch-app` 当前 active，HEAD `cafc052`；未更改生产数据库、环境或服务。
