@@ -22,8 +22,13 @@ test('admin lead route is registered and rejects unauthenticated access before d
 test('authorized staff can list receipts and audited detail, but not an invalid id', async () => {
   let auditCount = 0;
   const id = '00000000-0000-4000-8000-000000000001';
-  const db = (async (parts: TemplateStringsArray) => ({ rows: parts.join('').includes('WHERE id')
-    ? [{ id, phone: '13800000000' }] : [{ id, name: '测试客户' }] })) as unknown as typeof sql;
+  const db = (async (parts: TemplateStringsArray) => {
+    const statement = parts.join('');
+    if (statement.includes('FROM wenshu_lead_followups') && statement.includes('LIMIT 20')) return { rows: [] };
+    return { rows: statement.includes('WHERE id')
+      ? [{ id, phone: '13800000000', name: '测试客户', business_type: '国际旅行社',
+        intent: 'growth_plan', page_url: 'https://www.zhilvtravel.com/' }] : [{ id, name: '测试客户' }] };
+  }) as unknown as typeof sql;
   const authorize = async () => ({ ok: true as const, email: 'ops@example.com', role: 'ops' as const });
   const audit = async () => { auditCount += 1; };
   const handler = createAdminLeadsHandler(db, authorize, audit);
@@ -35,6 +40,7 @@ test('authorized staff can list receipts and audited detail, but not an invalid 
   await handler({ method: 'GET', url: `/api/admin/wenshu-leads?id=${id}`, headers: {} }, detail.res);
   assert.equal(detail.state.status, 200);
   assert.equal((detail.state.body.lead as Record<string, unknown>).phone, '13800000000');
+  assert.match((detail.state.body.followupDraft as { subject: string }).subject, /增长方案/);
   assert.equal(auditCount, 1);
   const invalid = response();
   await handler({ method: 'GET', url: '/api/admin/wenshu-leads?id=invalid', headers: {} }, invalid.res);
@@ -86,4 +92,46 @@ test('admin can retry only the customer confirmation when internal notification 
   assert.equal(internal, 0);
   assert.equal(customer, 1);
   assert.equal(audited, true);
+});
+
+test('reviewed follow-up is sent to the stored customer email once for the same request ID', async () => {
+  const id = '00000000-0000-4000-8000-000000000031';
+  const requestId = '00000000-0000-4000-8000-000000000032';
+  const lead = { id, name: '客户', phone: '13800000000', company: '公司', company_address: '成都',
+    business_type: '国际旅行社', entry: 'hero', page_url: 'https://www.zhilvtravel.com/',
+    message: '', email: 'buyer@example.com', intent: 'growth_plan' };
+  let saved: { id: string; lead_id: string; recipient_email: string; subject: string; body: string;
+    sent_at: string | null } | null = null;
+  let sends = 0;
+  const db = (async (parts: TemplateStringsArray, ...values: unknown[]) => {
+    const statement = parts.join('');
+    if (statement.includes('FROM wenshu_leads WHERE id')) return { rows: [lead] };
+    if (statement.includes('INSERT INTO wenshu_lead_followups')) {
+      if (!saved) saved = { id: requestId, lead_id: id, recipient_email: lead.email,
+        subject: String(values[3]), body: String(values[4]), sent_at: null };
+      return { rows: [] };
+    }
+    if (statement.includes('FROM wenshu_lead_followups WHERE request_id')) return { rows: saved ? [{ ...saved }] : [] };
+    if (statement.includes('SET claimed_at = NOW()')) return { rows: saved?.sent_at ? [] : [{ id: requestId }] };
+    if (statement.includes('SET sent_at = NOW()')) { if (saved) saved.sent_at = new Date().toISOString(); return { rows: [] }; }
+    throw new Error('Unexpected query: ' + statement);
+  }) as unknown as typeof sql;
+  const handler = createAdminLeadsHandler(db,
+    async () => ({ ok: true as const, email: 'sales@example.com', role: 'ops' as const }),
+    async () => {}, async () => {}, async () => {}, async mail => {
+      sends += 1;
+      assert.equal(mail.recipient_email, 'buyer@example.com');
+      assert.equal(mail.subject, '跟进增长方案');
+    });
+  const request = { method: 'POST', url: `/api/admin/wenshu-leads?id=${id}&action=send-follow-up`,
+    headers: { 'idempotency-key': requestId }, body: { subject: '跟进增长方案', body: '您好，请回复本邮件。' } };
+  const first = response(); await handler(request, first.res);
+  assert.equal(first.state.status, 201);
+  assert.equal(first.state.body.recipientEmail, 'buyer@example.com');
+  const retry = response(); await handler(request, retry.res);
+  assert.equal(retry.state.status, 201);
+  assert.equal(sends, 1);
+  const mismatch = response(); await handler({ ...request, body: { subject: '另一封', body: '不同内容' } }, mismatch.res);
+  assert.equal(mismatch.state.status, 409);
+  assert.equal(sends, 1);
 });

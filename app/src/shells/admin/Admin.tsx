@@ -317,7 +317,7 @@ function inquirySourceSummary(inquiry: {
   );
 }
 
-function SignInView({ onSignedIn }: { onSignedIn: (session: AuthSession) => void }) {
+function SignInView({ onSignedIn, returnPath = '/admin' }: { onSignedIn: (session: AuthSession) => void; returnPath?: string }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [otpCode, setOtpCode] = useState('');
@@ -349,7 +349,7 @@ function SignInView({ onSignedIn }: { onSignedIn: (session: AuthSession) => void
 
   const handleGoogle = async () => {
     try {
-      await signInWithOAuth('google', 'account', { returnPath: '/admin' });
+      await signInWithOAuth('google', 'account', { returnPath });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign-in failed.');
     }
@@ -4125,7 +4125,9 @@ export default function Admin() {
   const [roleStatus, setRoleStatus] = useState<'pending' | 'ok' | 'denied'>('pending');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
+  const [requestedWenshuLeadId] = useState(() => new URLSearchParams(window.location.search).get('wenshuLead') || '');
+  const [activeTab, setActiveTab] = useState<AdminTab>(() =>
+    /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(requestedWenshuLeadId) ? 'wenshu-leads' : 'dashboard');
   const [seededListFilters, setSeededListFilters] = useState<
     Partial<Record<PendingListFilter['tab'], string>>
   >({});
@@ -4204,10 +4206,11 @@ export default function Admin() {
   }, [session]);
 
   useEffect(() => {
+    if (roleStatus !== 'ok') return;
     const visible = filterNavGroups(adminRole).flatMap((group) => group.items);
     if (visible.some((item) => item.value === activeTab)) return;
     setActiveTab('dashboard');
-  }, [adminRole, activeTab]);
+  }, [adminRole, activeTab, roleStatus]);
 
   useEffect(() => {
     if (!mobileNavOpen) return;
@@ -4263,7 +4266,7 @@ export default function Admin() {
   }
 
   if (!session) {
-    return <SignInView onSignedIn={setSession} />;
+    return <SignInView onSignedIn={setSession} returnPath={requestedWenshuLeadId ? `/admin?wenshuLead=${encodeURIComponent(requestedWenshuLeadId)}` : '/admin'} />;
   }
 
   if (roleStatus === 'pending') {
@@ -4397,7 +4400,7 @@ export default function Admin() {
               />
             </TabsContent>
             <TabsContent value="wenshu-leads" className="mt-0">
-              <WenshuLeadsPanel token={session.accessToken} />
+              <WenshuLeadsPanel token={session.accessToken} initialLeadId={requestedWenshuLeadId} />
             </TabsContent>
             <TabsContent value="departures" className="mt-0">
               <DeparturesPanel token={session.accessToken} />

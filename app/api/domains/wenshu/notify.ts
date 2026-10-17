@@ -28,10 +28,12 @@ const SEGMENT_LABELS = {
 export function renderInternalLeadMail(lead: WenshuLeadForEmail) {
   const intent = INTENT_LABELS[lead.intent] || INTENT_LABELS.growth_plan;
   const segment = SEGMENT_LABELS[resolveBusinessSegment(lead.business_type)];
+  const reviewUrl = `https://admin.xuntingtravel.com/admin?wenshuLead=${encodeURIComponent(lead.id)}`;
   return {
     subject: `【文数智旅·${intent}·${segment}】新客户线索`,
+    html: `<div style="font-family:Arial,sans-serif;line-height:1.7;color:#17213a"><p>文数智旅收到新线索。请先审核，再向客户邮箱发送正式跟进。</p><p><a href="${reviewUrl}" style="display:inline-block;padding:12px 18px;background:#143d82;color:#fff;text-decoration:none;border-radius:6px">审核并向客户邮箱发送跟进</a></p><p>回执编号：${lead.id}</p><p>如按钮无法打开，请使用纯文本邮件中的审核链接。</p></div>`,
     text: [
-      `文数智旅官网收到「${intent}」线索，请在管理后台核对并跟进。`,
+      `文数智旅官网收到「${intent}」线索，请在管理后台审核，并向客户邮箱发送正式跟进邮件。`,
       `回执编号：${lead.id}`,
       `需求类型：${intent}`,
       `业务分类：${segment}`,
@@ -44,7 +46,7 @@ export function renderInternalLeadMail(lead: WenshuLeadForEmail) {
       `页面：${lead.page_url || '未填写'}`,
       `邮箱：${lead.email || '未填写'}`,
       `留言：${lead.message || '未填写'}`,
-      '管理入口：https://admin.xuntingtravel.com/admin',
+      `审核并向客户邮箱发送跟进：${reviewUrl}`,
     ].join('\n'),
   };
 }
@@ -68,10 +70,10 @@ export function renderCustomerLeadMail(lead: WenshuLeadForEmail) {
   }[lead.intent] || '我们已收到您的申请。';
   return english ? {
     subject: `[Wenshu Travel] ${({ growth_plan: 'Growth plan', product_demo: 'Product demo', custom_consultation: 'Custom consultation', resource_request: 'Information request', offline_message: 'Message' } as Record<WenshuLeadIntent, string>)[lead.intent] || 'Request'} received`,
-    text: `Hello${lead.name ? ` ${lead.name}` : ''},\n\n${intro}\nOur team will review ${focus} for your ${lead.business_type} business and contact you using the details provided. This is a confirmation, not an attached proposal or a booked appointment.\n\nReceipt: ${lead.id}\nBusiness type: ${lead.business_type}\nPhone: ${lead.phone}\n\nWenshu Travel`,
+    text: `Hello${lead.name ? ` ${lead.name}` : ''},\n\n${intro}\nOur team will review ${focus} for your ${lead.business_type} business and follow up at this email address after review. This is a confirmation, not an attached proposal or a booked appointment.\n\nReceipt: ${lead.id}\nBusiness type: ${lead.business_type}\nPhone: ${lead.phone}\n\nWenshu Travel`,
   } : {
     subject: `【文数智旅】${INTENT_LABELS[lead.intent] || '申请'}已收到`,
-    text: `${lead.name || '客户'}，您好：\n\n${intro}\n顾问会结合您填写的业务类型（${lead.business_type}），重点核对${focus}相关需求，并通过您留下的联系方式与您联系。本邮件仅确认收到申请，不代表方案已发送或体验时间已预约成功。\n\n回执编号：${lead.id}\n联系电话：${lead.phone}\n\n文数智旅团队`,
+    text: `${lead.name || '客户'}，您好：\n\n${intro}\n顾问会结合您填写的业务类型（${lead.business_type}），重点核对${focus}相关需求，审核后通过本邮箱向您发送正式跟进邮件。本邮件仅确认收到申请，不代表方案已发送或体验时间已预约成功。\n\n回执编号：${lead.id}\n联系电话：${lead.phone}\n\n文数智旅团队`,
   };
 }
 
@@ -88,13 +90,13 @@ export async function sendWenshuLeadEmail(
     throw new Error('Wenshu lead notification is not configured.');
   }
 
-  const { text, subject } = renderInternalLeadMail(lead);
+  const { text, subject, html } = renderInternalLeadMail(lead);
   if (apiKey && from) {
     try {
       const response = await fetchImpl('https://api.resend.com/emails', {
         method: 'POST',
         headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ from, to: [to], subject, text }),
+        body: JSON.stringify({ from, to: [to], subject, text, html }),
         signal: AbortSignal.timeout(10000),
       });
       if (!response.ok) throw new Error(`Resend HTTP ${response.status}`);
@@ -105,7 +107,7 @@ export async function sendWenshuLeadEmail(
     }
   }
   if (!smtpConfigured(env)) throw new Error('Wenshu lead notification is not configured.');
-  await smtpSend({ to, subject, text }, env);
+  await smtpSend({ to, subject, text, html }, env);
   return 'qq-smtp';
 }
 
@@ -138,7 +140,7 @@ export async function sendWenshuCustomerEmail(
   return 'qq-smtp';
 }
 
-type MailContent = { to: string; subject: string; text: string };
+type MailContent = { to: string; subject: string; text: string; html?: string; replyTo?: string };
 
 function smtpConfigured(env: NodeJS.ProcessEnv): boolean {
   return Boolean(env.WENSHU_SMTP_USER?.trim() && env.WENSHU_SMTP_APP_PASSWORD?.trim());
