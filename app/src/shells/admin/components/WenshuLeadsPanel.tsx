@@ -12,6 +12,7 @@ type LeadSummary = {
   created_at: string;
   notification_sent_at: string | null;
   notification_attempted_at: string | null;
+  notification_provider: string;
 };
 
 type LeadDetail = LeadSummary & {
@@ -31,7 +32,7 @@ function dateTime(value: string | null) {
 }
 
 function noticeLabel(lead: LeadSummary) {
-  if (lead.notification_sent_at) return '邮件平台已接收';
+  if (lead.notification_sent_at) return `邮件平台已接收${lead.notification_provider === 'qq-smtp' ? '（QQ SMTP）' : lead.notification_provider === 'resend' ? '（Resend）' : ''}`;
   if (lead.notification_attempted_at) return '邮件未确认，请人工跟进';
   return '未发送（历史记录）';
 }
