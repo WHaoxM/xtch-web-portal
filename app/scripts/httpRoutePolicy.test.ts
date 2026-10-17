@@ -22,6 +22,7 @@ test('SPA shells remain deep-linkable (not unknown)', () => {
   const paths = createPublicPathSet({ version: 1, paths: ['/'] });
   assert.equal(classifyPagePath('/account', paths), 'spa');
   assert.equal(classifyPagePath('/admin', paths), 'spa');
+  assert.equal(classifyPagePath('/wenshu/review', paths), 'spa');
   assert.equal(classifyPagePath('/search', paths), 'spa');
   assert.equal(classifyPagePath('/auth/callback', paths), 'spa');
   assert.equal(classifyPagePath('/orders/XTCH-123', paths), 'spa');

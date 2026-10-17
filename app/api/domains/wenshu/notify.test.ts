@@ -9,6 +9,7 @@ const lead: WenshuLeadForEmail = {
   company: '测试公司', company_address: '测试地址', business_type: '旅行社',
   entry: 'final-cta', page_url: 'https://www.zhilvtravel.com/', message: '请联系', email: '', intent: 'growth_plan',
 };
+const reviewToken = 'A'.repeat(43);
 
 test('request intent and business segment distinguish internal and customer copy', () => {
   const base = { ...lead, email: 'buyer@example.com' };
@@ -18,11 +19,12 @@ test('request intent and business segment distinguish internal and customer copy
   assert.notEqual(plan.subject, demo.subject);
   assert.notEqual(demo.subject, custom.subject);
   assert.match(custom.text, /定制化咨询/);
-  assert.match(renderInternalLeadMail({ ...base, intent: 'custom_consultation', business_type: '入境游地接社' }).subject,
+  assert.match(renderInternalLeadMail({ ...base, intent: 'custom_consultation', business_type: '入境游地接社' }, reviewToken).subject,
     /定制化咨询·入境游地接/);
-  assert.match(renderInternalLeadMail(base).text,
-    /www\.xuntingtravel\.com\/admin\?wenshuLead=00000000-0000-4000-8000-000000000001/);
-  assert.match(renderInternalLeadMail(base).html, /<a href="https:\/\/www\.xuntingtravel\.com\/admin\?wenshuLead=/);
+  assert.match(renderInternalLeadMail(base, reviewToken).text,
+    /www\.xuntingtravel\.com\/wenshu\/review#review=A{43}/);
+  assert.match(renderInternalLeadMail(base, reviewToken).html,
+    /<a href="https:\/\/www\.xuntingtravel\.com\/wenshu\/review#review=A{43}/);
   const english = renderCustomerLeadMail({ ...base, intent: 'product_demo',
     page_url: 'https://www.zhilvtravel.com/en/index.html', business_type: 'Inbound Ground Operator' });
   assert.match(english.subject, /Product demo/);
@@ -52,7 +54,7 @@ test('new Wenshu lead uses existing Resend service with fixed recipient', async 
     assert.match(payload.text, /13800000000/);
     return new Response('{}', { status: 200 });
   }) as typeof fetch;
-  const provider = await sendWenshuLeadEmail(lead, fakeFetch, {
+  const provider = await sendWenshuLeadEmail(lead, reviewToken, fakeFetch, {
     RESEND_API_KEY: 'test-key', WENSHU_RESEND_FROM_EMAIL: 'no-reply@example.com',
     WENSHU_LEAD_TO_EMAIL: 'ops@example.com',
   });
@@ -61,9 +63,9 @@ test('new Wenshu lead uses existing Resend service with fixed recipient', async 
 });
 
 test('missing recipient or Resend rejection never reports notification success', async () => {
-  await assert.rejects(sendWenshuLeadEmail(lead, fetch, {}), /not configured/);
+  await assert.rejects(sendWenshuLeadEmail(lead, reviewToken, fetch, {}), /not configured/);
   const rejected = (async () => new Response('{}', { status: 403 })) as typeof fetch;
-  await assert.rejects(sendWenshuLeadEmail(lead, rejected, {
+  await assert.rejects(sendWenshuLeadEmail(lead, reviewToken, rejected, {
     RESEND_API_KEY: 'test-key', WENSHU_RESEND_FROM_EMAIL: 'no-reply@example.com',
     WENSHU_LEAD_TO_EMAIL: 'ops@example.com',
   }), /HTTP 403/);
@@ -80,10 +82,10 @@ test('Resend rejection falls back to QQ SMTP, while a successful Resend send doe
     WENSHU_LEAD_TO_EMAIL: 'ops@example.com', WENSHU_SMTP_USER: '12345678@qq.com',
     WENSHU_SMTP_APP_PASSWORD: 'test-app-code' };
   const rejected = (async () => new Response('{}', { status: 403 })) as typeof fetch;
-  assert.equal(await sendWenshuLeadEmail(lead, rejected, env, fallback), 'qq-smtp');
+  assert.equal(await sendWenshuLeadEmail(lead, reviewToken, rejected, env, fallback), 'qq-smtp');
   assert.equal(smtpCalls, 1);
   const accepted = (async () => new Response('{}', { status: 200 })) as typeof fetch;
-  assert.equal(await sendWenshuLeadEmail(lead, accepted, env, fallback), 'resend');
+  assert.equal(await sendWenshuLeadEmail(lead, reviewToken, accepted, env, fallback), 'resend');
   assert.equal(smtpCalls, 1);
 });
 
@@ -106,7 +108,7 @@ test('QQ SMTP uses verified TLS, authorization code and checks recipient accepta
 test('QQ SMTP can send when Resend is not configured', async () => {
   let sent = false;
   const unavailableFetch = (async () => { throw new Error('Resend must not be called'); }) as typeof fetch;
-  const provider = await sendWenshuLeadEmail(lead, unavailableFetch, {
+  const provider = await sendWenshuLeadEmail(lead, reviewToken, unavailableFetch, {
     WENSHU_LEAD_TO_EMAIL: 'ops@example.com', WENSHU_SMTP_USER: '12345678@qq.com',
     WENSHU_SMTP_APP_PASSWORD: 'test-app-code',
   }, async () => { sent = true; });

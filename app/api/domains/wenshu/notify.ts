@@ -1,6 +1,7 @@
 import type { SqlClient } from '../../platform/db';
 import nodemailer from 'nodemailer';
 import { resolveBusinessSegment, type WenshuLeadIntent } from './intent';
+import { issueReviewToken, validReviewToken } from './reviewAccess';
 
 export type WenshuLeadForEmail = {
   id: string;
@@ -25,14 +26,14 @@ const SEGMENT_LABELS = {
   scenic: '景区/文旅', other: '其他业务',
 };
 
-export function renderInternalLeadMail(lead: WenshuLeadForEmail) {
+export function renderInternalLeadMail(lead: WenshuLeadForEmail, reviewToken: string) {
+  if (!validReviewToken(reviewToken)) throw new Error('Invalid review link token.');
   const intent = INTENT_LABELS[lead.intent] || INTENT_LABELS.growth_plan;
   const segment = SEGMENT_LABELS[resolveBusinessSegment(lead.business_type)];
-  // Use the canonical public host: some mailbox browsers bounce the admin subdomain to the homepage.
-  const reviewUrl = `https://www.xuntingtravel.com/admin?wenshuLead=${encodeURIComponent(lead.id)}`;
+  const reviewUrl = `https://www.xuntingtravel.com/wenshu/review#review=${reviewToken}`;
   return {
     subject: `【文数智旅·${intent}·${segment}】新客户线索`,
-    html: `<div style="font-family:Arial,sans-serif;line-height:1.7;color:#17213a"><p>文数智旅收到新线索。请先审核，再向客户邮箱发送正式跟进。</p><p><a href="${reviewUrl}" style="display:inline-block;padding:12px 18px;background:#143d82;color:#fff;text-decoration:none;border-radius:6px">审核并向客户邮箱发送跟进</a></p><p>回执编号：${lead.id}</p><p>如按钮无法打开，请使用纯文本邮件中的审核链接。</p></div>`,
+    html: `<div style="font-family:Arial,sans-serif;line-height:1.7;color:#17213a"><p>文数智旅收到新线索。请先审核，再向客户邮箱发送正式跟进。仅打开链接不会发信。</p><p><a href="${reviewUrl}" style="display:inline-block;padding:12px 18px;background:#143d82;color:#fff;text-decoration:none;border-radius:6px">免登录审核并发送跟进</a></p><p>回执编号：${lead.id}</p><p>链接 30 天内有效，仅供客服使用，请勿转发。如按钮无法打开，请使用纯文本邮件中的审核链接。</p></div>`,
     text: [
       `文数智旅官网收到「${intent}」线索，请在管理后台审核，并向客户邮箱发送正式跟进邮件。`,
       `回执编号：${lead.id}`,
@@ -47,7 +48,7 @@ export function renderInternalLeadMail(lead: WenshuLeadForEmail) {
       `页面：${lead.page_url || '未填写'}`,
       `邮箱：${lead.email || '未填写'}`,
       `留言：${lead.message || '未填写'}`,
-      `审核并向客户邮箱发送跟进：${reviewUrl}`,
+      `免登录审核链接（打开不会发信，核对后须点击确认发送；30 天有效，请勿转发）：${reviewUrl}`,
     ].join('\n'),
   };
 }
@@ -80,6 +81,7 @@ export function renderCustomerLeadMail(lead: WenshuLeadForEmail) {
 
 export async function sendWenshuLeadEmail(
   lead: WenshuLeadForEmail,
+  reviewToken: string,
   fetchImpl: typeof fetch = fetch,
   env: NodeJS.ProcessEnv = process.env,
   smtpSend: typeof sendWenshuLeadViaSmtp = sendWenshuLeadViaSmtp,
@@ -91,7 +93,7 @@ export async function sendWenshuLeadEmail(
     throw new Error('Wenshu lead notification is not configured.');
   }
 
-  const { text, subject, html } = renderInternalLeadMail(lead);
+  const { text, subject, html } = renderInternalLeadMail(lead, reviewToken);
   if (apiKey && from) {
     try {
       const response = await fetchImpl('https://api.resend.com/emails', {
@@ -175,7 +177,7 @@ export async function sendWenshuLeadViaSmtp(
 export async function deliverWenshuLead(
   sql: SqlClient,
   lead: WenshuLeadForEmail & { notification_sent_at: string | null },
-  send: (lead: WenshuLeadForEmail) => Promise<'resend' | 'qq-smtp' | void> = sendWenshuLeadEmail,
+  send: (lead: WenshuLeadForEmail, reviewToken: string) => Promise<'resend' | 'qq-smtp' | void> = sendWenshuLeadEmail,
 ): Promise<'sent' | 'already-sent' | 'in-progress'> {
   if (lead.notification_sent_at) return 'already-sent';
   const claim = await sql<{ id: string }>`UPDATE wenshu_leads SET notification_claimed_at = NOW()
@@ -213,7 +215,8 @@ export async function deliverWenshuCustomerConfirmation(
     RETURNING id`;
   if (!claim.rows[0]) return 'in-progress';
   try {
-    const provider = await send(lead);
+    const reviewToken = await issueReviewToken(sql, lead.id);
+    const provider = await send(lead, reviewToken);
     await sql`UPDATE wenshu_leads SET customer_confirmation_sent_at = NOW(), customer_confirmation_attempted_at = NOW(),
       customer_confirmation_claimed_at = NULL, customer_confirmation_provider = ${provider || ''},
       customer_confirmation_last_error = '' WHERE id = ${lead.id}::uuid`;

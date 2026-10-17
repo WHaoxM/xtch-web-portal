@@ -14,6 +14,7 @@ const SPA_SHELL_EXACT = new Set([
   '/search',
   '/account',
   '/admin',
+  '/wenshu/review',
   '/auth/callback',
   '/china-tours',
 ]);

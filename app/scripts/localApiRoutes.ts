@@ -5,6 +5,7 @@
  */
 export const localApiRoutes: Record<string, string> = {
   '/api/wenshu': '/api/wenshu.ts',
+  '/api/wenshu-review': '/api/wenshu-review.ts',
   '/api/im/auth/exchange': '/api/im/auth-exchange.ts',
   '/api/im/auth/introspect': '/api/im/auth-introspect.ts',
   '/api/im/auth/refresh': '/api/im/auth-refresh.ts',

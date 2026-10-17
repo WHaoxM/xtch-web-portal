@@ -111,6 +111,7 @@ function clipDescription(text: string, max = 155): string {
 function isPrivatePath(pathname: string): boolean {
   return (
     pathname === '/admin' ||
+    pathname === '/wenshu/review' ||
     pathname === '/account' ||
     pathname.startsWith('/auth/') ||
     pathname.startsWith('/orders/')

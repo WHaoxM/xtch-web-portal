@@ -23,6 +23,7 @@ import OrderSuccess from './pages/OrderSuccess';
 import Admin from './pages/Admin';
 import Account from './pages/Account';
 import AuthCallback from './pages/AuthCallback';
+import WenshuReview from './pages/WenshuReview';
 import NotFound from './pages/NotFound';
 import { completeAuthRedirectNavigation, urlHasAuthTokens } from './lib/authClient';
 import { ensureContentDataLoaded } from './lib/contentStore';
@@ -48,6 +49,7 @@ function isAndroidAppWrapper() {
 function App() {
   const location = useLocation();
   const isAdminRoute = location.pathname === '/admin';
+  const isWenshuReviewRoute = location.pathname === '/wenshu/review';
   const isAuthCallbackRoute = location.pathname === '/auth/callback';
   const isChinaTripsRoute =
     location.pathname === '/china-trips' || location.pathname === '/china-tours';
@@ -121,15 +123,15 @@ function App() {
     };
   }, [authReady, location.pathname]);
 
-  const contentReady = isAdminRoute || isAuthCallbackRoute || contentDataLoaded;
+  const contentReady = isAdminRoute || isWenshuReviewRoute || isAuthCallbackRoute || contentDataLoaded;
   const hideSiteChrome =
-    isAdminRoute || isAuthCallbackRoute || (isChinaTripsRoute && isMiniAppViewport);
+    isAdminRoute || isWenshuReviewRoute || isAuthCallbackRoute || (isChinaTripsRoute && isMiniAppViewport);
   const publicImSource = isChinaTripsRoute && isMiniAppViewport ? 'portal_mobile' : 'portal_web';
-  const showPublicIm = !isAndroidAppWrapper() && !isAdminRoute && !isAuthCallbackRoute;
+  const showPublicIm = !isAndroidAppWrapper() && !isAdminRoute && !isWenshuReviewRoute && !isAuthCallbackRoute;
 
   if (!authReady) return null;
 
-  if (contentDataFailed && !isAdminRoute && !isAuthCallbackRoute) {
+  if (contentDataFailed && !isAdminRoute && !isWenshuReviewRoute && !isAuthCallbackRoute) {
     return (
       <>
         <div className="flex min-h-screen flex-col items-center justify-center bg-white px-6 text-center">
@@ -176,6 +178,7 @@ function App() {
           <Route path="/account" element={<Account />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/wenshu/review" element={<WenshuReview />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
