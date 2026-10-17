@@ -1,5 +1,5 @@
 import { sql } from '../../../platform/db';
-import { canAccessConversation } from '../conversationAccess';
+import { canAccessConversation, hasLegacyAssignmentScope } from '../conversationAccess';
 import { authenticateStaffRequest, hasGlobalPermission, hasPermission } from '../imAuth';
 import { type ImRequest, type ImResponse } from '../httpTypes';
 
@@ -33,7 +33,8 @@ export default async function handler(req: ImRequest, res: ImResponse) {
     res.status(400).json({ ok: false, error: 'Valid conversation and staff ids are required.' });
     return;
   }
-  if (!(await canAccessConversation(auth.principal, conversationId, 'assign', permission))) {
+  if (auth.principal.sourceScopeEnforced &&
+      !(await canAccessConversation(auth.principal, conversationId, 'assign', permission))) {
     res.status(403).json({ ok: false, error: 'Conversation assignment access denied.' });
     return;
   }
@@ -60,8 +61,10 @@ export default async function handler(req: ImRequest, res: ImResponse) {
       const conversationRow = current.rows[0];
       if (
         !auth.principal.sourceScopeEnforced &&
-        !hasGlobalPermission(auth.principal, 'im:assignment:claim') &&
-        (!conversationRow.tenant_id || !auth.principal.tenantIds.includes(conversationRow.tenant_id))
+        !hasLegacyAssignmentScope(
+          hasGlobalPermission(auth.principal, 'im:assignment:claim'),
+          Boolean(conversationRow.tenant_id && auth.principal.tenantIds.includes(conversationRow.tenant_id)),
+        )
       ) {
         throw new AssignmentError('Conversation is outside your tenant scope.', 403);
       }

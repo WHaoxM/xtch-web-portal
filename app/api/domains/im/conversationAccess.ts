@@ -26,6 +26,31 @@ export function resolveConversationAccess(input: ConversationAccessDecision): bo
   return input.globalAccess || input.membership || (input.permission === 'im:conversation:read' && input.tenantRead);
 }
 
+/** Legacy lifecycle access historically required the close permission and the regular read ACL. */
+export function resolveLegacyConversationCloseAccess(input: {
+  closePermission: boolean;
+  readPermission: boolean;
+  readGlobalAccess: boolean;
+  membership: boolean;
+  tenantRead: boolean;
+}): boolean {
+  if (!input.closePermission || !input.readPermission) return false;
+  return resolveConversationAccess({
+    permission: 'im:conversation:read',
+    conversationSource: '',
+    sourceScopeEnforced: false,
+    sourceGrantActive: false,
+    globalAccess: input.readGlobalAccess,
+    membership: input.membership,
+    tenantRead: input.tenantRead,
+  });
+}
+
+/** Keep the pre-source-scope assignment gate: global claim or the conversation's tenant. */
+export function hasLegacyAssignmentScope(globalClaim: boolean, tenantScope: boolean): boolean {
+  return globalClaim || tenantScope;
+}
+
 export function permissionForConversationMode(mode: ConversationAccessMode): string {
   return mode === 'read'
     ? 'im:conversation:read'
@@ -81,6 +106,15 @@ export async function canAccessConversation(
   `;
   const row = result.rows[0];
   if (!row) return false;
+  if (!row.source_scope_enforced && mode === 'close') {
+    return resolveLegacyConversationCloseAccess({
+      closePermission: hasPermission(principal, permission),
+      readPermission: hasPermission(principal, 'im:conversation:read'),
+      readGlobalAccess: hasGlobalPermission(principal, 'im:conversation:read'),
+      membership: row.member_access,
+      tenantRead: Boolean(row.tenant_id && principal.tenantIds.includes(row.tenant_id)),
+    });
+  }
   return resolveConversationAccess({
     permission,
     conversationSource: row.source,

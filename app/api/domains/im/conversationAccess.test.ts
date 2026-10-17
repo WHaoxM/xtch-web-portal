@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { resolveConversationAccess } from './conversationAccess';
+import {
+  hasLegacyAssignmentScope,
+  resolveConversationAccess,
+  resolveLegacyConversationCloseAccess,
+} from './conversationAccess';
 
 const permissionCases = [
   ['read', 'im:conversation:read'],
@@ -54,6 +58,31 @@ test('accounts without explicit source enforcement preserve legacy global, membe
   assert.equal(resolveConversationAccess({ ...base, globalAccess: false, membership: true, tenantRead: false }), true);
   assert.equal(resolveConversationAccess({ ...base, globalAccess: false, membership: false, tenantRead: true }), true);
   assert.equal(resolveConversationAccess({ ...base, globalAccess: false, membership: false, tenantRead: false }), false);
+});
+
+test('legacy close requires both lifecycle permission and the prior read-access path', () => {
+  const close = (overrides: Partial<Parameters<typeof resolveLegacyConversationCloseAccess>[0]> = {}) =>
+    resolveLegacyConversationCloseAccess({
+      closePermission: true,
+      readPermission: true,
+      readGlobalAccess: false,
+      membership: false,
+      tenantRead: true,
+      ...overrides,
+    });
+
+  assert.equal(close(), true, 'tenant read plus close permission remains allowed');
+  assert.equal(close({ tenantRead: false, readGlobalAccess: true }), true, 'global read plus close remains allowed');
+  assert.equal(close({ tenantRead: false, membership: true }), true, 'active member read path plus close remains allowed');
+  assert.equal(close({ closePermission: false }), false, 'close permission remains required');
+  assert.equal(close({ readPermission: false, readGlobalAccess: true }), false, 'global close without read permission is denied');
+  assert.equal(close({ tenantRead: false, membership: false, readGlobalAccess: false }), false);
+});
+
+test('legacy assignment keeps the prior global-claim or tenant-scope gate', () => {
+  assert.equal(hasLegacyAssignmentScope(true, false), true, 'global claim scope remains allowed');
+  assert.equal(hasLegacyAssignmentScope(false, true), true, 'tenant scope remains allowed for claim/takeover/transfer');
+  assert.equal(hasLegacyAssignmentScope(false, false), false, 'unscoped legacy account remains denied');
 });
 
 test('source-enforced access never inherits a broad permission or membership when the requested source permission is absent', () => {

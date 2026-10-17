@@ -1,5 +1,12 @@
 # Agent Progress
 
+## Current Goal 续修（IM 旧账号授权兼容回归，2026-10-17）
+- Coordinator 复审 `fda7314` 发现：旧 `source_scope_enforced=false` 账号的会话状态路径必须保留原有 close permission + read ACL 双门槛（tenant read / global read / active membership）；assignment takeover/transfer 必须保留 action permission + legacy global claim 或 tenant scope 的行为。
+- 修复：legacy close 在共享 ACL 中复用旧 read 权限/全局 read、成员、tenant read 判定；assignment 只对 source-enforced 账号做动作级来源 ACL 预检，legacy 账号继续由事务内原 global claim 或 tenant gate 授权。来源账号预检与事务内精确 grant 检查未放宽。
+- 先写测试并确认缺失行为时测试红，再实现后变绿。回归覆盖 close/read 双门槛、global/tenant/member read 路径、legacy assignment global claim/tenant scope，以及既有 source 精确来源动作 ACL。
+- 验证：在 `app/` 下 `npx tsx --test api/domains/im/conversationAccess.test.ts api/domains/im/imAuth.test.ts api/domains/im/http/staffAdmin.test.ts scripts/messagingOutbox.test.ts scripts/messagingSocket.test.ts`（23/23）、`npm run typecheck`、`npm run lint`、`npm run build`、`git diff --check` 全部通过。build 只有既有 Browserslist 数据过期与 chunk 大小告警；生成 sitemap/manifest 与 HEAD 一致，没有无关生成物修改。
+- 限制：未连数据库执行授权路径集成测试，未改生产数据/账号，不推送或部署。
+
 ## Current Goal（IM 客服来源范围，2026-10-17）
 - 目标：在不改变现有客服账号默认授权的前提下，为未来受限客服账号提供显式来源 allowlist；文数智旅客服只能查看/认领/发送/上传下载附件/关闭 `wenshuzhilv` 来源会话。覆盖队列、会话 ACL、分配目标、消息/附件、状态、读游标及 socket 订阅授权；账号禁用与范围收紧对后续请求即时生效。
 - 工作基线：后端干净工作树 `codex/wenshu-chat-multimodal`，已有多模态本地提交；本任务将独立本地提交，不推送、不部署、不改生产数据库/账号。
