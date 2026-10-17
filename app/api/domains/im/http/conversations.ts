@@ -80,9 +80,27 @@ export default async function handler(req: ImRequest, res: ImResponse) {
           (${normalizedStatus}::text IS NULL AND c.status <> 'closed')
           OR c.status = ${normalizedStatus}::text
         )
+        AND EXISTS (
+          SELECT 1 FROM im_staff_accounts current_staff
+          WHERE current_staff.id = ${auth.principal.staffId}::uuid
+            AND current_staff.status = 'active'
+            AND current_staff.source_scope_enforced = ${auth.principal.sourceScopeEnforced}
+        )
         AND (
-          ${globalRead}::boolean
+          ${auth.principal.sourceScopeEnforced}::boolean
+          OR ${globalRead}::boolean
           OR c.tenant_id = ANY(${auth.principal.tenantIds}::uuid[])
+        )
+        AND (
+          NOT ${auth.principal.sourceScopeEnforced}::boolean
+          OR EXISTS (
+            SELECT 1 FROM im_staff_permissions source_read
+            WHERE source_read.staff_id = ${auth.principal.staffId}::uuid
+              AND source_read.permission_code = 'im:conversation:read'
+              AND source_read.scope_type = 'source'
+              AND source_read.scope_source = c.source
+              AND source_read.revoked_at IS NULL
+          )
         )
         AND (
           ${scope}::text = 'all'

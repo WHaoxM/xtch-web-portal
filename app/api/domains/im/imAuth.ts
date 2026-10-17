@@ -3,6 +3,15 @@ import { sql } from '../../platform/db';
 import { bearerToken, type ImRequest } from './httpTypes';
 
 const ACCESS_TTL_SECONDS = 10 * 60;
+export const IM_SOURCE_SCOPED_PERMISSION_CODES = [
+  'im:conversation:read',
+  'im:assignment:claim',
+  'im:assignment:takeover',
+  'im:assignment:transfer',
+  'im:message:send',
+  'im:conversation:close',
+] as const;
+const imSourceScopedPermissionSet = new Set<string>(IM_SOURCE_SCOPED_PERMISSION_CODES);
 
 export type ImStaffPrincipal = {
   staffId: string;
@@ -12,6 +21,8 @@ export type ImStaffPrincipal = {
   permissions: string[];
   globalPermissions: string[];
   tenantIds: string[];
+  sourceScopeEnforced: boolean;
+  sourcePermissions: string[];
 };
 
 type JwtClaims = {
@@ -39,6 +50,7 @@ export type ImIntrospectionPrincipal = {
   tenantId: string | null;
   tenantIds: string[];
   scopes: string[];
+  sourceScopeEnforced: boolean;
 };
 
 type StaffRow = {
@@ -47,6 +59,36 @@ type StaffRow = {
   display_name: string;
   account_type: 'super_admin' | 'staff';
 };
+
+type StaffPermissionRow = {
+  permission_code: string;
+  scope_type: 'global' | 'tenant' | 'source';
+  scope_id: string | null;
+};
+
+export function resolveStaffPermissionSets(rows: StaffPermissionRow[], sourceScopeEnforced: boolean) {
+  const tokenPermissions = [...new Set(rows
+    .filter((row) => row.scope_type !== 'source')
+    .map((row) => row.permission_code))];
+  const globalPermissions = [...new Set(rows
+    .filter((row) => row.scope_type === 'global')
+    .map((row) => row.permission_code))];
+  const tenantIds = [...new Set(rows
+    .filter((row) => row.scope_type === 'tenant' && row.permission_code === 'im:conversation:read')
+    .map((row) => row.scope_id)
+    .filter((scopeId): scopeId is string => Boolean(scopeId)))];
+  const sourcePermissions = sourceScopeEnforced
+    ? [...new Set(rows
+      .filter((row) => row.scope_type === 'source' && imSourceScopedPermissionSet.has(row.permission_code))
+      .map((row) => row.permission_code))]
+    : [];
+  const permissions = [...new Set([...tokenPermissions, ...sourcePermissions])];
+  return { permissions, tokenPermissions, globalPermissions, tenantIds, sourcePermissions };
+}
+
+export function isActiveImStaffStatus(status: string | null | undefined): boolean {
+  return status === 'active';
+}
 
 export async function authenticateStaffRequest(req: ImRequest): Promise<
   | { ok: true; principal: ImStaffPrincipal }
@@ -58,14 +100,22 @@ export async function authenticateStaffRequest(req: ImRequest): Promise<
   const claims = verifyAccessToken(token);
   if (!claims) return { ok: false, status: 401, error: 'Invalid or expired IM session.' };
 
-  const result = await sql<StaffRow>`
-    SELECT id, username, display_name, account_type
+  const result = await sql<StaffRow & { status: string; source_scope_enforced: boolean; source_permissions: string[] }>`
+    SELECT id, username, display_name, account_type, status, source_scope_enforced,
+      ARRAY(
+        SELECT p.permission_code
+        FROM im_staff_permissions p
+        WHERE p.staff_id = im_staff_accounts.id
+          AND p.scope_type = 'source' AND p.revoked_at IS NULL
+      ) AS source_permissions
     FROM im_staff_accounts
     WHERE id = ${claims.sub}::uuid
-      AND status = 'active'
   `;
   const staff = result.rows[0];
-  if (!staff) return { ok: false, status: 401, error: 'IM account is inactive.' };
+  if (!staff || !isActiveImStaffStatus(staff.status)) return { ok: false, status: 401, error: 'IM account is inactive.' };
+  const sourcePermissions = staff.source_scope_enforced
+    ? staff.source_permissions.filter((permission) => imSourceScopedPermissionSet.has(permission))
+    : [];
 
   return {
     ok: true,
@@ -74,15 +124,21 @@ export async function authenticateStaffRequest(req: ImRequest): Promise<
       username: staff.username,
       displayName: staff.display_name,
       accountType: staff.account_type,
+      // Source grants are live database data, never flattened into long-lived token permissions.
+      // Otherwise a source-only permission could become a broad legacy membership grant.
       permissions: claims.permissions,
       globalPermissions: claims.globalPermissions ?? [],
       tenantIds: claims.tenantIds,
+      sourceScopeEnforced: staff.source_scope_enforced,
+      sourcePermissions,
     },
   };
 }
 
 export function hasPermission(principal: ImStaffPrincipal, permission: string): boolean {
-  return principal.accountType === 'super_admin' || principal.permissions.includes(permission);
+  return principal.accountType === 'super_admin'
+    || principal.permissions.includes(permission)
+    || (principal.sourceScopeEnforced && imSourceScopedPermissionSet.has(permission) && principal.sourcePermissions.includes(permission));
 }
 
 export function hasGlobalPermission(principal: ImStaffPrincipal, permission: string): boolean {
@@ -97,8 +153,8 @@ export function hasGlobalPermission(principal: ImStaffPrincipal, permission: str
 export async function introspectImAccessToken(token: string): Promise<ImIntrospectionPrincipal | null> {
   const claims = verifyAccessToken(token);
   if (!claims) return null;
-  const result = await sql<{ account_type: 'super_admin' | 'staff' }>`
-    SELECT account_type
+  const result = await sql<{ account_type: 'super_admin' | 'staff'; source_scope_enforced: boolean }>`
+    SELECT account_type, source_scope_enforced
     FROM im_staff_accounts
     WHERE id = ${claims.sub}::uuid AND status = 'active'
   `;
@@ -110,34 +166,33 @@ export async function introspectImAccessToken(token: string): Promise<ImIntrospe
     tenantId: claims.tenantIds[0] ?? null,
     tenantIds: claims.tenantIds,
     scopes: claims.permissions,
+    sourceScopeEnforced: staff.source_scope_enforced,
   };
 }
 
 export async function issueStaffTokens(
-  staff: StaffRow,
+  staff: Pick<StaffRow, 'id' | 'account_type'>,
   options: { ipHash?: string; userAgentHash?: string; externalRole?: string; tokenFamily?: string } = {},
 ) {
-  const permissionsResult = await sql<{ permission_code: string; scope_type: 'global' | 'tenant'; scope_id: string | null }>`
-    SELECT permission_code, scope_type, scope_id
-    FROM im_staff_permissions
-    WHERE staff_id = ${staff.id}::uuid
-      AND revoked_at IS NULL
+  const permissionsResult = await sql<{
+    permission_code: string | null;
+    scope_type: 'global' | 'tenant' | 'source' | null;
+    scope_id: string | null;
+    source_scope_enforced: boolean;
+  }>`
+    SELECT p.permission_code, p.scope_type, p.scope_id, a.source_scope_enforced
+    FROM im_staff_accounts a
+    LEFT JOIN im_staff_permissions p ON p.staff_id = a.id AND p.revoked_at IS NULL
+    WHERE a.id = ${staff.id}::uuid
   `;
-  const permissions = [...new Set(permissionsResult.rows.map((row) => row.permission_code))] as string[];
-  const globalPermissions = [...new Set(
-    permissionsResult.rows
-      .filter((row) => row.scope_type === 'global')
-      .map((row) => row.permission_code),
-  )] as string[];
-  if (staff.account_type !== 'super_admin' && !permissions.includes('im:conversation:read')) {
+  const activeRows = permissionsResult.rows.filter((row): row is typeof row & { permission_code: string; scope_type: 'global' | 'tenant' | 'source' } =>
+    Boolean(row.permission_code && row.scope_type),
+  );
+  const sourceScopeEnforced = permissionsResult.rows[0]?.source_scope_enforced ?? false;
+  const permissionSets = resolveStaffPermissionSets(activeRows, sourceScopeEnforced);
+  if (staff.account_type !== 'super_admin' && !permissionSets.permissions.includes('im:conversation:read')) {
     throw new ImAccessDeniedError();
   }
-  const tenantIds = [...new Set(
-    permissionsResult.rows
-      .filter((row) => row.scope_type === 'tenant' && row.permission_code === 'im:conversation:read')
-      .map((row) => row.scope_id)
-      .filter((scopeId): scopeId is string => Boolean(scopeId)),
-  )] as string[];
   const now = Math.floor(Date.now() / 1000);
   const claims: JwtClaims = {
     iss: 'xtch',
@@ -146,9 +201,9 @@ export async function issueStaffTokens(
     jti: crypto.randomUUID(),
     iat: now,
     exp: now + ACCESS_TTL_SECONDS,
-    permissions,
-    globalPermissions,
-    tenantIds,
+    permissions: permissionSets.tokenPermissions,
+    globalPermissions: permissionSets.globalPermissions,
+    tenantIds: permissionSets.tenantIds,
   };
   const accessToken = signAccessToken(claims);
   const refreshToken = randomToken();
@@ -176,8 +231,8 @@ export async function issueStaffTokens(
     refreshToken,
     sessionId: sessionResult.rows[0]?.id ?? null,
     expiresIn: ACCESS_TTL_SECONDS,
-    permissions,
-    tenantIds,
+    permissions: permissionSets.permissions,
+    tenantIds: permissionSets.tenantIds,
   };
 }
 

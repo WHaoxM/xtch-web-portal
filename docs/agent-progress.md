@@ -1,5 +1,19 @@
 # Agent Progress
 
+## Current Goal（IM 客服来源范围，2026-10-17）
+- 目标：在不改变现有客服账号默认授权的前提下，为未来受限客服账号提供显式来源 allowlist；文数智旅客服只能查看/认领/发送/上传下载附件/关闭 `wenshuzhilv` 来源会话。覆盖队列、会话 ACL、分配目标、消息/附件、状态、读游标及 socket 订阅授权；账号禁用与范围收紧对后续请求即时生效。
+- 工作基线：后端干净工作树 `codex/wenshu-chat-multimodal`，已有多模态本地提交；本任务将独立本地提交，不推送、不部署、不改生产数据库/账号。
+- 已读：`AGENTS.md`、`docs/agent-context.md`、`docs/agent-workflows.md`、`docs/agent-gotchas.md`、IM migration 014/015/022、staff auth/ACL/list/assignment/message/media/status/detail/readCursor/admin/introspection 与 `app/scripts/messagingSocket.ts`。
+- 初步模型：在 `im_staff_accounts` 加 `source_scope_enforced BOOLEAN NOT NULL DEFAULT FALSE`，保持旧账号行为；在 `im_staff_permissions` 增加 `scope_type='source'` + 文本 `scope_source`。强制模式下所有会话读取/写入都需当前有效的精确来源权限，global、tenant、membership 不再构成跨来源旁路。来源授权不写入 JWT 全局权限；API 每次实时读取有效来源授权，且 auth 与最终 DB 门禁检查 enforcement 状态一致。
+- 不触碰：quick-login、XT_MVP exchange/demo 账号逻辑、真实账号授权、生产配置/数据库/部署、游客 Wenshu 流程及旧邮件业务。
+- 已实现：迁移 023 与来源范围文档；中央会话 ACL、队列/详情/消息、分配目标、发送/附件、状态和读游标均按当前会话来源及来源动作权限授权；账号禁用每次 API 请求查 DB，enforcement 与授权变更在最终 SQL/事务重新检查。来源权限通过管理 API 精确 grant/revoke，未知 `scopeType` 400，不会误降为 global。
+- 已实现：来源权限与 JWT 其他 scope 分离；签发 token 不把 source grants 压平成广权限，来源强制账号每次客服 API auth 读取当前来源权限。已连接 staff socket 在来源启用后不再收到 outbox 消息；source-scoped 工作台退化为 4 秒队列/2.5 秒消息轮询。outbox 合并会话、tenant、target staff 房间后一次批量授权，当前状态/范围/成员查库失败则不发送且重试。visitor socket 每次出站重新检查 session active/non-revoked/unexpired 与身份仍绑定该会话。
+- 已增加测试：纯 ACL 精确来源/旧账号行为、账户状态、来源权限不入 JWT、scope 输入 fail-closed、socket 访客/客服撤权、批量大房间/多 tab、重叠房间去重与 DB 故障 fail-closed。
+- 已验证：在 `app/` 下运行聚焦测试 `npx tsx --test api/domains/im/conversationAccess.test.ts api/domains/im/imAuth.test.ts api/domains/im/http/staffAdmin.test.ts scripts/messagingOutbox.test.ts scripts/messagingSocket.test.ts`（21/21）、`npm run typecheck`、`npm run lint`、`npm run build` 均通过；既有 `npm run test:wenshu` 30/30 通过；`git diff --check` 通过。Build 仅有仓库既有 Browserslist 数据过期与大 chunk 提示。
+- 生成物核对：构建刷新 sitemap/SEO manifest，但相对 HEAD 没有内容差异，不纳入提交。
+- 未验证/限制：未连数据库实际运行迁移或 HTTP 端到端、未设置客服账号/权限、未执行生产操作。签名附件 URL 已发出后最多约 5 分钟无法即时撤销；新链接签发被即时来源 ACL 阻断，详见 `docs/ops/shared/im-staff-source-scope.md`。
+- 完成状态：授权前置功能已独立提交 `dd755d9`（`Add opt-in source-scoped IM staff access`），仅本地分支 `codex/wenshu-chat-multimodal`；不推送、不部署、不改 quick-login/XT_MVP exchange/账号或生产数据；SSO 与独立客服账号方案仍待用户决定。
+
 ## Current Goal（文数智旅客服多模态咨询闭环，2026-10-17）
 - 目标：在文数智旅官网客服工具栏实现可用表情选择器、图片/常见文件私有上传与双端预览下载、铃铛新回复提醒；访客与客服两端消息支持附件历史重载、权限隔离、大小/MIME 校验、失败重试与幂等。删除旧占位说明并覆盖中英文。
 - 任务基线：前端 `D:\AGeneral Workspace\xjch2026\ZhilvTravel` `main`=`9bd6b06` 且 clean；后端 `D:\AGeneral Workspace\xjch2026\xtch-web-portal-wenshu-followup` `codex/wenshu-followup-email`=`9f18b01` 且 clean。工作均已在独立分支 `codex/wenshu-chat-multimodal` 继续；不改脏的 `product_wenshuzhilv`/`xtch-web-portal` checkout，不推送、合并或部署。

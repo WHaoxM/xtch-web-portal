@@ -33,9 +33,19 @@ export default async function handler(req: ImRequest, res: ImResponse) {
   try {
     const result = await sql.begin(async (tx) => {
       const conversation = await tx<{ last_message_seq: number }>`
-        SELECT last_message_seq
-        FROM im_conversations
-        WHERE id = ${conversationId}::uuid
+        SELECT c.last_message_seq
+        FROM im_conversations c
+        JOIN im_staff_accounts s ON s.id = ${auth.principal.staffId}::uuid AND s.status = 'active'
+        WHERE c.id = ${conversationId}::uuid
+          AND s.source_scope_enforced = ${auth.principal.sourceScopeEnforced}
+          AND (
+            NOT s.source_scope_enforced
+            OR EXISTS (
+              SELECT 1 FROM im_staff_permissions p
+              WHERE p.staff_id = s.id AND p.permission_code = 'im:conversation:read'
+                AND p.scope_type = 'source' AND p.scope_source = c.source AND p.revoked_at IS NULL
+            )
+          )
       `;
       const row = conversation.rows[0];
       if (!row) throw new ReadCursorError('Conversation not found.', 404);

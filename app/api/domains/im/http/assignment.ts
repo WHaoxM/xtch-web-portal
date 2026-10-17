@@ -1,4 +1,5 @@
 import { sql } from '../../../platform/db';
+import { canAccessConversation } from '../conversationAccess';
 import { authenticateStaffRequest, hasGlobalPermission, hasPermission } from '../imAuth';
 import { type ImRequest, type ImResponse } from '../httpTypes';
 
@@ -32,27 +33,65 @@ export default async function handler(req: ImRequest, res: ImResponse) {
     res.status(400).json({ ok: false, error: 'Valid conversation and staff ids are required.' });
     return;
   }
+  if (!(await canAccessConversation(auth.principal, conversationId, 'assign', permission))) {
+    res.status(403).json({ ok: false, error: 'Conversation assignment access denied.' });
+    return;
+  }
 
   try {
     const result = await sql.begin(async (tx) => {
-      const current = await tx<{ id: string; tenant_id: string | null }>`
-        SELECT id, tenant_id FROM im_conversations WHERE id = ${conversationId}::uuid AND status <> 'closed' FOR UPDATE
+      const current = await tx<{ id: string; tenant_id: string | null; source: string }>`
+        SELECT c.id, c.tenant_id, c.source
+        FROM im_conversations c
+        JOIN im_staff_accounts actor ON actor.id = ${auth.principal.staffId}::uuid AND actor.status = 'active'
+        WHERE c.id = ${conversationId}::uuid AND c.status <> 'closed'
+          AND actor.source_scope_enforced = ${auth.principal.sourceScopeEnforced}
+          AND (
+            NOT actor.source_scope_enforced
+            OR EXISTS (
+              SELECT 1 FROM im_staff_permissions p
+              WHERE p.staff_id = actor.id AND p.permission_code = ${permission}
+                AND p.scope_type = 'source' AND p.scope_source = c.source AND p.revoked_at IS NULL
+            )
+          )
+        FOR UPDATE OF c
       `;
       if (!current.rows[0]) throw new AssignmentError('Conversation is unavailable.', 404);
       const conversationRow = current.rows[0];
       if (
+        !auth.principal.sourceScopeEnforced &&
         !hasGlobalPermission(auth.principal, 'im:assignment:claim') &&
         (!conversationRow.tenant_id || !auth.principal.tenantIds.includes(conversationRow.tenant_id))
       ) {
         throw new AssignmentError('Conversation is outside your tenant scope.', 403);
       }
-      const target = await tx<{ id: string; account_type: string }>`
-        SELECT id, account_type
-        FROM im_staff_accounts
-        WHERE id = ${targetStaffId}::uuid AND status = 'active'
+      const target = await tx<{
+        id: string;
+        account_type: string;
+        source_scope_enforced: boolean;
+        source_read_granted: boolean;
+        source_send_granted: boolean;
+      }>`
+        SELECT target.id, target.account_type, target.source_scope_enforced,
+          EXISTS (
+            SELECT 1 FROM im_staff_permissions p
+            WHERE p.staff_id = target.id AND p.permission_code = 'im:conversation:read'
+              AND p.scope_type = 'source' AND p.scope_source = ${conversationRow.source} AND p.revoked_at IS NULL
+          ) AS source_read_granted,
+          EXISTS (
+            SELECT 1 FROM im_staff_permissions p
+            WHERE p.staff_id = target.id AND p.permission_code = 'im:message:send'
+              AND p.scope_type = 'source' AND p.scope_source = ${conversationRow.source} AND p.revoked_at IS NULL
+          ) AS source_send_granted
+        FROM im_staff_accounts target
+        WHERE target.id = ${targetStaffId}::uuid AND target.status = 'active'
       `;
       if (!target.rows[0]) throw new AssignmentError('Target staff account is inactive or missing.', 409);
-      if (conversationRow.tenant_id && target.rows[0].account_type !== 'super_admin') {
+      if (target.rows[0].source_scope_enforced &&
+          (!target.rows[0].source_read_granted || !target.rows[0].source_send_granted)) {
+        throw new AssignmentError('Target staff is outside the conversation source scope or cannot reply.', 409);
+      }
+      if (conversationRow.tenant_id && !target.rows[0].source_scope_enforced && target.rows[0].account_type !== 'super_admin') {
         const targetScope = await tx<{ staff_id: string }>`
           SELECT staff_id
           FROM im_staff_permissions

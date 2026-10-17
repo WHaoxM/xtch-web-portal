@@ -28,7 +28,7 @@ export default async function handler(req: ImRequest, res: ImResponse) {
       res.status(403).json({ ok: false, error: 'Conversation read permission required.' });
       return;
     }
-    await listMessages(conversationId, req, res);
+    await listMessages(conversationId, auth.principal.staffId, auth.principal.sourceScopeEnforced, req, res);
     return;
   }
 
@@ -37,30 +37,41 @@ export default async function handler(req: ImRequest, res: ImResponse) {
       res.status(403).json({ ok: false, error: 'Message send permission required.' });
       return;
     }
-    await sendMessage(conversationId, auth.principal.staffId, req, res);
+    await sendMessage(conversationId, auth.principal.staffId, auth.principal.sourceScopeEnforced, req, res);
     return;
   }
 
   res.status(405).json({ ok: false, error: 'Method not allowed.' });
 }
 
-async function listMessages(conversationId: string, req: ImRequest, res: ImResponse) {
+async function listMessages(conversationId: string, staffId: string, sourceScopeEnforced: boolean, req: ImRequest, res: ImResponse) {
   const query = new URL(req.url ?? '/', 'http://xtch.local').searchParams;
   const afterSeq = Math.max(Number(query.get('after_seq') || 0), 0);
   const limit = Math.min(Math.max(Number(query.get('limit') || 50), 1), 200);
   const result = await sql`
-    SELECT id, conversation_id, seq, client_message_id, sender_type, sender_id,
-      content_type, body, metadata, created_at
-    FROM im_messages
-    WHERE conversation_id = ${conversationId}::uuid
-      AND seq > ${afterSeq}
-    ORDER BY seq ASC
+    SELECT m.id, m.conversation_id, m.seq, m.client_message_id, m.sender_type, m.sender_id,
+      m.content_type, m.body, m.metadata, m.created_at
+    FROM im_messages m
+    JOIN im_conversations c ON c.id = m.conversation_id
+    JOIN im_staff_accounts s ON s.id = ${staffId}::uuid AND s.status = 'active'
+    WHERE m.conversation_id = ${conversationId}::uuid
+      AND s.source_scope_enforced = ${sourceScopeEnforced}
+      AND (
+        NOT s.source_scope_enforced
+        OR EXISTS (
+          SELECT 1 FROM im_staff_permissions p
+          WHERE p.staff_id = s.id AND p.permission_code = 'im:conversation:read'
+            AND p.scope_type = 'source' AND p.scope_source = c.source AND p.revoked_at IS NULL
+        )
+      )
+      AND m.seq > ${afterSeq}
+    ORDER BY m.seq ASC
     LIMIT ${limit}
   `;
   res.status(200).json({ ok: true, items: result.rows, nextAfterSeq: result.rows.at(-1)?.seq ?? afterSeq });
 }
 
-async function sendMessage(conversationId: string, staffId: string, req: ImRequest, res: ImResponse) {
+async function sendMessage(conversationId: string, staffId: string, sourceScopeEnforced: boolean, req: ImRequest, res: ImResponse) {
   const body = isRecord(req.body) ? req.body : {};
   let text = stringValue(body.body);
   const contentType = stringValue(body.contentType) || 'text';
@@ -91,11 +102,21 @@ async function sendMessage(conversationId: string, staffId: string, req: ImReque
       const conversation = await tx<{ last_message_seq: number }>`
         SELECT c.last_message_seq
         FROM im_conversations c
+        JOIN im_staff_accounts s ON s.id = ${staffId}::uuid AND s.status = 'active'
         LEFT JOIN im_conversation_members m
           ON m.conversation_id = c.id AND m.principal_type = 'staff'
           AND m.principal_id = ${staffId} AND m.left_at IS NULL
         WHERE c.id = ${conversationId}::uuid
           AND c.status <> 'closed'
+          AND s.source_scope_enforced = ${sourceScopeEnforced}
+          AND (
+            NOT s.source_scope_enforced
+            OR EXISTS (
+              SELECT 1 FROM im_staff_permissions p
+              WHERE p.staff_id = s.id AND p.permission_code = 'im:message:send'
+                AND p.scope_type = 'source' AND p.scope_source = c.source AND p.revoked_at IS NULL
+            )
+          )
           AND (m.id IS NOT NULL OR EXISTS (
             SELECT 1 FROM im_staff_accounts s WHERE s.id = ${staffId}::uuid AND s.account_type = 'super_admin'
           ))

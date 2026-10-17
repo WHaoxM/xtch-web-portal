@@ -3,6 +3,7 @@ import { Server as SocketIOServer, type Namespace } from 'socket.io';
 import { sql } from '../api/platform/db';
 import { parseCookies } from '../api/domains/im/httpTypes';
 import { hashToken } from '../api/domains/im/imAuth';
+import { canStaffReadConversationNow } from '../api/domains/im/conversationAccess';
 import { VISITOR_COOKIE_NAME } from '../api/domains/im/visitorAuth';
 
 export type MessagingSocketPrincipal = {
@@ -11,6 +12,7 @@ export type MessagingSocketPrincipal = {
   tenantId: string | null;
   tenantIds?: string[];
   scopes: string[];
+  sourceScopeEnforced?: boolean;
 };
 
 export type MessagingSocketAuthenticator = (
@@ -32,6 +34,10 @@ export type MessagingSocketServer = {
   io: SocketIOServer;
   namespace: Namespace;
 };
+
+export function mayUseRealtimeMessaging(principal: MessagingSocketPrincipal): boolean {
+  return principal.role === 'visitor' || principal.sourceScopeEnforced !== true;
+}
 
 /**
  * Attach the IM namespace to the existing Node HTTP server.
@@ -89,6 +95,10 @@ export function createMessagingSocketServer(
         next(new Error('Messaging access denied'));
         return;
       }
+      if (!mayUseRealtimeMessaging(principal)) {
+        next(new Error('Source-scoped staff use authorized polling for conversation updates'));
+        return;
+      }
       socket.data.principal = principal;
       next();
     } catch {
@@ -120,30 +130,9 @@ export function createMessagingSocketServer(
                 AND i.revoked_at IS NULL
               WHERE c.id = ${conversationId}::uuid
             `
-          : principal.role === 'platform_admin'
-            ? await sql<{ id: string }>`
-                SELECT c.id
-                FROM im_conversations c
-                WHERE c.id = ${conversationId}::uuid
-              `
-            : await sql<{ id: string }>`
-              SELECT c.id
-              FROM im_conversations c
-              WHERE c.id = ${conversationId}::uuid
-                AND (
-                  EXISTS (
-                    SELECT 1 FROM im_conversation_members m
-                    WHERE m.conversation_id = c.id
-                      AND m.principal_type = 'staff'
-                      AND m.principal_id = ${principal.subject}
-                      AND m.left_at IS NULL
-                  )
-                  OR (
-                    c.tenant_id = ANY(${principal.tenantIds ?? (principal.tenantId ? [principal.tenantId] : [])}::uuid[])
-                    AND 'im:conversation:read' = ANY(${principal.scopes}::text[])
-                  )
-                )
-            `;
+          : (await canStaffReadConversationNow(principal.subject, conversationId))
+            ? { rows: [{ id: conversationId }] }
+            : { rows: [] };
         if (!result.rows[0]) {
           acknowledge?.({ ok: false, error: 'Conversation access denied.' });
           return;
@@ -236,6 +225,7 @@ export function createRemoteMessagingAuthenticator(
         role,
         tenantId: typeof tenantValue === 'string' ? tenantValue : null,
         tenantIds,
+        sourceScopeEnforced: envelope.sourceScopeEnforced === true || envelope.source_scope_enforced === true,
         scopes: Array.isArray(envelope.scopes)
           ? envelope.scopes.filter((scope): scope is string => typeof scope === 'string')
           : [],

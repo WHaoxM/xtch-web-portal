@@ -32,7 +32,17 @@ export default async function handler(req: ImRequest, res: ImResponse) {
         v.phone AS visitor_phone
       FROM im_conversations c
       LEFT JOIN im_visitors v ON v.id = c.visitor_id
+      JOIN im_staff_accounts s ON s.id = ${auth.principal.staffId}::uuid AND s.status = 'active'
       WHERE c.id = ${conversationId}::uuid
+        AND s.source_scope_enforced = ${auth.principal.sourceScopeEnforced}
+        AND (
+          NOT s.source_scope_enforced
+          OR EXISTS (
+            SELECT 1 FROM im_staff_permissions p
+            WHERE p.staff_id = s.id AND p.permission_code = 'im:conversation:read'
+              AND p.scope_type = 'source' AND p.scope_source = c.source AND p.revoked_at IS NULL
+          )
+        )
     `;
     const conversation = result.rows[0];
     if (!conversation) {

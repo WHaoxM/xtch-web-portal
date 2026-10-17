@@ -33,7 +33,7 @@ export default async function handler(req: ImRequest, res: ImResponse) {
     res.status(400).json({ ok: false, error: 'Status must be open, pending, or closed.' });
     return;
   }
-  if (!(await canAccessConversation(auth.principal, conversationId, 'read'))) {
+  if (!(await canAccessConversation(auth.principal, conversationId, 'close'))) {
     res.status(403).json({ ok: false, error: 'Conversation access denied.' });
     return;
   }
@@ -41,10 +41,20 @@ export default async function handler(req: ImRequest, res: ImResponse) {
   try {
     const result = await sql.begin(async (tx) => {
       const current = await tx<{ id: string; status: ConversationStatus; version: number; closed_at: string | null }>`
-        SELECT id, status, version, closed_at
-        FROM im_conversations
-        WHERE id = ${conversationId}::uuid
-        FOR UPDATE
+        SELECT c.id, c.status, c.version, c.closed_at
+        FROM im_conversations c
+        JOIN im_staff_accounts s ON s.id = ${auth.principal.staffId}::uuid AND s.status = 'active'
+        WHERE c.id = ${conversationId}::uuid
+          AND s.source_scope_enforced = ${auth.principal.sourceScopeEnforced}
+          AND (
+            NOT s.source_scope_enforced
+            OR EXISTS (
+              SELECT 1 FROM im_staff_permissions p
+              WHERE p.staff_id = s.id AND p.permission_code = 'im:conversation:close'
+                AND p.scope_type = 'source' AND p.scope_source = c.source AND p.revoked_at IS NULL
+            )
+          )
+        FOR UPDATE OF c
       `;
       const row = current.rows[0];
       if (!row) throw new ConversationStatusError('Conversation not found.', 404);
