@@ -21,8 +21,8 @@ test('request intent and business segment distinguish internal and customer copy
   assert.match(renderInternalLeadMail({ ...base, intent: 'custom_consultation', business_type: '入境游地接社' }).subject,
     /定制化咨询·入境游地接/);
   assert.match(renderInternalLeadMail(base).text,
-    /admin\.xuntingtravel\.com\/admin\?wenshuLead=00000000-0000-4000-8000-000000000001/);
-  assert.match(renderInternalLeadMail(base).html, /<a href="https:\/\/admin\.xuntingtravel\.com\/admin\?wenshuLead=/);
+    /www\.xuntingtravel\.com\/admin\?wenshuLead=00000000-0000-4000-8000-000000000001/);
+  assert.match(renderInternalLeadMail(base).html, /<a href="https:\/\/www\.xuntingtravel\.com\/admin\?wenshuLead=/);
   const english = renderCustomerLeadMail({ ...base, intent: 'product_demo',
     page_url: 'https://www.zhilvtravel.com/en/index.html', business_type: 'Inbound Ground Operator' });
   assert.match(english.subject, /Product demo/);

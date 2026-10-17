@@ -28,7 +28,8 @@ const SEGMENT_LABELS = {
 export function renderInternalLeadMail(lead: WenshuLeadForEmail) {
   const intent = INTENT_LABELS[lead.intent] || INTENT_LABELS.growth_plan;
   const segment = SEGMENT_LABELS[resolveBusinessSegment(lead.business_type)];
-  const reviewUrl = `https://admin.xuntingtravel.com/admin?wenshuLead=${encodeURIComponent(lead.id)}`;
+  // Use the canonical public host: some mailbox browsers bounce the admin subdomain to the homepage.
+  const reviewUrl = `https://www.xuntingtravel.com/admin?wenshuLead=${encodeURIComponent(lead.id)}`;
   return {
     subject: `【文数智旅·${intent}·${segment}】新客户线索`,
     html: `<div style="font-family:Arial,sans-serif;line-height:1.7;color:#17213a"><p>文数智旅收到新线索。请先审核，再向客户邮箱发送正式跟进。</p><p><a href="${reviewUrl}" style="display:inline-block;padding:12px 18px;background:#143d82;color:#fff;text-decoration:none;border-radius:6px">审核并向客户邮箱发送跟进</a></p><p>回执编号：${lead.id}</p><p>如按钮无法打开，请使用纯文本邮件中的审核链接。</p></div>`,
