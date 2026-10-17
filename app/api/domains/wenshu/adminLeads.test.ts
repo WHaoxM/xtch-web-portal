@@ -64,3 +64,26 @@ test('admin can retry a failed notification without changing the lead receipt', 
   assert.equal(updates, 2);
   assert.equal(audits, 1);
 });
+
+test('admin can retry only the customer confirmation when internal notification already succeeded', async () => {
+  const id = '00000000-0000-4000-8000-000000000011';
+  let internal = 0, customer = 0, audited = false;
+  const db = (async (parts: TemplateStringsArray) => {
+    const statement = parts.join('');
+    if (statement.includes('SELECT')) return { rows: [{ id, email: 'buyer@example.com', intent: 'growth_plan',
+      customer_confirmation_enabled: true, customer_confirmation_sent_at: null,
+      notification_sent_at: new Date().toISOString() }] };
+    if (statement.includes('RETURNING id')) return { rows: [{ id }] };
+    return { rows: [] };
+  }) as unknown as typeof sql;
+  const handler = createAdminLeadsHandler(db,
+    async () => ({ ok: true as const, email: 'ops@example.com', role: 'ops' as const }),
+    async () => { audited = true; }, async () => { internal += 1; }, async () => { customer += 1; });
+  const r = response();
+  await handler({ method: 'POST', url: `/api/admin/wenshu-leads?id=${id}&action=retry-customer-confirmation`, headers: {} }, r.res);
+  assert.equal(r.state.status, 200);
+  assert.equal(r.state.body.customerConfirmationSent, true);
+  assert.equal(internal, 0);
+  assert.equal(customer, 1);
+  assert.equal(audited, true);
+});

@@ -2,7 +2,8 @@ import { sql as database } from '../../platform/db';
 import { writeAuditLog } from '../../platform/auditLog';
 import { requireAdminAuth } from '../identity/admin/adminAuth';
 import { validId } from './contract';
-import { deliverWenshuLead, sendWenshuLeadEmail, type WenshuLeadForEmail } from './notify';
+import { deliverWenshuLead, deliverWenshuCustomerConfirmation, sendWenshuLeadEmail,
+  sendWenshuCustomerEmail, type WenshuLeadForEmail } from './notify';
 
 type Request = { method?: string; url?: string; headers: Record<string, string | string[] | undefined> };
 type Response = { status: (code: number) => Response; json: (body: unknown) => void; setHeader?: (key: string, value: string) => void };
@@ -12,6 +13,7 @@ export function createAdminLeadsHandler(
   authorize = requireAdminAuth,
   audit = writeAuditLog,
   notify = sendWenshuLeadEmail,
+  confirm = sendWenshuCustomerEmail,
 ) {
   return async function handler(req: Request, res: Response) {
     res.setHeader?.('Cache-Control', 'no-store');
@@ -22,28 +24,39 @@ export function createAdminLeadsHandler(
     const id = params.get('id');
     try {
       if (req.method === 'POST') {
-        if (params.get('action') !== 'retry-notification' || !id || !validId(id)) {
+        const action = params.get('action');
+        if (!['retry-notification', 'retry-customer-confirmation'].includes(action || '') || !id || !validId(id)) {
           res.status(400).json({ ok: false, error: 'Invalid notification retry.' }); return;
         }
-        const result = await sql<WenshuLeadForEmail & { notification_sent_at: string | null }>`SELECT
+        const result = await sql<WenshuLeadForEmail & { notification_sent_at: string | null;
+          customer_confirmation_enabled: boolean; customer_confirmation_sent_at: string | null }>`SELECT
           id, name, phone, company, company_address, business_type, entry, page_url,
-          message, email, notification_sent_at FROM wenshu_leads WHERE id = ${id}::uuid`;
+          message, email, intent, notification_sent_at, customer_confirmation_enabled,
+          customer_confirmation_sent_at FROM wenshu_leads WHERE id = ${id}::uuid`;
         const lead = result.rows[0];
         if (!lead) { res.status(404).json({ ok: false, error: 'Lead not found.' }); return; }
         await audit({ actorType: 'admin', actorEmail: admin.email,
-          action: 'admin_wenshu_lead_notification_retry', targetType: 'wenshu_lead', targetId: id });
-        const state = await deliverWenshuLead(sql, lead, notify);
+          action: action === 'retry-notification' ? 'admin_wenshu_lead_notification_retry' : 'admin_wenshu_customer_confirmation_retry',
+          targetType: 'wenshu_lead', targetId: id });
+        if (action === 'retry-customer-confirmation' && !lead.customer_confirmation_enabled) {
+          res.status(409).json({ ok: false, error: 'Customer confirmation was not requested.' }); return;
+        }
+        const state = action === 'retry-notification' ? await deliverWenshuLead(sql, lead, notify)
+          : await deliverWenshuCustomerConfirmation(sql, lead, confirm);
         if (state === 'in-progress') {
           res.status(409).json({ ok: false, error: 'Notification already in progress.' }); return;
         }
-        res.status(200).json({ ok: true, id, notificationSent: true });
+        res.status(200).json({ ok: true, id, notificationSent: action === 'retry-notification',
+          customerConfirmationSent: action === 'retry-customer-confirmation' });
         return;
       }
       if (id) {
         if (!validId(id)) { res.status(400).json({ ok: false, error: 'Invalid lead id.' }); return; }
         const result = await sql`SELECT id, name, phone, company, company_address, business_type,
-          entry, page_url, message, email, status, created_at, notification_sent_at,
-          notification_attempted_at, notification_provider, notification_last_error
+          entry, page_url, message, email, intent, status, created_at, notification_sent_at,
+          notification_attempted_at, notification_provider, notification_last_error,
+          customer_confirmation_enabled, customer_confirmation_sent_at, customer_confirmation_attempted_at,
+          customer_confirmation_provider, customer_confirmation_last_error
           FROM wenshu_leads WHERE id = ${id}::uuid`;
         const lead = result.rows[0];
         if (!lead) { res.status(404).json({ ok: false, error: 'Lead not found.' }); return; }
@@ -58,8 +71,10 @@ export function createAdminLeadsHandler(
           !Number.isSafeInteger(offset) || offset < 0) {
         res.status(400).json({ ok: false, error: 'Invalid pagination.' }); return;
       }
-      const result = await sql`SELECT id, name, company, entry, status, created_at,
-        notification_sent_at, notification_attempted_at, notification_provider
+      const result = await sql`SELECT id, name, company, entry, intent, business_type, status, created_at,
+        notification_sent_at, notification_attempted_at, notification_provider,
+        customer_confirmation_enabled, customer_confirmation_sent_at, customer_confirmation_attempted_at,
+        customer_confirmation_provider
         FROM wenshu_leads ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`;
       res.status(200).json({ ok: true, leads: result.rows });
     } catch (error) {

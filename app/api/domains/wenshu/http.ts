@@ -5,10 +5,12 @@ import { VISITOR_COOKIE_NAME } from '../im/visitorAuth';
 import { hashToken } from '../im/imAuth';
 import { getClientIp, headerValue, type ImRequest, type ImResponse } from '../im/httpTypes';
 import { allowedOrigin, readLead, validId, validSessionToken } from './contract';
-import { deliverWenshuLead, sendWenshuLeadEmail, type WenshuLeadForEmail } from './notify';
+import { deliverWenshuLead, deliverWenshuCustomerConfirmation, sendWenshuLeadEmail,
+  sendWenshuCustomerEmail, type WenshuLeadForEmail } from './notify';
 
 // Dedicated cross-site visitor transport. Never accepts staff/portal credentials or cookies.
-export function createHandler(sql = database, messages = publicMessages, notify = sendWenshuLeadEmail) {
+export function createHandler(sql = database, messages = publicMessages, notify = sendWenshuLeadEmail,
+  confirm = sendWenshuCustomerEmail) {
 return async function handler(req: ImRequest, res: ImResponse) {
   const origin = headerValue(req.headers.origin);
   res.setHeader?.('Vary', 'Origin');
@@ -61,14 +63,17 @@ async function saveLead(req: ImRequest, res: ImResponse) {
   let lead: ReturnType<typeof readLead>;
   const requestId = headerValue(req.headers['idempotency-key']) || '';
   try { lead = readLead(req.body); if (!validId(requestId)) throw new Error('Invalid request ID.'); }
-  catch { res.status(400).json({ ok: false, error: 'Please check your phone and company address.' }); return; }
-  const result = await sql<WenshuLeadForEmail & { notification_sent_at: string | null }>`INSERT INTO wenshu_leads
-    (request_id, name, phone, company, company_address, business_type, entry, page_url, message, email)
+  catch { res.status(400).json({ ok: false, error: 'Please check your phone, email, business type and company address.' }); return; }
+  const result = await sql<WenshuLeadForEmail & { notification_sent_at: string | null;
+    customer_confirmation_enabled: boolean; customer_confirmation_sent_at: string | null }>`INSERT INTO wenshu_leads
+    (request_id, name, phone, company, company_address, business_type, entry, page_url, message, email,
+      intent, customer_confirmation_enabled)
     VALUES (${requestId}::uuid, ${lead.name}, ${lead.phone}, ${lead.company}, ${lead.companyAddress},
-      ${lead.businessType}, ${lead.entry}, ${lead.pageUrl}, ${lead.message}, ${lead.email})
+      ${lead.businessType}, ${lead.entry}, ${lead.pageUrl}, ${lead.message}, ${lead.email},
+      ${lead.intent}, ${lead.customerConfirmationEnabled})
     ON CONFLICT (request_id) DO UPDATE SET request_id = EXCLUDED.request_id
     RETURNING id, name, phone, company, company_address, business_type, entry, page_url,
-      message, email, notification_sent_at`;
+      message, email, intent, notification_sent_at, customer_confirmation_enabled, customer_confirmation_sent_at`;
   const stored = result.rows[0];
   if (!stored) throw new Error('Wenshu lead receipt missing.');
   if (!stored.notification_sent_at) {
@@ -80,6 +85,18 @@ async function saveLead(req: ImRequest, res: ImResponse) {
       }
     } catch {
       res.status(503).json({ ok: false, id: stored.id, error: 'Lead saved, but notification not confirmed. Please retry.' });
+      return;
+    }
+  }
+  if (stored.customer_confirmation_enabled && !stored.customer_confirmation_sent_at) {
+    try {
+      const state = await deliverWenshuCustomerConfirmation(sql, stored, confirm);
+      if (state === 'in-progress') {
+        res.status(503).json({ ok: false, id: stored.id, error: 'Lead saved; customer confirmation is in progress. Please retry shortly.' });
+        return;
+      }
+    } catch {
+      res.status(503).json({ ok: false, id: stored.id, error: 'Lead saved, but customer confirmation not confirmed. Please retry.' });
       return;
     }
   }
