@@ -1,6 +1,7 @@
 # Agent Progress
 
 ## Current Goal（文数智旅线索接收，2026-10-17）
+- 用户已确认收到 QQ SMTP 测试邮件；这是从 VPS 使用生产备用账号发送的无客户信息邮件，证明 SMTP 接受及收件箱到达。用户确认 Cloudflare 的 Resend DNS 四条记录暂未添加。已询问是否先发布仅文数智旅 QQ 备用，以及备用是否同时覆盖寻庭询价/订单确认；在用户选择前，不扩展邮件范围或合并 PR #11。
 - QQ SMTP 授权码已由用户明确授权使用；2026-10-17 07:32 UTC 从 VPS 通过 TLS/SMTP 登录并向该 QQ 账号发送**不含客户资料**的测试邮件，SMTP 服务确认接受。随后已在服务器 `env/cloud-vps/.env` 写入文数智旅收件地址和 QQ SMTP 备用配置，未将授权码写入 Git 或操作日志；原 env 备份在 VPS `/opt/xtch-release-backups/qq-smtp-config/cloud-vps.env.20261017T073240Z.bak`（目录 700、文件 600）。用户收件箱是否收到仍待确认。四条 Resend DNS 记录再次核查均缺失，Resend 域名仍无法验证；PR #11 继续保持草稿，不合并。
 - 2026-10-17 续做：`main` 回滚提交 `fcd8b8c` 的自动部署已成功；公网测试线索再次得到正常回执。新工作树 `D:\AGeneral Workspace\xjch2026\xtch-web-portal-wenshu-mail-ready` 从该回滚基线重新挑选三项功能提交（功能提交止于 `16591e1`），草稿 PR #11（`codex/wenshu-mail-ready`）已推送，**不得在邮件通道验证前合并**。本工作树 15 项 Wenshu 测试、typecheck、lint、build 通过。
 - 发信阻塞仍在：`mail.xuntingtravel.com` 的四条 Cloudflare DNS 记录尚未添加（公网查无记录），所以 Resend 域名未验证；QQ SMTP 已获服务器接受，但收件箱到达待确认。DNS 填写清单位于工作区外 `D:\AGeneral Workspace\xjch2026\resend-mail-xuntingtravel-dns-20261017.md`。现有询价与订单确认也使用未验证的 `neutronm.store` 发件域；是否将 QQ 备用覆盖两者，已请用户确认，确认前不改它们的发送逻辑。
