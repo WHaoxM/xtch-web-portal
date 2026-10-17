@@ -43,7 +43,7 @@ export function createAdminLeadsHandler(
         if (!validId(id)) { res.status(400).json({ ok: false, error: 'Invalid lead id.' }); return; }
         const result = await sql`SELECT id, name, phone, company, company_address, business_type,
           entry, page_url, message, email, status, created_at, notification_sent_at,
-          notification_attempted_at, notification_last_error
+          notification_attempted_at, notification_provider, notification_last_error
           FROM wenshu_leads WHERE id = ${id}::uuid`;
         const lead = result.rows[0];
         if (!lead) { res.status(404).json({ ok: false, error: 'Lead not found.' }); return; }
@@ -59,7 +59,7 @@ export function createAdminLeadsHandler(
         res.status(400).json({ ok: false, error: 'Invalid pagination.' }); return;
       }
       const result = await sql`SELECT id, name, company, entry, status, created_at,
-        notification_sent_at, notification_attempted_at
+        notification_sent_at, notification_attempted_at, notification_provider
         FROM wenshu_leads ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`;
       res.status(200).json({ ok: true, leads: result.rows });
     } catch (error) {

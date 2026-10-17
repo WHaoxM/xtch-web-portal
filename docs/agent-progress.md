@@ -4,7 +4,8 @@
 - 用户已确认收件邮箱并同意邮件提醒与管理后台列表并行实施；真实收件邮箱仅存生产环境变量，不提交仓库。生产 `www.xuntingtravel.com/api/wenshu?action=lead` 已有持久化回执，但此前无邮件通知或线索列表。
 - 新工作树 `D:\AGeneral Workspace\xjch2026\xtch-web-portal-wenshu-impl` 基于 GitHub/生产 `main` `cafc052`，不改动原有脏工作树。已实现通知状态迁移、Resend 提醒、数据库发送占用防并发重发、Admin 线索列表/详情/人工重试及相关测试；线索详情限管理员并记录审计。
 - 本地 `test:wenshu` 12 项、`typecheck`、`lint`、`build`、`git diff --check` 通过。生产 `xtch-app` 当前 active，HEAD `cafc052`；未更改生产数据库、环境或服务。
-- 阻断发布：生产现有 Resend API key 已配置，但从服务器向 Resend 提交邮件请求得到 Cloudflare HTTP 403 / 1010。用空 JSON 请求能到达 Resend 并得到 422，故不能把当前发信通道认定为可用。为防止上线后表单持续失败，尚未合入 `main`、迁移或部署。需先修复发信通道并用无客户资料的测试邮件验证，然后备份、发布、测试线索、核对收件箱。
+- 阻断发布：先前 Python 预检得到 Cloudflare HTTP 403 / 1010；改用生产实际 Node `fetch` 后，Resend 明确返回 HTTP 403：配置中的 `neutronm.store` 发件域名未验证。该 API key 的域名列表为空；`INQUIRY_FROM_EMAIL` 与 `BOOKING_FROM_EMAIL` 均使用此未验证域名。已在同一 Resend 账号创建专用 `mail.xuntingtravel.com` 域名（ID `41184936-f52a-43da-8e31-5ccf9c15bbbc`），状态 `not_started`；DNS 记录保存在 VPS `/opt/xtch-release-backups/resend-mail-xuntingtravel-domain.json`，尚未更改 Cloudflare DNS。
+- 用户进一步要求 Resend 修复且 QQ SMTP 作为备用。服务器已验证 `smtp.qq.com:465` TLS 连接成功；备用发信代码和 env example 正在补充。需要 Cloudflare DNS 配置与 QQ 邮箱 SMTP 授权码后，才能无客户资料测试两条通道。为防止上线后表单持续失败，尚未合入 `main`、迁移或部署。
 
 ## Current Goal（文数智旅部署与真实联调，2026-09-07）
 - 用户已在交接发布顺序后明确“开始实施”；范围为后端迁移/部署、受控测试线索及客服联调，通过后再发布文数智旅官网。
