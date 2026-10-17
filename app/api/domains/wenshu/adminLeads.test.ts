@@ -56,6 +56,7 @@ test('admin can retry a failed notification without changing the lead receipt', 
     const statement = parts.join('');
     if (statement.includes('SELECT')) return { rows: [{ id, phone: '13800000000',
       company_address: '测试地址', notification_sent_at: null }] };
+    if (statement.includes('INSERT INTO wenshu_lead_review_links')) return { rows: [] };
     if (statement.includes('UPDATE')) { updates += 1; return { rows: statement.includes('RETURNING id') ? [{ id }] : [] }; }
     throw new Error('Unexpected query');
   }) as unknown as typeof sql;

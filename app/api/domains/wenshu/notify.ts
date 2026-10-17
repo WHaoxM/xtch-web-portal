@@ -186,7 +186,8 @@ export async function deliverWenshuLead(
     RETURNING id`;
   if (!claim.rows[0]) return 'in-progress';
   try {
-    const provider = await send(lead);
+    const reviewToken = await issueReviewToken(sql, lead.id);
+    const provider = await send(lead, reviewToken);
     await sql`UPDATE wenshu_leads SET notification_sent_at = NOW(), notification_attempted_at = NOW(),
       notification_claimed_at = NULL, notification_provider = ${provider || ''},
       notification_last_error = '' WHERE id = ${lead.id}::uuid`;
@@ -215,8 +216,7 @@ export async function deliverWenshuCustomerConfirmation(
     RETURNING id`;
   if (!claim.rows[0]) return 'in-progress';
   try {
-    const reviewToken = await issueReviewToken(sql, lead.id);
-    const provider = await send(lead, reviewToken);
+    const provider = await send(lead);
     await sql`UPDATE wenshu_leads SET customer_confirmation_sent_at = NOW(), customer_confirmation_attempted_at = NOW(),
       customer_confirmation_claimed_at = NULL, customer_confirmation_provider = ${provider || ''},
       customer_confirmation_last_error = '' WHERE id = ${lead.id}::uuid`;

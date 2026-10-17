@@ -1,8 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import nodemailer from 'nodemailer';
+import type { sql } from '../../platform/db';
 import { renderCustomerLeadMail, renderInternalLeadMail, sendWenshuCustomerEmail,
-  sendWenshuLeadEmail, sendWenshuLeadViaSmtp, type WenshuLeadForEmail } from './notify';
+  sendWenshuLeadEmail, sendWenshuLeadViaSmtp, deliverWenshuLead,
+  deliverWenshuCustomerConfirmation, type WenshuLeadForEmail } from './notify';
+import { reviewTokenHash, validReviewToken } from './reviewAccess';
 
 const lead: WenshuLeadForEmail = {
   id: '00000000-0000-4000-8000-000000000001', name: '测试客户', phone: '13800000000',
@@ -10,6 +13,29 @@ const lead: WenshuLeadForEmail = {
   entry: 'final-cta', page_url: 'https://www.zhilvtravel.com/', message: '请联系', email: '', intent: 'growth_plan',
 };
 const reviewToken = 'A'.repeat(43);
+
+test('internal notification issues a review token; customer confirmation does not', async () => {
+  let storedHash = '', issued = 0, internalCalls = 0, customerCalls = 0;
+  const db = (async (parts: TemplateStringsArray, ...values: unknown[]) => {
+    const statement = parts.join('');
+    if (statement.includes('INSERT INTO wenshu_lead_review_links')) {
+      issued += 1; storedHash = String(values[1]); return { rows: [] };
+    }
+    if (statement.includes('RETURNING id')) return { rows: [{ id: lead.id }] };
+    return { rows: [] };
+  }) as unknown as typeof sql;
+  assert.equal(await deliverWenshuLead(db, { ...lead, notification_sent_at: null }, async (_lead, token) => {
+    internalCalls += 1;
+    assert.equal(validReviewToken(token), true);
+    assert.equal(storedHash, reviewTokenHash(token));
+  }), 'sent');
+  assert.equal(await deliverWenshuCustomerConfirmation(db,
+    { ...lead, email: 'buyer@example.com', customer_confirmation_enabled: true, customer_confirmation_sent_at: null },
+    async (...args) => { customerCalls += 1; assert.equal(args.length, 1); }), 'sent');
+  assert.equal(issued, 1);
+  assert.equal(internalCalls, 1);
+  assert.equal(customerCalls, 1);
+});
 
 test('request intent and business segment distinguish internal and customer copy', () => {
   const base = { ...lead, email: 'buyer@example.com' };
