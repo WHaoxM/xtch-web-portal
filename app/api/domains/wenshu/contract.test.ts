@@ -182,3 +182,23 @@ test('conversation substitution denied; staff authorization and cookies not forw
   await handler({ method: 'GET', url: `/api/wenshu?action=messages&conversation=${id}`, headers }, good.res);
   assert.equal(good.state.status, 200); assert.equal(forwarded, true);
 });
+
+test('Wenshu media ticket and download actions cannot substitute another visitor conversation', async () => {
+  const id = '00000000-0000-4000-8000-000000000002';
+  let attachmentQuery = false;
+  const db = (async (parts: TemplateStringsArray) => {
+    const query = parts.join('');
+    if (query.includes('request_limits')) return { rows: [{ count: 1 }] };
+    if (query.includes('im_message_attachments')) attachmentQuery = true;
+    return { rows: [{ id, session_id: '00000000-0000-4000-8000-000000000003' }] };
+  }) as unknown as typeof sql;
+  const handler = createHandler(db);
+  const headers = { origin: WENSHU_ORIGIN, 'x-wenshu-session': 'ws_' + 'b'.repeat(64) };
+  for (const action of ['media-upload', 'media-links']) {
+    const result = response();
+    await handler({ method: 'POST', url: `/api/wenshu?action=${action}&conversation=another-conversation`, headers,
+      body: { clientUploadId: '00000000-0000-4000-8000-000000000004', file: {}, attachmentIds: [] } }, result.res);
+    assert.equal(result.state.status, 403, action);
+  }
+  assert.equal(attachmentQuery, false, 'session-bound conversation mismatch is rejected before any attachment lookup');
+});

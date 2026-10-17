@@ -4,6 +4,8 @@ import publicMessages from '../im/http/publicMessages';
 import { VISITOR_COOKIE_NAME } from '../im/visitorAuth';
 import { hashToken } from '../im/imAuth';
 import { getClientIp, headerValue, type ImRequest, type ImResponse } from '../im/httpTypes';
+import { ChatAttachmentError, createChatAttachmentTicket, listChatAttachmentDownloadUrls } from '../im/imChatAttachments';
+import { resolveRequestOrigin } from '../../platform/publicOrigin';
 import { allowedOrigin, readLead, validId, validSessionToken } from './contract';
 import { deliverWenshuLead, deliverWenshuCustomerConfirmation, sendWenshuLeadEmail,
   sendWenshuCustomerEmail, type WenshuLeadForEmail } from './notify';
@@ -22,13 +24,13 @@ return async function handler(req: ImRequest, res: ImResponse) {
   if (req.method === 'OPTIONS') { res.status(200).json({ ok: true }); return; }
   const params = new URL(req.url || '/', 'https://localhost').searchParams;
   const action = params.get('action');
-  if (!['session', 'messages', 'lead'].includes(action || '') ||
+  if (!['session', 'messages', 'lead', 'media-upload', 'media-links'].includes(action || '') ||
       (req.method !== 'POST' && !(action === 'messages' && req.method === 'GET'))) {
     res.status(405).json({ ok: false, error: 'Unsupported operation.' }); return;
   }
   try {
     const bucket = hashToken(`${getClientIp(req)}:${action}`);
-    const limit = action === 'messages' ? 120 : 10;
+    const limit = action === 'messages' || action === 'media-links' ? 120 : action === 'media-upload' ? 30 : 10;
     const rate = await sql<{ count: number }>`INSERT INTO wenshu_request_limits (bucket, window_start, count)
       VALUES (${bucket}, NOW(), 1) ON CONFLICT (bucket) DO UPDATE SET
       count = CASE WHEN wenshu_request_limits.window_start < NOW() - INTERVAL '1 minute' THEN 1 ELSE wenshu_request_limits.count + 1 END,
@@ -39,26 +41,68 @@ return async function handler(req: ImRequest, res: ImResponse) {
     const token = headerValue(req.headers['x-wenshu-session']) || '';
     if (action === 'session' && !token) { await createSession(req, res); return; }
     if (!validSessionToken(token)) { res.status(401).json({ ok: false, error: 'Session required.' }); return; }
-    const rows = await sql<{ id: string }>`SELECT c.id FROM im_visitor_sessions s
+    const rows = await sql<{ id: string; session_id: string }>`SELECT c.id, s.id AS session_id FROM im_visitor_sessions s
       JOIN im_conversation_identities i ON i.identity_type = 'visitor_session' AND i.identity_subject = s.id::text
       JOIN im_conversations c ON c.id = i.conversation_id
       WHERE s.session_token_hash = ${hashToken(token)} AND s.revoked_at IS NULL AND s.expires_at > NOW()
       AND i.revoked_at IS NULL AND c.source = 'wenshuzhilv' ORDER BY c.created_at DESC LIMIT 1`;
     const conversation = rows.rows[0];
     if (!conversation) { res.status(401).json({ ok: false, error: 'Session expired.' }); return; }
-    if (action === 'session') { res.status(200).json({ ok: true, conversation }); return; }
+    if (action === 'session') { res.status(200).json({ ok: true, conversation: { id: conversation.id } }); return; }
     if (params.get('conversation') !== conversation.id) { res.status(403).json({ ok: false, error: 'Conversation unavailable.' }); return; }
+    if (action === 'media-upload') {
+      const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body)
+        ? req.body as Record<string, unknown> : {};
+      const ticket = await createChatAttachmentTicket({
+        db: sql,
+        conversationId: conversation.id,
+        actor: { type: 'visitor', id: rows.rows[0].session_id },
+        clientUploadId: headerValue(req.headers['idempotency-key']) || stringValue(body.clientUploadId),
+        file: body.file,
+        requestOrigin: resolveRequestOrigin(req),
+      });
+      res.status(200).json({ ok: true, ticket });
+      return;
+    }
+    if (action === 'media-links') {
+      const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body)
+        ? req.body as Record<string, unknown> : {};
+      const ids = Array.isArray(body.attachmentIds)
+        ? body.attachmentIds.filter((value): value is string => typeof value === 'string').slice(0, 50)
+        : [];
+      if (!ids.length || ids.some((id) => !isUuid(id))) { res.status(400).json({ ok: false, error: 'Select valid attachments.' }); return; }
+      const urls = await listChatAttachmentDownloadUrls({
+        db: sql,
+        conversationId: conversation.id,
+        attachmentIds: ids,
+        requestOrigin: resolveRequestOrigin(req),
+      });
+      res.status(200).json({ ok: true, urls });
+      return;
+    }
     const seq = Number(params.get('after_seq') || 0);
     if (!Number.isSafeInteger(seq) || seq < 0) { res.status(400).json({ ok: false, error: 'Invalid cursor.' }); return; }
     await messages({ ...req,
       headers: { 'cookie': `${VISITOR_COOKIE_NAME}=${token}`, 'idempotency-key': headerValue(req.headers['idempotency-key']) },
       url: `/api/im/public/conversations/${conversation.id}/messages?after_seq=${seq}&limit=200`,
     }, res);
-  } catch {
+  } catch (error) {
+    if (error instanceof ChatAttachmentError) {
+      res.status(error.status).json({ ok: false, error: error.message });
+      return;
+    }
     res.status(503).json({ ok: false, error: 'Service temporarily unavailable. Please call our consultant.' });
   }
 }
 ;
+function stringValue(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(value);
+}
+
 async function saveLead(req: ImRequest, res: ImResponse) {
   let lead: ReturnType<typeof readLead>;
   const requestId = headerValue(req.headers['idempotency-key']) || '';

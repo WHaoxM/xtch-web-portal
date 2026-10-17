@@ -1,5 +1,17 @@
 # Agent Progress
 
+## Current Goal（文数智旅客服多模态咨询闭环，2026-10-17）
+- 目标：在文数智旅官网客服工具栏实现可用表情选择器、图片/常见文件私有上传与双端预览下载、铃铛新回复提醒；访客与客服两端消息支持附件历史重载、权限隔离、大小/MIME 校验、失败重试与幂等。删除旧占位说明并覆盖中英文。
+- 任务基线：前端 `D:\AGeneral Workspace\xjch2026\ZhilvTravel` `main`=`9bd6b06` 且 clean；后端 `D:\AGeneral Workspace\xjch2026\xtch-web-portal-wenshu-followup` `codex/wenshu-followup-email`=`9f18b01` 且 clean。工作均已在独立分支 `codex/wenshu-chat-multimodal` 继续；不改脏的 `product_wenshuzhilv`/`xtch-web-portal` checkout，不推送、合并或部署。
+- 已读：仓库 `AGENTS.md`、`docs/agent-context.md`、`docs/agent-workflows.md`、`docs/agent-gotchas.md`、`docs/agent-task-board.md`、`docs/agent-manual-gates.md`；线上文数智旅 HTML/JS 入口与现有 Wenshu、IM、S3 实现。Coordinator 授权仅改 `wenshu/http.ts` 的 IM 代理段与 Admin 客服组件的消息/附件段，不改旧邮件业务。
+- 关键安全判断：生产现有 `S3_BUCKET` 可能公开，附件必须使用独立、非匿名的 `IM_MEDIA_S3_BUCKET`；由访客会话或客服 IM 权限签发短期 PUT/GET URL。生产 VPS 目前没有该新环境项；运维须先创建私有桶、设置跨站 CORS 并验证匿名拒绝，未授权本轮改生产配置。
+- 已实现：独立 `IM_MEDIA_S3_BUCKET` 私有桶、随机对象 key、短期条件 PUT/GET、HEAD 大小/声明 MIME 与文件签名校验；新增迁移 022 附件票据与幂等状态。Wenshu 代理仅接受当前有效访客 token 绑定的会话；客服签名/发送/取链接均经过现有 IM staff 身份和会话 read/write ACL。两端附件历史消息均按会话签发短期 GET；客服工作台可发送图片/文件、预览/下载、失败后复用相同票据和消息 ID 重试。
+- 已实现：官网表情选择器、图片/文件工具、铃铛提醒与站内未读回退；系统通知只在用户点铃铛后申请。历史首次 hydration 不触发提醒；已开启提醒时，页面关闭/后台仍轻量轮询，使用 sessionStorage 的既有访客会话可在刷新后静默重新 hydration。中英文页面均去除旧占位说明；修正 hidden 菜单/重试条的 CSS 显示规则。
+- 存储/运维：Compose 新增独立 `xtch-im-private` 与匿名拒绝，不改三个公开桶；新增精确源 CORS XML、一次性生产开通/验证/回滚文档。签名 URL 使用 canonical S3 浏览域，避免把访客页面域错误当成 MinIO 域。生产环境未配置新变量、未改桶策略/数据库，也未跑 migration。
+- 验证完成：官网 `npm run build`、`npm run validate`（静态站检查 + 10/10 测试）通过；此前全部响应式/媒体用例均通过，静态浏览器 smoke 验证 emoji/retry `[hidden]` 状态。后端 `npm run lint`、`npm run typecheck`、`npm run test:wenshu`（30/30）、`npx tsx --test api/domains/media/imChatMediaRules.test.ts api/domains/media/imChatMedia.test.ts api/domains/wenshu/contract.test.ts`（17/17）、`npm run build` 均通过；Vite 只有已有 Browserslist/chunk 警告。两个工作树 `git diff --check` 无空白错误。
+- 生成物核对：后端构建报告 `app/public/sitemap.xml`、`app/scripts/seo-public-route-manifest.json` 为工作树 modified，但内容 blob 与 HEAD 完全相同，`git diff` 不包含这两项，不会形成 SEO 漂移提交。
+- 完成状态：实现与本地自动验证完成，等待 Coordinator 代码审查；两个改动均留在 `codex/wenshu-chat-multimodal` 未提交，未推送/合并/部署。生产开通仍待由 Coordinator/运维在发布窗口备份后新建私有桶、拒匿名、写入精确 CORS、设置 `IM_MEDIA_S3_BUCKET=xtch-im-private` 与 `S3_BROWSER_ENDPOINT=https://www.xuntingtravel.com/s3`，应用迁移 022 并做双端真实授权验收。
+
 ## Current Goal（文数智旅线索接收，2026-10-17）
 - 2026-10-17 续做：`main` 回滚提交 `fcd8b8c` 的自动部署已成功；公网测试线索再次得到正常回执。新工作树 `D:\AGeneral Workspace\xjch2026\xtch-web-portal-wenshu-mail-ready` 从该回滚基线重新挑选三项功能提交（功能提交止于 `16591e1`），草稿 PR #11（`codex/wenshu-mail-ready`）已推送，**不得在邮件通道验证前合并**。本工作树 15 项 Wenshu 测试、typecheck、lint、build 通过。
 - 发信阻塞仍在：`mail.xuntingtravel.com` 的四条 Cloudflare DNS 记录尚未添加（公网查无记录），所以 Resend 域名未验证；QQ SMTP TLS 可达但尚无授权码/实发测试。DNS 填写清单位于工作区外 `D:\AGeneral Workspace\xjch2026\resend-mail-xuntingtravel-dns-20261017.md`。用户已表示可以生成 QQ SMTP 授权码，待安全输入与收件箱确认。现有询价与订单确认也使用未验证的 `neutronm.store` 发件域；是否将 QQ 备用覆盖两者，已请用户确认，确认前不改它们的发送逻辑。

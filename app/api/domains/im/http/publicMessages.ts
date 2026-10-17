@@ -3,6 +3,7 @@ import { sql } from '../../../platform/db';
 import { getUserFromRequest } from '../../identity/traveler/userAuth';
 import { getVisitorPrincipal } from '../visitorAuth';
 import { headerValue, type ImRequest, type ImResponse } from '../httpTypes';
+import { ChatAttachmentError, lockReadyChatAttachment, verifyReadyChatAttachment } from '../imChatAttachments';
 
 type MessageRow = {
   id: string;
@@ -36,14 +37,39 @@ export default async function handler(req: ImRequest, res: ImResponse) {
 
   const body = isRecord(req.body) ? req.body : {};
   const clientMessageId = stringValue(body.clientMessageId) || headerValue(req.headers['idempotency-key']) || crypto.randomUUID();
-  const text = stringValue(body.body);
+  let text = stringValue(body.body);
   const contentType = stringValue(body.contentType) || 'text';
-  if (!text || text.length > 8_000 || contentType !== 'text') {
-    res.status(400).json({ ok: false, error: 'Only non-empty text messages up to 8KB are supported.' });
+  const attachmentId = isRecord(body.metadata) ? stringValue(body.metadata.attachmentId) : '';
+  const isAttachment = contentType === 'image' || contentType === 'file';
+  if ((!isAttachment && contentType !== 'text') || (contentType === 'text' && (!text || text.length > 8_000)) ||
+      (isAttachment && !attachmentId)) {
+    res.status(400).json({ ok: false, error: 'Message must be text or an authorized image/file attachment.' });
     return;
   }
 
   try {
+    // Retries after a lost response must return the durable row even though its
+    // attachment ticket has already transitioned to attached.
+    if (isAttachment) {
+      const duplicate = await sql<MessageRow>`
+        SELECT id, conversation_id, seq, client_message_id, sender_type, sender_id,
+          content_type, body, metadata, created_at
+        FROM im_messages
+        WHERE conversation_id = ${conversationId}::uuid AND sender_type = 'visitor'
+          AND sender_id = ${visitor.sessionId} AND client_message_id = ${clientMessageId}
+          AND EXISTS (
+            SELECT 1 FROM im_conversation_identities i
+            WHERE i.conversation_id = im_messages.conversation_id AND i.revoked_at IS NULL
+              AND ((i.identity_type = 'visitor_session' AND i.identity_subject = ${visitor.sessionId})
+                OR (i.identity_type = 'supabase_user' AND i.identity_subject = ${authenticated.ok ? authenticated.user.id : ''}))
+          )
+      `;
+      if (duplicate.rows[0]) { res.status(201).json({ ok: true, message: duplicate.rows[0] }); return; }
+    }
+    const attachment = isAttachment ? await verifyReadyChatAttachment({ conversationId, attachmentId,
+      actor: { type: 'visitor', id: visitor.sessionId }, contentType: contentType as 'image' | 'file' }) : null;
+    if (attachment) text = attachment.filename;
+
     const message = await sql.begin(async (tx) => {
       const conversation = await tx<{ last_message_seq: number; status: string; version: number }>`
         SELECT c.last_message_seq
@@ -60,6 +86,17 @@ export default async function handler(req: ImRequest, res: ImResponse) {
       `;
       const current = conversation.rows[0];
       if (!current) throw new PublicMessageError('Conversation is not available to this browser session.', 403);
+
+      const existing = await tx<MessageRow>`
+        SELECT id, conversation_id, seq, client_message_id, sender_type, sender_id,
+          content_type, body, metadata, created_at
+        FROM im_messages
+        WHERE conversation_id = ${conversationId}::uuid
+          AND sender_type = 'visitor'
+          AND sender_id = ${visitor.sessionId}
+          AND client_message_id = ${clientMessageId}
+      `;
+      if (existing.rows[0]) return existing.rows[0];
 
       if (current.status === 'closed') {
         await tx`
@@ -87,29 +124,33 @@ export default async function handler(req: ImRequest, res: ImResponse) {
         `;
       }
 
-      const existing = await tx<MessageRow>`
-        SELECT id, conversation_id, seq, client_message_id, sender_type, sender_id,
-          content_type, body, metadata, created_at
-        FROM im_messages
-        WHERE conversation_id = ${conversationId}::uuid
-          AND sender_type = 'visitor'
-          AND sender_id = ${visitor.sessionId}
-          AND client_message_id = ${clientMessageId}
-      `;
-      if (existing.rows[0]) return existing.rows[0];
+      const lockedAttachment = attachment ? await lockReadyChatAttachment(tx, { conversationId, attachmentId,
+        actor: { type: 'visitor', id: visitor.sessionId }, contentType: contentType as 'image' | 'file' }) : null;
 
       const nextSeq = Number(current.last_message_seq) + 1;
+      const messageMetadata = lockedAttachment ? {
+        attachmentId: lockedAttachment.id,
+        filename: lockedAttachment.filename,
+        contentType: lockedAttachment.content_type,
+        byteSize: Number(lockedAttachment.byteSize),
+        kind: lockedAttachment.kind,
+      } : {};
       const inserted = await tx<MessageRow>`
         INSERT INTO im_messages (
-          conversation_id, seq, client_message_id, sender_type, sender_id, content_type, body
+          conversation_id, seq, client_message_id, sender_type, sender_id, content_type, body, metadata
         ) VALUES (
-          ${conversationId}::uuid, ${nextSeq}, ${clientMessageId}, 'visitor', ${visitor.sessionId}, 'text', ${text}
+          ${conversationId}::uuid, ${nextSeq}, ${clientMessageId}, 'visitor', ${visitor.sessionId}, ${contentType}, ${text},
+          ${JSON.stringify(messageMetadata)}::jsonb
         )
         RETURNING id, conversation_id, seq, client_message_id, sender_type, sender_id,
           content_type, body, metadata, created_at
       `;
       const row = inserted.rows[0];
       if (!row) throw new Error('Message insert returned no row.');
+      if (lockedAttachment) await tx`
+        UPDATE im_message_attachments SET status = 'attached', message_id = ${row.id}::uuid, attached_at = NOW()
+        WHERE id = ${lockedAttachment.id}::uuid AND status = 'pending'
+      `;
       await tx`
         UPDATE im_conversations
         SET last_message_seq = ${nextSeq}, last_message_at = NOW(), updated_at = NOW(), version = version + 1
@@ -128,13 +169,17 @@ export default async function handler(req: ImRequest, res: ImResponse) {
           actor_type, actor_id, action, conversation_id, target_type, target_id, after_state
         ) VALUES (
           'visitor', ${visitor.sessionId}, 'message.send', ${conversationId}::uuid, 'message', ${row.id},
-          ${JSON.stringify({ seq: nextSeq, content_type: 'text' })}::jsonb
+          ${JSON.stringify({ seq: nextSeq, content_type: contentType, ...(lockedAttachment ? { attachment_id: lockedAttachment.id } : {}) })}::jsonb
         )
       `;
       return row;
     });
     res.status(201).json({ ok: true, message });
   } catch (error) {
+    if (error instanceof ChatAttachmentError) {
+      res.status(error.status).json({ ok: false, error: error.message });
+      return;
+    }
     if (error instanceof PublicMessageError) {
       res.status(error.status).json({ ok: false, error: error.message });
       return;

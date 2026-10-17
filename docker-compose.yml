@@ -48,7 +48,7 @@ services:
       retries: 5
       start_period: 10s
 
-  # One-shot bucket bootstrap: public-read bucket for browser-loaded media URLs.
+  # One-shot bucket bootstrap: public-read content buckets plus isolated private IM attachment storage.
   # Uses the same MINIO_ROOT_* vars as the minio service (no duplicated literals).
   minio-init:
     image: minio/mc:RELEASE.2025-04-16T18-13-26Z
@@ -68,7 +68,9 @@ services:
       mc anonymous set download local/xtch-tunnel &&
       mc mb local/xtch-prod --ignore-existing &&
       mc anonymous set download local/xtch-prod &&
-      echo 'MinIO buckets xtch-public + xtch-tunnel + xtch-prod ready (public read)'
+      mc mb local/xtch-im-private --ignore-existing &&
+      mc anonymous set none local/xtch-im-private &&
+      echo 'MinIO public buckets ready; xtch-im-private is private (anonymous access disabled)'
       "
     restart: "no"
 

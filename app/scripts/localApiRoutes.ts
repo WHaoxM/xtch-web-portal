@@ -12,6 +12,7 @@ export const localApiRoutes: Record<string, string> = {
   '/api/im/auth/logout': '/api/im/auth-logout.ts',
   '/api/im/auth/activate': '/api/im/auth-activate.ts',
   '/api/im/auth/login': '/api/im/auth-login.ts',
+  '/api/im/staff-media': '/api/im/staff-media.ts',
   '/api/im/staff/invite': '/api/im/staff-invite.ts',
   '/api/im/staff/permissions': '/api/im/staff-permissions.ts',
   '/api/im/conversations/assign': '/api/im/assignment.ts',

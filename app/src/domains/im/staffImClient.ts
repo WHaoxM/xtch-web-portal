@@ -68,6 +68,18 @@ export type StaffMessage = {
   created_at: string;
 };
 
+export type ChatAttachmentKind = 'image' | 'file';
+
+export type ChatAttachmentTicket = {
+  attachmentId: string;
+  filename: string;
+  contentType: string;
+  byteSize: number;
+  kind: ChatAttachmentKind;
+  uploadUrl: string;
+  expiresInSeconds: number;
+};
+
 export type StaffConversationList = {
   items: StaffConversation[];
   nextCursor: string | null;
@@ -188,7 +200,8 @@ export class StaffImClient {
     );
   }
 
-  async sendMessage(conversationId: string, body: string, clientMessageId: string): Promise<StaffMessage> {
+  async sendMessage(conversationId: string, body: string, clientMessageId: string,
+    contentType: string = 'text', metadata: Record<string, unknown> = {}): Promise<StaffMessage> {
     const payload = await this.request<{ message: StaffMessage }>(
       apiUrl(`/api/im/conversations/${encodeURIComponent(conversationId)}/messages`),
       {
@@ -197,10 +210,60 @@ export class StaffImClient {
           'content-type': 'application/json',
           'idempotency-key': clientMessageId,
         },
-        body: JSON.stringify({ body, clientMessageId }),
+        body: JSON.stringify({ body, clientMessageId, contentType, metadata }),
       },
     );
     return payload.message;
+  }
+
+  async createAttachmentTicket(conversationId: string, clientUploadId: string, file: {
+    filename: string; contentType: string; byteSize: number; kind: ChatAttachmentKind;
+  }): Promise<ChatAttachmentTicket> {
+    const payload = await this.request<{ ticket: ChatAttachmentTicket }>(apiUrl('/api/im/staff-media'), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'idempotency-key': clientUploadId },
+      body: JSON.stringify({ action: 'upload', conversationId, clientUploadId, file }),
+    });
+    return payload.ticket;
+  }
+
+  async uploadAttachment(conversationId: string, file: File, clientUploadId: string, clientMessageId: string,
+    contentType: string, kind: ChatAttachmentKind): Promise<StaffMessage> {
+    const fileInfo = { filename: file.name, contentType, byteSize: file.size, kind };
+    let ticket = await this.createAttachmentTicket(conversationId, clientUploadId, fileInfo);
+    if (ticket.uploadUrl) {
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 90_000);
+      let response: Response;
+      try {
+        response = await fetch(ticket.uploadUrl, {
+          method: 'PUT',
+          headers: { 'content-type': ticket.contentType, 'if-none-match': '*' },
+          body: file,
+          cache: 'no-store',
+          credentials: 'omit',
+          signal: controller.signal,
+        });
+      } finally {
+        window.clearTimeout(timeout);
+      }
+      if (response.status === 412) {
+        ticket = await this.createAttachmentTicket(conversationId, clientUploadId, fileInfo);
+        if (ticket.uploadUrl) throw new StaffImError('附件正在处理中，请稍后重试。');
+      } else if (!response.ok) {
+        throw new StaffImError('附件上传失败，请重试。');
+      }
+    }
+    return this.sendMessage(conversationId, ticket.filename, clientMessageId, kind, { attachmentId: ticket.attachmentId });
+  }
+
+  async listAttachmentUrls(conversationId: string, attachmentIds: string[]): Promise<Record<string, string>> {
+    const payload = await this.request<{ urls: Record<string, string> }>(apiUrl('/api/im/staff-media'), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'links', conversationId, attachmentIds }),
+    });
+    return payload.urls || {};
   }
 
   async updateStatus(conversationId: string, status: ImConversationStatus, expectedVersion?: number): Promise<StaffConversation> {
